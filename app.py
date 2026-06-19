@@ -6,18 +6,30 @@ from auth import login
 from utils import extract_projects
 from utils import render_navigation
 
-render_navigation()
-st.markdown("""
-<style>
-div[data-testid="stHorizontalBlock"] {
-    position: sticky;
-    top: 0;
-    background-color: white;
-    z-index: 999;
-    padding-top: 5px;
-}
-</style>
-""", unsafe_allow_html=True)
+def render_navigation():
+    st.markdown("""
+    <div class="topbar">
+        <div class="brand">🏗 QAQC ENTERPRISE DASHBOARD</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    pages = [
+        ("📊 Dashboard", "app.py"),
+        ("📋 Audit", "pages/Audit_Surveillance.py"),
+        ("🏗 Concrete", "pages/Concrete_Tracker.py"),
+        ("📦 CTQ", "pages/CTQ_Dashboard.py"),
+        ("📑 Reports", "pages/Daily_Reports.py"),
+    ]
+
+    for i, (label, page) in enumerate(pages):
+        with [col1, col2, col3, col4, col5][i]:
+            if st.button(label):
+                st.switch_page(page)
+
+    st.divider()
+
 if not login():
     st.stop()
 
@@ -53,24 +65,115 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-inject_global_ui()
-
-st.markdown(
-    """
+def inject_global_ui():
+    st.markdown("""
     <style>
-        .reportview-container { background-color: #0b1320; color: #e2e8f0; }
-        .sidebar .sidebar-content { background: #0f172a; }
-        .stButton>button { background-color: #1d4ed8; color: white; }
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
-        .kpi-card { padding: 1.2rem; border-radius: 18px; color: #fff; min-height: 120px; box-shadow: 0 18px 40px rgba(0,0,0,0.2); }
-        .kpi-title { font-size: 0.95rem; opacity: 0.8; margin-bottom: 0.5rem; }
-        .kpi-value { font-size: 2rem; font-weight: 700; margin-bottom: 0.35rem; }
-        .kpi-subtitle { font-size: 0.9rem; opacity: 0.75; }
+
+    /* =========================
+       ENTERPRISE DARK THEME
+    ========================== */
+    .main {
+        background: #0a0f1c;
+        color: #e5e7eb;
+        font-family: "Inter", sans-serif;
+    }
+
+    /* Hide Streamlit chrome */
+    #MainMenu, footer, header {
+        visibility: hidden;
+    }
+
+    /* =========================
+       TOP APP BAR
+    ========================== */
+    .topbar {
+        background: #0f172a;
+        padding: 12px 20px;
+        border-bottom: 1px solid #1f2937;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .brand {
+        font-size: 18px;
+        font-weight: 700;
+        color: #60a5fa;
+    }
+
+    /* =========================
+       KPI STRIP
+    ========================== */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-top: 10px;
+    }
+
+    .kpi-card {
+        background: linear-gradient(145deg, #111827, #0b1220);
+        border: 1px solid #1f2937;
+        border-radius: 14px;
+        padding: 14px;
+        box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+    }
+
+    .kpi-title {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    .kpi-value {
+        font-size: 22px;
+        font-weight: 700;
+        margin-top: 6px;
+        color: #f8fafc;
+    }
+
+    /* =========================
+       FILTER BAR
+    ========================== */
+    section[data-testid="stSidebar"] {
+        background: #0f172a;
+        border-right: 1px solid #1e293b;
+    }
+
+    /* =========================
+       DATA TABLE
+    ========================== */
+    .stDataFrame {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #1f2937;
+    }
+
+    /* =========================
+       BUTTONS
+    ========================== */
+    .stButton button {
+        background: #2563eb;
+        color: white;
+        border-radius: 8px;
+        border: none;
+        padding: 6px 12px;
+    }
+
+    .stButton button:hover {
+        background: #1d4ed8;
+    }
+
+    /* =========================
+       CARDS HOVER EFFECT
+    ========================== */
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        border: 1px solid #3b82f6;
+        transition: 0.2s ease-in-out;
+    }
+
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+    """, unsafe_allow_html=True)
 
 st.sidebar.title("Evomec QA/QC Executive")
 st.title("Evomec QA/QC Executive Dashboard")
@@ -149,6 +252,21 @@ kpis = [
 ]
 
 build_gradient_cards(kpis)
+def render_kpi_strip(kpis):
+    st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
+
+    cols = st.columns(len(kpis))
+
+    for i, kpi in enumerate(kpis):
+        with cols[i]:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-title">{kpi['label']}</div>
+                <div class="kpi-value">{kpi['value']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("---")
 st.subheader("Data Source Overview")
@@ -166,3 +284,25 @@ else:
 
 st.markdown("---")
 st.write("Use the Streamlit sidebar to navigate to modules and apply global filters across pages.")
+
+def render_workspace():
+    tab1, tab2, tab3 = st.tabs([
+        "📊 Overview",
+        "📁 Data Explorer",
+        "📈 Analytics"
+    ])
+
+    with tab1:
+        st.subheader("Project Overview")
+        st.write("KPIs, trends, and summary insights go here")
+
+    with tab2:
+        st.subheader("Raw Data")
+        st.dataframe(st.session_state.get("data", {}))
+
+    with tab3:
+        st.subheader("Analytics")
+        st.write("Charts (Plotly recommended)")
+with st.sidebar:
+    st.title("🔍 Global Controls")
+    data = global_filter_sidebar(data)
