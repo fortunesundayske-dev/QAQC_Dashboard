@@ -1,7 +1,7 @@
 from pathlib import Path
 import pandas as pd
 import streamlit as st
-
+import uuid
 
 # =========================
 # DATA LOADING (DICT SYSTEM)
@@ -67,12 +67,27 @@ def global_filter_sidebar(data, page="main"):
         st.sidebar.info("No projects found")
         return data
 
+    # =========================
+    # SESSION STATE (STABLE UX)
+    # =========================
+    if "global_project" not in st.session_state:
+        st.session_state.global_project = "All"
+
     selected_project = st.sidebar.selectbox(
         "Project",
         ["All"] + projects,
+        index=(
+            ["All"] + projects).index(st.session_state.global_project)
+            if st.session_state.global_project in projects
+            else 0,
         key=f"global_project_filter_{page}"
     )
 
+    st.session_state.global_project = selected_project
+
+    # =========================
+    # FILTER LOGIC
+    # =========================
     if selected_project == "All":
         return data
 
@@ -395,7 +410,7 @@ def render_table_with_details(
 def render_navigation():
     st.markdown("""
     <div class="topbar">
-        <div class="brand">🏗 QAQC ENTERPRISE DASHBOARD</div>
+        <div class="brand">🏗 EVOMEC QAQC DASHBOARD</div>
     </div>
     """, unsafe_allow_html=True)
 
