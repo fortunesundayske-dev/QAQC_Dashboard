@@ -13,7 +13,9 @@ from utils import (
     render_navigation
 )
 from auth import login
+from utils import render_navigation
 
+render_navigation()
 if not login():
     st.stop()
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
