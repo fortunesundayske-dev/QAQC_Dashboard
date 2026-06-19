@@ -1,9 +1,21 @@
 import streamlit as st
 import pandas as pd
+import utils
 import plotly.express as px
 from pathlib import Path
-from utils import load_master_data, global_filter_sidebar, apply_filters, render_table, inject_global_ui, render_table_with_details
+from utils import (
+    load_master_data,
+    global_filter_sidebar,
+    apply_filters,
+    render_table,
+    inject_global_ui,
+    render_table_with_details,
+    render_navigation
+)
 from auth import login
+from utils import render_navigation
+
+render_navigation()
 
 if not login():
     st.stop()
@@ -42,6 +54,18 @@ concrete = apply_filters(data.get("Concrete Tracker", pd.DataFrame()), filters, 
 if concrete.empty:
     st.warning("No concrete tracker records available.")
     st.stop()
+    
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 999;
+    padding-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
 # ==========================================
 # 🧹 CLEAN VOLUME COLUMN (CRITICAL FIX)
 # ==========================================

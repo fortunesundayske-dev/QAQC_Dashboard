@@ -301,3 +301,49 @@ def render_table_with_details(
         return selected_row
 
     return display_df
+
+def render_navigation():
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    with col1:
+        st.page_link("app.py", label="📊 Dashboard")
+
+    with col2:
+        st.page_link("pages/Audit_Surveillance.py", label="📋 Audit")
+
+    with col3:
+        st.page_link("pages/Concrete_Tracker.py", label="🏗 Concrete")
+
+    with col4:
+        st.page_link("pages/CTQ_Dashboard.py", label="📦 CTQ")
+
+    with col5:
+        st.page_link("pages/Daily_Reports.py", label="📑 Reports")
+
+    st.divider()
+
+    # Mobile-friendly dropdown
+    page_map = {
+        "📊 Dashboard": "app.py",
+        "📋 Audit": "pages/Audit_Surveillance.py",
+        "🏗 Concrete": "pages/Concrete_Tracker.py",
+        "📦 CTQ": "pages/CTQ_Dashboard.py",
+        "📑 Reports": "pages/Daily_Reports.py",
+        "🔧 Rework": "pages/Defect_Rework_Tracker.py",
+        "📄 Documents": "pages/Document_Status.py",
+        "📋 ITR": "pages/ITR_Tracker.py",
+        "💡 Lessons": "pages/Lessons_Learned.py",
+        "📈 Summary": "pages/Management_Executive_Summary.py",
+        "🚨 NCR": "pages/NCR_Tracker.py",
+        "👁 OBS": "pages/OBS_Tracker.py",
+    }
+
+    selected = st.selectbox(
+        "📱 Quick Navigation",
+        list(page_map.keys()),
+        index=None,
+        placeholder="Go to page..."
+    )
+
+    if selected:
+        st.switch_page(page_map[selected])
