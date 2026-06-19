@@ -53,14 +53,15 @@ def render_table(df, height=300):
 # =========================
 # GLOBAL FILTERS
 # =========================
-def global_filter_sidebar(data):
+def global_filter_sidebar(data, page="main"):
 
     st.sidebar.header("Global Filters")
 
     if not isinstance(data, dict):
         return data
 
-    projects = sorted(set(extract_projects(data)))
+    projects = extract_projects(data) or []
+    projects = sorted(list(set(str(p) for p in projects if p)))
 
     if not projects:
         st.sidebar.info("No projects found")
@@ -69,21 +70,18 @@ def global_filter_sidebar(data):
     selected_project = st.sidebar.selectbox(
         "Project",
         ["All"] + projects,
-        key="global_project_filter"
+        key=f"global_project_filter_{page}"
     )
 
     if selected_project == "All":
         return data
 
-    filtered = {}
-
-    for k, df in data.items():
-        if isinstance(df, pd.DataFrame) and "Project" in df.columns:
-            filtered[k] = df[df["Project"] == selected_project]
-        else:
-            filtered[k] = df
-
-    return filtered
+    return {
+        k: df[df["Project"] == selected_project]
+        if isinstance(df, pd.DataFrame) and "Project" in df.columns
+        else df
+        for k, df in data.items()
+    }
 
     # =========================
     # STEP 1: COLLECT PROJECTS
@@ -109,7 +107,7 @@ def global_filter_sidebar(data):
     selected_project = st.sidebar.selectbox(
     "Project",
     ["All"] + list(projects),
-    key="global_project_filter"
+    key=f"global_project_filter_{id(data)}"
 )
     # =========================
     # STEP 3: RETURN DATA
