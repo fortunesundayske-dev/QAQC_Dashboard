@@ -152,3 +152,62 @@ else:
 
 st.markdown("---")
 st.write("Use the Streamlit sidebar to navigate to modules and apply global filters across pages.")
+
+st.set_page_config(page_title="QAQC Dashboard", layout="wide")
+
+# ---------------------------
+# DEVICE DETECTION (JS BRIDGE)
+# ---------------------------
+device_check = """
+<script>
+const width = window.innerWidth;
+const isMobile = width < 768;
+
+window.parent.postMessage(
+    {type: "device_type", mobile: isMobile},
+    "*"
+);
+</script>
+"""
+
+mode = st.query_params.get("mode", "auto")
+is_mobile = (mode == "mobile")
+if "is_mobile" not in st.session_state:
+    st.session_state.is_mobile = False
+
+query_params = st.query_params
+mode = query_params.get("mode", "auto")
+
+col1, col2, col3, col4, col5 = st.columns(5)
+
+if col1.button("Dashboard"):
+    st.session_state.page = "Dashboard"
+if col2.button("Audit"):
+    st.session_state.page = "Audit"
+if col3.button("Concrete"):
+    st.session_state.page = "Concrete"
+if col4.button("Procurement"):
+    st.session_state.page = "Procurement"
+if col5.button("Reports"):
+    st.session_state.page = "Reports"
+
+page = st.session_state.get("page", "Dashboard")
+
+st.set_page_config(page_title="QAQC Dashboard", layout="wide")
+
+# -------------------------
+# PAGE NAVIGATION TOOLBAR
+# -------------------------
+pages = [
+    "Dashboard",
+    "Audit Surveillance",
+    "Concrete Tracker",
+    "Procurement",
+    "Reports"
+]
+
+selected_page = st.selectbox(
+    "Navigate Dashboard",
+    pages,
+    index=0
+)
