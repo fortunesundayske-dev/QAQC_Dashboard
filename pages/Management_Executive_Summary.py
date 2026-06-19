@@ -1,9 +1,21 @@
 import streamlit as st
 import pandas as pd
+import utils
 from pathlib import Path
 import plotly.express as px
-from utils import load_master_data, global_filter_sidebar, apply_filters, inject_global_ui
+from utils import (
+    load_master_data,
+    global_filter_sidebar,
+    apply_filters,
+    render_table,
+    inject_global_ui,
+    render_table_with_details,
+    render_navigation
+)
 from auth import login
+from utils import render_navigation
+
+render_navigation()
 
 if not login():
     st.stop()
@@ -83,6 +95,18 @@ c1.metric("Quality Index", f"{quality_index}%")
 c2.metric("Top Performing Project", top_project)
 c3.metric("Lowest Performing Project", lowest_project)
 c4.metric("Open Quality Issues", len(ncr[ncr["Status"].str.lower() == "open"]))
+
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 999;
+    padding-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("---")
 st.subheader("Management Summary")
