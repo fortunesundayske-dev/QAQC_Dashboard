@@ -8,6 +8,18 @@ from utils import render_navigation
 
 render_navigation()
 
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 999;
+    padding-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 if not login():
     st.stop()
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
@@ -65,15 +77,3 @@ if "Discipline" in ctq.columns:
 failure_pareto = ctq[ctq["Status"].str.lower() == "failed"]["CTQ Description"].value_counts().reset_index().head(10)
 failure_pareto.columns = ["Category", "Count"]
 st.plotly_chart(px.bar(failure_pareto, x="Category", y="Count", title="CTQ Failure Pareto Chart"), use_container_width=True)
-
-st.markdown("""
-<style>
-div[data-testid="stHorizontalBlock"] {
-    position: sticky;
-    top: 0;
-    background-color: white;
-    z-index: 999;
-    padding-top: 5px;
-}
-</style>
-""", unsafe_allow_html=True)
