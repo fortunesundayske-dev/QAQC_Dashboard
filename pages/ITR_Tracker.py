@@ -1,9 +1,21 @@
 import streamlit as st
 import pandas as pd
+import utils
 import plotly.express as px
 from pathlib import Path
-from utils import load_master_data, global_filter_sidebar, apply_filters, render_table, inject_global_ui, render_table_with_details
+from utils import (
+    load_master_data,
+    global_filter_sidebar,
+    apply_filters,
+    render_table,
+    inject_global_ui,
+    render_table_with_details,
+    render_navigation
+)
 from auth import login
+from utils import render_navigation
+
+render_navigation()
 
 if not login():
     st.stop()
@@ -88,6 +100,17 @@ c2.metric("Open ITRs", int((itr["Status"].str.lower() == "open").sum()))
 c3.metric("Closed ITRs", int((itr["Status"].str.lower() == "closed").sum()))
 c4.metric("Completion %", f"{int((itr["Status"].str.lower() == "closed").sum() / max(1, len(itr)) * 100)}%")
 
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 999;
+    padding-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
 st.markdown("---")
 st.subheader("ITR Records")
 table_cols = [col for col in ["ITR_ID", "Project", "Discipline", "Activity", "Status"] if col in itr.columns]
