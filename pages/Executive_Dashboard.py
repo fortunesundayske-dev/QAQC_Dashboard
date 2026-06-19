@@ -1,9 +1,21 @@
 import streamlit as st
 import pandas as pd
+import utils
 import plotly.express as px
 from pathlib import Path
-from utils import load_master_data, global_filter_sidebar, apply_filters, load_company_logo, inject_global_ui
+from utils import (
+    load_master_data,
+    global_filter_sidebar,
+    apply_filters,
+    render_table,
+    inject_global_ui,
+    render_table_with_details,
+    render_navigation
+)
 from auth import login
+from utils import render_navigation
+
+render_navigation()
 
 if not login():
     st.stop()
@@ -74,7 +86,18 @@ if st.button("Refresh Dashboard"):
 cols = st.columns(4)
 for index, metric in enumerate(build_metrics()):
     cols[index % 4].metric(metric["label"], metric["value"])
-
+    
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 999;
+    padding-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
 st.markdown("---")
 
 ncr_status = pd.DataFrame({"Status": ["Open", "Closed"], "Count": [status_counts(ncr, "Open"), status_counts(ncr, "Closed")]})
