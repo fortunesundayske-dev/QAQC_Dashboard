@@ -33,7 +33,98 @@ with col1:
 with col2:
     if NLNG_LOGO:
         st.image(NLNG_LOGO, width=140)
+# ==========================
+# TOP NAVIGATION BAR
+# ==========================
 
+col1, col2, col3, col4, col5 = st.columns(5)
+
+with col1:
+    st.page_link("app.py", label="📊 Dashboard")
+
+with col2:
+    st.page_link(
+        "pages/Audit_Surveillance.py",
+        label="📋 Audit"
+    )
+
+with col3:
+    st.page_link(
+        "pages/Concrete_Tracker.py",
+        label="🏗 Concrete"
+    )
+
+with col4:
+    st.page_link(
+        "pages/CTQ_Dashboard.py",
+        label="📦 CTQ"
+    )
+
+with col5:
+    st.page_link(
+        "pages/Daily_Reports.py",
+        label="📑 Reports"
+    )
+
+st.divider()
+
+# ==========================
+# MOBILE NAVIGATION
+# ==========================
+
+page = st.selectbox(
+    "📱 Navigate",
+    [
+        "Dashboard",
+        "Audit",
+        "Concrete",
+        "CTQ",
+        "Reports",
+        "Rework Tracker",
+        "Document Status",
+        "ITR Tracker",
+        "Lessons Learned",
+        "Management Summary",
+        "NCR Tracker",
+        "OBS Tracker"
+    ]
+)
+
+if page == "Dashboard":
+    st.switch_page("app.py")
+
+elif page == "Audit":
+    st.switch_page("pages/Audit_Surveillance.py")
+
+elif page == "Concrete":
+    st.switch_page("pages/Concrete_Tracker.py")
+
+elif page == "CTQ":
+    st.switch_page("pages/CTQ_Dashboard.py")
+
+elif page == "Reports":
+    st.switch_page("pages/Daily_Reports.py")
+
+elif page == "Rework Tracker":
+    st.switch_page("pages/Defect_Rework_Tracker.py")
+
+elif page == "Document Status":
+    st.switch_page("pages/Document_Status.py")
+
+elif page == "ITR Tracker":
+    st.switch_page("pages/ITR_Tracker.py")
+
+elif page == "Lessons Learned":
+    st.switch_page("pages/Lessons_Learned.py")
+
+elif page == "Management Summary":
+    st.switch_page("pages/Management_Executive_Summary.py")
+
+elif page == "NCR Tracker":
+    st.switch_page("pages/NCR_Tracker.py")
+
+elif page == "OBS Tracker":
+    st.switch_page("pages/OBS_Tracker.py")
 st.title("Audit & Surveillance")
 st.markdown("Track planned and actual audit/surveillance activities and compliance performance.")
 
