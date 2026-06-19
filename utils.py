@@ -54,14 +54,36 @@ def render_table(df, height=300):
 # GLOBAL FILTERS
 # =========================
 def global_filter_sidebar(data):
-    """
-    Safe global project filter for dict of DataFrames
-    """
 
     st.sidebar.header("Global Filters")
 
     if not isinstance(data, dict):
         return data
+
+    projects = sorted(set(extract_projects(data)))
+
+    if not projects:
+        st.sidebar.info("No projects found")
+        return data
+
+    selected_project = st.sidebar.selectbox(
+        "Project",
+        ["All"] + projects,
+        key="global_project_filter"
+    )
+
+    if selected_project == "All":
+        return data
+
+    filtered = {}
+
+    for k, df in data.items():
+        if isinstance(df, pd.DataFrame) and "Project" in df.columns:
+            filtered[k] = df[df["Project"] == selected_project]
+        else:
+            filtered[k] = df
+
+    return filtered
 
     # =========================
     # STEP 1: COLLECT PROJECTS
@@ -85,10 +107,10 @@ def global_filter_sidebar(data):
     # STEP 2: UI SELECTOR
     # =========================
     selected_project = st.sidebar.selectbox(
-        "Project",
-        ["All"] + projects
-    )
-
+    "Project",
+    ["All"] + list(projects),
+    key="global_project_filter"
+)
     # =========================
     # STEP 3: RETURN DATA
     # =========================

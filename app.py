@@ -9,7 +9,7 @@ from utils import render_navigation
 def render_navigation():
     st.markdown("""
     <div class="topbar">
-        <div class="brand">🏗 QAQC ENTERPRISE DASHBOARD</div>
+        <div class="brand">🏗 EVOMEC QAQC DASHBOARD</div>
     </div>
     """, unsafe_allow_html=True)
 
