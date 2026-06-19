@@ -6,29 +6,7 @@ from auth import login
 from utils import extract_projects
 from utils import render_navigation
 
-def render_navigation():
-    st.markdown("""
-    <div class="topbar">
-        <div class="brand">🏗 EVOMEC QAQC DASHBOARD</div>
-    </div>
-    """, unsafe_allow_html=True)
 
-    col1, col2, col3, col4, col5 = st.columns(5)
-
-    pages = [
-        ("📊 Dashboard", "app.py"),
-        ("📋 Audit", "pages/Audit_Surveillance.py"),
-        ("🏗 Concrete", "pages/Concrete_Tracker.py"),
-        ("📦 CTQ", "pages/CTQ_Dashboard.py"),
-        ("📑 Reports", "pages/Daily_Reports.py"),
-    ]
-
-    for i, (label, page) in enumerate(pages):
-        with [col1, col2, col3, col4, col5][i]:
-            if st.button(label):
-                st.switch_page(page)
-
-    st.divider()
 
 if not login():
     st.stop()
@@ -185,7 +163,7 @@ except FileNotFoundError as err:
     st.error(err)
     st.stop()
 
-filters = global_filter_sidebar(data)
+
 
 import pandas as pd
 
@@ -236,7 +214,7 @@ lessons_df = data.get("Lessons Learned", pd.DataFrame())
 
 kpis = [
     {"label": "Total Projects", "value": project_count, "color": "#2563eb"},
-    {"label": "Daily Reports", "value": len(data.get("Daily Reports", [])), "color": "#047857"},
+    {"label": "Daily Reports", "value": len(data.get("Daily Reports", pd.DataFrame())), "color": "#047857"},
     {"label": "Open NCR", "value": int((ncr_df["Status"] == "Open").sum()) if "Status" in ncr_df.columns else 0, "color": "#dc2626"},
     {"label": "Closed NCR", "value": int((ncr_df["Status"] == "Closed").sum()) if "Status" in ncr_df.columns else 0, "color": "#14b8a6"},
     {"label": "Open OBS", "value": int((obs_df["Status"] == "Open").sum()) if "Status" in obs_df.columns else 0, "color": "#f59e0b"},
@@ -323,9 +301,10 @@ def render_drilldown(df, id_col="ID"):
     ids = df[id_col].dropna().astype(str).unique().tolist()
 
     selected = st.selectbox(
-        f"Select {id_col}",
-        options=["-- Select --"] + ids
-    )
+    f"Select {id_col}",
+    options=["-- Select --"] + ids,
+    key=f"drilldown_{id_col}"
+)
 
     if selected == "-- Select --":
         st.warning("Please select a record to view details")
