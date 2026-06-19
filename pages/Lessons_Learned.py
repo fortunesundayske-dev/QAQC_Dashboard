@@ -1,10 +1,21 @@
 import streamlit as st
 import pandas as pd
+import utils
 import plotly.express as px
 from pathlib import Path
-from utils import load_master_data, global_filter_sidebar, apply_filters, render_table, inject_global_ui, render_table_with_details
+from utils import (
+    load_master_data,
+    global_filter_sidebar,
+    apply_filters,
+    render_table,
+    inject_global_ui,
+    render_table_with_details,
+    render_navigation
+)
 from auth import login
+from utils import render_navigation
 
+render_navigation()
 if not login():
     st.stop()
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
@@ -45,6 +56,18 @@ if lessons.empty:
 table_cols = [col for col in ["Lesson_ID","Project", "Category", "Lesson", "Impact", "Recommendation", "Date_Logged"] if col in lessons.columns]
 id_col = "Lesson_ID" if "Lesson_ID" in lessons.columns else None
 selected = render_table_with_details(lessons, id_col=id_col, table_columns=table_cols, detail_label="Lesson")
+
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 999;
+    padding-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("---")
 if "Discipline" in lessons.columns:
