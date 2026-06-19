@@ -58,7 +58,98 @@ st.markdown(
 )
 
 st.sidebar.title("Evomec QA/QC Executive")
+# ==========================
+# TOP NAVIGATION BAR
+# ==========================
 
+col1, col2, col3, col4, col5 = st.columns(5)
+
+with col1:
+    st.page_link("app.py", label="📊 Dashboard")
+
+with col2:
+    st.page_link(
+        "pages/Audit_Surveillance.py",
+        label="📋 Audit"
+    )
+
+with col3:
+    st.page_link(
+        "pages/Concrete_Tracker.py",
+        label="🏗 Concrete"
+    )
+
+with col4:
+    st.page_link(
+        "pages/CTQ_Dashboard.py",
+        label="📦 CTQ"
+    )
+
+with col5:
+    st.page_link(
+        "pages/Daily_Reports.py",
+        label="📑 Reports"
+    )
+
+st.divider()
+
+# ==========================
+# MOBILE NAVIGATION
+# ==========================
+
+page = st.selectbox(
+    "📱 Navigate",
+    [
+        "Dashboard",
+        "Audit",
+        "Concrete",
+        "CTQ",
+        "Reports",
+        "Rework Tracker",
+        "Document Status",
+        "ITR Tracker",
+        "Lessons Learned",
+        "Management Summary",
+        "NCR Tracker",
+        "OBS Tracker"
+    ]
+)
+
+if page == "Dashboard":
+    st.switch_page("app.py")
+
+elif page == "Audit":
+    st.switch_page("pages/Audit_Surveillance.py")
+
+elif page == "Concrete":
+    st.switch_page("pages/Concrete_Tracker.py")
+
+elif page == "CTQ":
+    st.switch_page("pages/CTQ_Dashboard.py")
+
+elif page == "Reports":
+    st.switch_page("pages/Daily_Reports.py")
+
+elif page == "Rework Tracker":
+    st.switch_page("pages/Defect_Rework_Tracker.py")
+
+elif page == "Document Status":
+    st.switch_page("pages/Document_Status.py")
+
+elif page == "ITR Tracker":
+    st.switch_page("pages/ITR_Tracker.py")
+
+elif page == "Lessons Learned":
+    st.switch_page("pages/Lessons_Learned.py")
+
+elif page == "Management Summary":
+    st.switch_page("pages/Management_Executive_Summary.py")
+
+elif page == "NCR Tracker":
+    st.switch_page("pages/NCR_Tracker.py")
+
+elif page == "OBS Tracker":
+    st.switch_page("pages/OBS_Tracker.py")
 st.title("Evomec QA/QC Executive Dashboard")
 st.markdown("A consolidated quality management console for construction projects with automated analytics and executive insights.")
 
@@ -194,101 +285,3 @@ if col5.button("Reports"):
 page = st.session_state.get("page", "Dashboard")
 
 st.set_page_config(page_title="QAQC Dashboard", layout="wide")
-
-# -------------------------
-# PAGE NAVIGATION TOOLBAR
-# -------------------------
-pages = [
-    "Dashboard",
-    "Audit Surveillance",
-    "Concrete Tracker",
-    "Procurement",
-    "Reports"
-]
-
-selected_page = st.selectbox(
-    "Navigate Dashboard",
-    pages,
-    index=0
-)
-pages = [
-    "Dashboard",
-    "Audit Surveillance",
-    "Concrete Tracker",
-    "Procurement",
-    "Reports"
-]
-
-page = st.selectbox(
-    "📱 Navigation",
-    pages,
-    label_visibility="collapsed"
-)
-st.radio(
-    "Menu",
-    pages,
-    horizontal=True
-)
-st.selectbox(
-    "Menu",
-    pages
-)
-st.page_link("app.py", label="📊 Dashboard")
-st.page_link("pages/Audit_Surveillance.py", label="📋 Audit")
-st.page_link("pages/Concrete_Tracker.py", label="🏗 Concrete")
-st.page_link("pages/Procurement.py", label="📦 Procurement")
-st.page_link("pages/Reports.py", label="📑 Reports")
-
-col1, col2, col3, col4, col5 = st.columns(5)
-
-with col1:
-    st.page_link("app.py", label="📊 Dashboard")
-
-with col2:
-    st.page_link(
-        "pages/Audit_Surveillance.py",
-        label="📋 Audit"
-    )
-
-with col3:
-    st.page_link(
-        "pages/Concrete_Tracker.py",
-        label="🏗 Concrete"
-    )
-
-with col4:
-    st.page_link(
-        "pages/Procurement.py",
-        label="📦 Procurement"
-    )
-
-with col5:
-    st.page_link(
-        "pages/Reports.py",
-        label="📑 Reports"
-    )
-page = st.selectbox(
-    "Navigate",
-    [
-        "Dashboard",
-        "Audit",
-        "Concrete",
-        "Procurement",
-        "Reports"
-    ]
-)
-
-if page == "Dashboard":
-    st.switch_page("app.py")
-
-elif page == "Audit":
-    st.switch_page("pages/Audit_Surveillance.py")
-
-elif page == "Concrete":
-    st.switch_page("pages/Concrete_Tracker.py")
-
-elif page == "Procurement":
-    st.switch_page("pages/Procurement.py")
-
-elif page == "Reports":
-    st.switch_page("pages/Reports.py")
