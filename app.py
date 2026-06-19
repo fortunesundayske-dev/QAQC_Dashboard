@@ -233,3 +233,62 @@ st.selectbox(
     "Menu",
     pages
 )
+st.page_link("app.py", label="📊 Dashboard")
+st.page_link("pages/Audit_Surveillance.py", label="📋 Audit")
+st.page_link("pages/Concrete_Tracker.py", label="🏗 Concrete")
+st.page_link("pages/Procurement.py", label="📦 Procurement")
+st.page_link("pages/Reports.py", label="📑 Reports")
+
+col1, col2, col3, col4, col5 = st.columns(5)
+
+with col1:
+    st.page_link("app.py", label="📊 Dashboard")
+
+with col2:
+    st.page_link(
+        "pages/Audit_Surveillance.py",
+        label="📋 Audit"
+    )
+
+with col3:
+    st.page_link(
+        "pages/Concrete_Tracker.py",
+        label="🏗 Concrete"
+    )
+
+with col4:
+    st.page_link(
+        "pages/Procurement.py",
+        label="📦 Procurement"
+    )
+
+with col5:
+    st.page_link(
+        "pages/Reports.py",
+        label="📑 Reports"
+    )
+page = st.selectbox(
+    "Navigate",
+    [
+        "Dashboard",
+        "Audit",
+        "Concrete",
+        "Procurement",
+        "Reports"
+    ]
+)
+
+if page == "Dashboard":
+    st.switch_page("app.py")
+
+elif page == "Audit":
+    st.switch_page("pages/Audit_Surveillance.py")
+
+elif page == "Concrete":
+    st.switch_page("pages/Concrete_Tracker.py")
+
+elif page == "Procurement":
+    st.switch_page("pages/Procurement.py")
+
+elif page == "Reports":
+    st.switch_page("pages/Reports.py")
