@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
 import utils
-import streamlit as st
-st.write(dir(utils))
-st.stop()
 import plotly.express as px
 from pathlib import Path
 from utils import (
