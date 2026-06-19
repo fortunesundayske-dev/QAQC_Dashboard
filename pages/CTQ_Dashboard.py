@@ -1,8 +1,17 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import utils
 from pathlib import Path
-from utils import load_master_data, global_filter_sidebar, apply_filters, render_table, inject_global_ui, render_table_with_details
+from utils import (
+    load_master_data,
+    global_filter_sidebar,
+    apply_filters,
+    render_table,
+    inject_global_ui,
+    render_table_with_details,
+    render_navigation
+)
 from auth import login
 from utils import render_navigation
 
