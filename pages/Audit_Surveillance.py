@@ -9,9 +9,30 @@ if not login():
     st.stop()
 BASE_DIR = Path(__file__).resolve().parent.parent    
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
+ASSETS = BASE_DIR / "assets"
 
 st.set_page_config(page_title="Audit & Surveillance", layout="wide")
 inject_global_ui()
+
+EVOMEC_LOGO = ASSETS / "evomec_logo.png"
+NLNG_LOGO = ASSETS / "nlng_logo.png"
+
+
+def safe_path(path):
+    return str(path) if path.exists() else None
+
+EVOMEC_LOGO = safe_path(EVOMEC_LOGO)
+NLNG_LOGO = safe_path(NLNG_LOGO)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    if EVOMEC_LOGO:
+        st.image(EVOMEC_LOGO, width=150)
+
+with col2:
+    if NLNG_LOGO:
+        st.image(NLNG_LOGO, width=140)
 
 st.title("Audit & Surveillance")
 st.markdown("Track planned and actual audit/surveillance activities and compliance performance.")

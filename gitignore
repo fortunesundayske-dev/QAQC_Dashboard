@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+.venv/
+
+# Streamlit
+.streamlit/
+
+# Excel temp files
+~$*
+
+# OS files
+.DS_Store
+Thumbs.db

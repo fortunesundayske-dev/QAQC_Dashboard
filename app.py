@@ -2,6 +2,7 @@ import streamlit as st
 from pathlib import Path
 from utils import load_master_data, load_company_logo, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path
 from auth import login
+from utils import extract_projects
 
 if not login():
     st.stop()
@@ -9,10 +10,27 @@ if not login():
 BASE_DIR = Path(__file__).resolve().parent
 
 EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
-LOGO_PATH = BASE_DIR / "assets" / "evomec_logo.png"
+ASSETS = BASE_DIR / "assets"
 
-asset_dir = Path(__file__).parent / "assets"
-LOGO_PATH = _find_image_path(asset_dir / "evomec_logo")
+EVOMEC_LOGO = ASSETS / "evomec_logo.png"
+NLNG_LOGO = ASSETS / "nlng_logo.png"
+
+
+def safe_path(path):
+    return str(path) if path.exists() else None
+
+EVOMEC_LOGO = safe_path(EVOMEC_LOGO)
+NLNG_LOGO = safe_path(NLNG_LOGO)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    if EVOMEC_LOGO:
+        st.image(EVOMEC_LOGO, width=150)
+
+with col2:
+    if NLNG_LOGO:
+        st.image(NLNG_LOGO, width=140)
 
 st.set_page_config(
     page_title="Evomec QA/QC Executive Dashboard",
@@ -52,12 +70,29 @@ except FileNotFoundError as err:
 
 filters = global_filter_sidebar(data)
 
-projects = sorted({
-    row
-    for df in data.values()
-    if hasattr(df, "columns") and "Project" in df.columns
-    for row in df["Project"].dropna().astype(str).unique()
-})
+import pandas as pd
+
+projects = set()
+
+for df in data.values():
+
+    # 🔥 STRICT TYPE CHECK (prevents crash)
+    if not isinstance(df, pd.DataFrame):
+        continue
+
+    # 🔥 COLUMN CHECK SAFELY
+    if "Project" not in df.columns:
+        continue
+
+    # 🔥 CLEAN EXTRA SAFETY
+    if df.empty:
+        continue
+
+    projects.update(
+        df["Project"].dropna().astype(str).unique()
+    )
+
+projects = extract_projects(data)
 project_count = len(projects)
 
 import pandas as pd
