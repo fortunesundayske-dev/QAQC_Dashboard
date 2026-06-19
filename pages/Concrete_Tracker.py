@@ -2,8 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from pathlib import Path
-from utils import load_master_data, global_filter_sidebar, apply_filters, render_table, inject_global_ui, render_table_with_details_render_navigation
+from utils import load_master_data, global_filter_sidebar, apply_filters, render_table, inject_global_ui, render_table_with_details_
 from auth import login
+from utils import render_navigation
+
 render_navigation()
 
 if not login():
@@ -43,6 +45,7 @@ concrete = apply_filters(data.get("Concrete Tracker", pd.DataFrame()), filters, 
 if concrete.empty:
     st.warning("No concrete tracker records available.")
     st.stop()
+    
 st.markdown("""
 <style>
 div[data-testid="stHorizontalBlock"] {
