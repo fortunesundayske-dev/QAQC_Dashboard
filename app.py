@@ -211,3 +211,25 @@ selected_page = st.selectbox(
     pages,
     index=0
 )
+pages = [
+    "Dashboard",
+    "Audit Surveillance",
+    "Concrete Tracker",
+    "Procurement",
+    "Reports"
+]
+
+page = st.selectbox(
+    "📱 Navigation",
+    pages,
+    label_visibility="collapsed"
+)
+st.radio(
+    "Menu",
+    pages,
+    horizontal=True
+)
+st.selectbox(
+    "Menu",
+    pages
+)
