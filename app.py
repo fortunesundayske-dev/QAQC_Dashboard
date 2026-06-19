@@ -1,9 +1,23 @@
 import streamlit as st
+import utils
 from pathlib import Path
-from utils import load_master_data, load_company_logo, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path
+from utils import load_master_data, load_company_logo, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation
 from auth import login
 from utils import extract_projects
+from utils import render_navigation
 
+render_navigation()
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 999;
+    padding-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
 if not login():
     st.stop()
 
