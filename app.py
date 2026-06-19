@@ -7,57 +7,6 @@ from utils import extract_projects
 if not login():
     st.stop()
 
-BASE_DIR = Path(__file__).resolve().parent
-
-EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
-ASSETS = BASE_DIR / "assets"
-
-EVOMEC_LOGO = ASSETS / "evomec_logo.png"
-NLNG_LOGO = ASSETS / "nlng_logo.png"
-
-
-def safe_path(path):
-    return str(path) if path.exists() else None
-
-EVOMEC_LOGO = safe_path(EVOMEC_LOGO)
-NLNG_LOGO = safe_path(NLNG_LOGO)
-
-col1, col2 = st.columns(2)
-
-with col1:
-    if EVOMEC_LOGO:
-        st.image(EVOMEC_LOGO, width=150)
-
-with col2:
-    if NLNG_LOGO:
-        st.image(NLNG_LOGO, width=140)
-
-st.set_page_config(
-    page_title="Evomec QA/QC Executive Dashboard",
-    page_icon="🏗️",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-inject_global_ui()
-
-st.markdown(
-    """
-    <style>
-        .reportview-container { background-color: #0b1320; color: #e2e8f0; }
-        .sidebar .sidebar-content { background: #0f172a; }
-        .stButton>button { background-color: #1d4ed8; color: white; }
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
-        .kpi-card { padding: 1.2rem; border-radius: 18px; color: #fff; min-height: 120px; box-shadow: 0 18px 40px rgba(0,0,0,0.2); }
-        .kpi-title { font-size: 0.95rem; opacity: 0.8; margin-bottom: 0.5rem; }
-        .kpi-value { font-size: 2rem; font-weight: 700; margin-bottom: 0.35rem; }
-        .kpi-subtitle { font-size: 0.9rem; opacity: 0.75; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-st.sidebar.title("Evomec QA/QC Executive")
 # ==========================
 # TOP NAVIGATION BAR
 # ==========================
@@ -150,6 +99,59 @@ elif page == "NCR Tracker":
 
 elif page == "OBS Tracker":
     st.switch_page("pages/OBS_Tracker.py")
+    
+
+BASE_DIR = Path(__file__).resolve().parent
+
+EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
+ASSETS = BASE_DIR / "assets"
+
+EVOMEC_LOGO = ASSETS / "evomec_logo.png"
+NLNG_LOGO = ASSETS / "nlng_logo.png"
+
+
+def safe_path(path):
+    return str(path) if path.exists() else None
+
+EVOMEC_LOGO = safe_path(EVOMEC_LOGO)
+NLNG_LOGO = safe_path(NLNG_LOGO)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    if EVOMEC_LOGO:
+        st.image(EVOMEC_LOGO, width=150)
+
+with col2:
+    if NLNG_LOGO:
+        st.image(NLNG_LOGO, width=140)
+
+st.set_page_config(
+    page_title="Evomec QA/QC Executive Dashboard",
+    page_icon="🏗️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+inject_global_ui()
+
+st.markdown(
+    """
+    <style>
+        .reportview-container { background-color: #0b1320; color: #e2e8f0; }
+        .sidebar .sidebar-content { background: #0f172a; }
+        .stButton>button { background-color: #1d4ed8; color: white; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+        .kpi-card { padding: 1.2rem; border-radius: 18px; color: #fff; min-height: 120px; box-shadow: 0 18px 40px rgba(0,0,0,0.2); }
+        .kpi-title { font-size: 0.95rem; opacity: 0.8; margin-bottom: 0.5rem; }
+        .kpi-value { font-size: 2rem; font-weight: 700; margin-bottom: 0.35rem; }
+        .kpi-subtitle { font-size: 0.9rem; opacity: 0.75; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.sidebar.title("Evomec QA/QC Executive")
 st.title("Evomec QA/QC Executive Dashboard")
 st.markdown("A consolidated quality management console for construction projects with automated analytics and executive insights.")
 
