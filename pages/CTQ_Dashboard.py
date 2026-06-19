@@ -4,6 +4,9 @@ import plotly.express as px
 from pathlib import Path
 from utils import load_master_data, global_filter_sidebar, apply_filters, render_table, inject_global_ui, render_table_with_details
 from auth import login
+from utils import render_navigation
+
+render_navigation()
 
 if not login():
     st.stop()
@@ -62,3 +65,15 @@ if "Discipline" in ctq.columns:
 failure_pareto = ctq[ctq["Status"].str.lower() == "failed"]["CTQ Description"].value_counts().reset_index().head(10)
 failure_pareto.columns = ["Category", "Count"]
 st.plotly_chart(px.bar(failure_pareto, x="Category", y="Count", title="CTQ Failure Pareto Chart"), use_container_width=True)
+
+st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] {
+    position: sticky;
+    top: 0;
+    background-color: white;
+    z-index: 999;
+    padding-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
