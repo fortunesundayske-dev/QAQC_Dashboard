@@ -306,3 +306,53 @@ def render_workspace():
 with st.sidebar:
     st.title("🔍 Global Controls")
     data = global_filter_sidebar(data)
+
+def render_drilldown(df, id_col="ID"):
+
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        st.info("No data available")
+        return
+
+    if id_col not in df.columns:
+        st.error(f"Column '{id_col}' not found")
+        return
+
+    # =========================
+    # SAFE ID CLEANING
+    # =========================
+    ids = df[id_col].dropna().astype(str).unique().tolist()
+
+    selected = st.selectbox(
+        f"Select {id_col}",
+        options=["-- Select --"] + ids
+    )
+
+    if selected == "-- Select --":
+        st.warning("Please select a record to view details")
+        return
+
+    # =========================
+    # FILTER SAFE MATCH
+    # =========================
+    selected_row = df[df[id_col].astype(str) == selected]
+
+    # =========================
+    # UX IMPROVEMENT: SUMMARY FIRST
+    # =========================
+    st.subheader("🔎 Record Summary")
+
+    st.dataframe(
+        selected_row.head(1),
+        use_container_width=True
+    )
+
+    # =========================
+    # FULL DETAIL EXPANDER
+    # =========================
+    with st.expander("📄 Full Record Details", expanded=True):
+        st.dataframe(
+            selected_row,
+            use_container_width=True
+        )
+
+    return selected_row
