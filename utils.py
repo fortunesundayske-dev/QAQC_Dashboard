@@ -109,33 +109,41 @@ def render_mobile_nav():
 # =========================
 # KPI CARDS
 # =========================
-def render_kpi_cards(kpis):
+def render_kpi_cards(kpis, cols_per_row=2):
 
-    rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
+    # split into rows of 2
+    rows = [kpis[i:i + cols_per_row] for i in range(0, len(kpis), cols_per_row)]
 
     for row in rows:
-        cols = st.columns(2)
+        cols = st.columns(cols_per_row)
 
         for i, kpi in enumerate(row):
 
-            color = kpi.get("color", "#2563eb")
-
             with cols[i]:
+
+                label = kpi.get("label", "")
+                value = kpi.get("value", 0)
+                color = kpi.get("color", "#2563eb")
+                delta = kpi.get("delta", None)
+
                 st.markdown(
                     f"""
                     <div style="
                         background: linear-gradient(135deg, {color}, #111827);
-                        padding: 20px;
+                        padding: 18px;
                         border-radius: 16px;
                         color: white;
+                        box-shadow: 0 8px 20px rgba(0,0,0,0.35);
                     ">
                         <div style="font-size:13px; opacity:0.8;">
-                            {kpi['label']}
+                            {label}
                         </div>
 
                         <div style="font-size:30px; font-weight:700; margin-top:6px;">
-                            {kpi['value']}
+                            {value}
                         </div>
+
+                        {f"<div style='font-size:12px;color:#22c55e;'>▲ {delta}%</div>" if delta is not None else ""}
                     </div>
                     """,
                     unsafe_allow_html=True
