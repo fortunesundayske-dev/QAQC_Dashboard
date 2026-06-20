@@ -57,7 +57,7 @@ if not login():
 inject_enterprise_theme()
 render_header()
 render_workspace()
-
+render_top_nav()
 st.divider()
 
 # =========================
@@ -164,10 +164,7 @@ else:
 
 st.markdown("---")
 
-render_top_nav()
 render_workspace()
-
-
 
 sheet_names = list(data.keys())
 
