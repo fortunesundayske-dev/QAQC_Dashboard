@@ -11,18 +11,25 @@ page_map = {
     "NCR": "ncr",
     "OBS": "obs"
 }
+# =========================
+# ROUTER
+# =========================
+page = st.session_state.page
 
-current_page = st.session_state.get("page", "Dashboard")
-if current_page == "Dashboard":
+if page == "Dashboard":
     st.write("Dashboard content here")
 
-elif current_page == "Audit":
+elif page == "Audit":
     st.write("Audit page content")
 
-elif current_page == "Concrete":
+elif page == "Concrete":
     st.write("Concrete page content")
-    # 6. NAV STATE
-page = st.session_state.page
+
+elif page == "CTQ":
+    st.write("CTQ page content")
+
+elif page == "NCR":
+    st.write("NCR page content")
 # =========================
 # CONFIG (MUST BE FIRST)
 # =========================
