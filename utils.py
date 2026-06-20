@@ -118,14 +118,18 @@ def render_header():
 # NAVIGATION (TOP)
 # =========================
 def render_top_nav():
-    tabs = ["Dashboard","Audit","Concrete","CTQ","NCR","OBS","ITR","Reports","Rework","Lessons"]
+    tabs = ["Dashboard","Audit","Concrete","CTQ","NCR","OBS"]
 
-    cols = st.columns(len(tabs))
+    selected = st.radio(
+        "Navigation",
+        tabs,
+        horizontal=True,
+        key="top_nav"
+    )
 
-    for i, t in enumerate(tabs):
-        with cols[i]:
-            if st.button(t, key=f"nav_{t}"):
-                st.session_state.page = t
+    st.session_state.page = selected
+
+
 # =========================
 # MOBILE NAV
 # =========================
