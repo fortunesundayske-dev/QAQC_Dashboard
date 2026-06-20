@@ -114,26 +114,26 @@ for df in data.values():
 # 1. LOAD DATA FIRST
 data = load_master_data(EXCEL_FILE)
 
-# 2. FILTER DATA (if needed)
+# 2. APPLY FILTER
 filtered_data = global_filter_sidebar(data)
 
-# 3. DERIVE KPI SOURCE DATA (THIS BLOCK GOES HERE ⬇️)
-projects = extract_projects(data)
+# 3. DERIVE KPI SOURCE FROM FILTERED DATA (NOT RAW DATA)
+projects = extract_projects(filtered_data)
 project_count = len(projects)
 
-ncr_df = data.get("NCR Log", pd.DataFrame())
-obs_df = data.get("OBS Log", pd.DataFrame())
-itr_df = data.get("ITR Log", pd.DataFrame())
-concrete_df = data.get("Concrete Tracker", pd.DataFrame())
-audit_df = data.get("Audit Register", pd.DataFrame())
-surv_df = data.get("Surveillance Register", pd.DataFrame())
-doc_df = data.get("Document Register", pd.DataFrame())
-lessons_df = data.get("Lessons Learned", pd.DataFrame())
+ncr_df = filtered_data.get("NCR Log", pd.DataFrame())
+obs_df = filtered_data.get("OBS Log", pd.DataFrame())
+itr_df = filtered_data.get("ITR Log", pd.DataFrame())
+concrete_df = filtered_data.get("Concrete Tracker", pd.DataFrame())
+audit_df = filtered_data.get("Audit Register", pd.DataFrame())
+surv_df = filtered_data.get("Surveillance Register", pd.DataFrame())
+doc_df = filtered_data.get("Document Register", pd.DataFrame())
+lessons_df = filtered_data.get("Lessons Learned", pd.DataFrame())
 
 # 4. BUILD KPI LIST (THIS IS YOUR BLOCK)
 kpis = [
     {"label": "Total Projects", "value": project_count, "color": "#2563eb"},
-    {"label": "Daily Reports", "value": len(data.get("Daily Reports", pd.DataFrame())), "color": "#047857"},
+    {"label": "Daily Reports", "value": len(filtered_data.get("Daily Reports", pd.DataFrame())), "color": "#047857"},
     {"label": "Open NCR", "value": int((ncr_df["Status"] == "Open").sum()) if "Status" in ncr_df.columns else 0, "color": "#dc2626"},
     {"label": "Closed NCR", "value": int((ncr_df["Status"] == "Closed").sum()) if "Status" in ncr_df.columns else 0, "color": "#14b8a6"},
     {"label": "Open OBS", "value": int((obs_df["Status"] == "Open").sum()) if "Status" in obs_df.columns else 0, "color": "#f59e0b"},
@@ -160,8 +160,8 @@ cols[1].metric("Last Refresh", st.session_state.get("last_refresh", "On load"))
 cols[2].metric("Records Loaded", sum(len(df) for df in data.values()))
 
 
-if "Daily Reports" in data:
-    render_table(data["Daily Reports"].head(10), height=300)
+if "Daily Reports" in filtered_data:
+    render_table(filtered_data["Daily Reports"].head(10), height=300)
 else:
     st.info("Daily Reports sheet is not available in the data source.")
 
@@ -169,10 +169,10 @@ st.markdown("---")
 
 # render_workspace()
 
-sheet_names = list(data.keys())
+sheet_names = list(filtered_data.keys())
 
 if len(sheet_names) > 0:
-    first_df = data[sheet_names[0]]
+    first_df = filtered_data[sheet_names[0]]
 
     col1, col2 = st.columns(2)
 

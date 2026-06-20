@@ -488,12 +488,45 @@ def render_pie_chart(df, names, values, title="Distribution"):
 # =========================
 # FILTERS (SAFE)
 # =========================
-def global_filter_sidebar(data, page="main"):
-    
+def global_filter_sidebar(data):
     st.sidebar.header("Global Filters")
 
     if not isinstance(data, dict):
         return data
+
+    projects = set()
+
+    for df in data.values():
+        if isinstance(df, pd.DataFrame) and "Project" in df.columns:
+            projects.update(df["Project"].dropna().astype(str).unique())
+
+    projects = sorted(list(projects))
+
+    if "global_project" not in st.session_state:
+        st.session_state.global_project = "All"
+
+    selected_project = st.sidebar.selectbox(
+        "Project",
+        ["All"] + projects,
+        index=0,
+        key="global_project_selectbox"
+    )
+
+    st.session_state.global_project = selected_project
+
+    # ✅ IMPORTANT FIX STARTS HERE
+    if selected_project == "All":
+        return data
+
+    filtered = {}
+
+    for k, df in data.items():
+        if isinstance(df, pd.DataFrame) and "Project" in df.columns:
+            filtered[k] = df[df["Project"] == selected_project]
+        else:
+            filtered[k] = df
+
+    return filtered   # 🔥 THIS WAS MISSING
 
     # =========================
     # EXTRACT PROJECTS SAFELY
