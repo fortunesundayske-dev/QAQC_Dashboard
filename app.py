@@ -1,7 +1,21 @@
 import streamlit as st
 import utils
 from pathlib import Path
-from utils import load_master_data, load_company_logo, render_line_chart, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation, inject_enterprise_theme, render_top_nav, extract_projects, render_bar_chart, render_kpi_cards, render_header, render_kpi_strip, render_workspace, render_top_nav, render_drilldown
+from utils import (
+    load_master_data,
+    global_filter_sidebar,
+    inject_global_ui,
+    inject_enterprise_theme,
+    render_header,
+    render_top_nav,
+    extract_projects,
+    render_line_chart,
+    render_bar_chart,
+    render_table,
+    render_kpi_cards,
+    render_drilldown,
+    render_workspace
+)
 from auth import login
 # =========================
 # PATHS
@@ -14,7 +28,6 @@ ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
 
-render_navigation()
 # =========================
 # DATA LOAD
 # =========================
