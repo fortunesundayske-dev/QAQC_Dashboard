@@ -152,10 +152,6 @@ def render_kpi_cards(kpis, cols_per_row=2):
 # =========================
 # SECTION WRAPPER
 # =========================
-def render_section_container(title):
-    st.markdown(f"### {title}", unsafe_allow_html=True)
-    st.markdown("---", unsafe_allow_html=True)
-
 
 # =========================
 # TABLES
