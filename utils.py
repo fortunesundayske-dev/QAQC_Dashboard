@@ -184,37 +184,59 @@ def render_section_container(title):
 # =========================
 # FILTERS (SAFE)
 # =========================
-def global_filter_sidebar(data):
-    st.sidebar.markdown("## 🎛 Filters")
+def global_filter_sidebar(data, page="main"):
+    
+    st.sidebar.header("Global Filters")
 
     if not isinstance(data, dict):
         return data
+
+    # =========================
+    # EXTRACT PROJECTS SAFELY
+    # =========================
     projects = set()
 
     for df in data.values():
-        if isinstance(df, pd.DataFrame) and "Project" in df.columns:
-            projects.update(df["Project"].dropna().astype(str))
+        if isinstance(df, __import__("pandas").DataFrame) and "Project" in df.columns:
+            projects.update(df["Project"].dropna().astype(str).unique())
 
-    selected_project = st.sidebar.selectbox("Project", ["All"] + sorted(projects))
+    projects = sorted(list(projects))
 
-    st.sidebar.markdown("---")
-    status = st.sidebar.selectbox("Status", ["All", "Open", "Closed"])
+    if not projects:
+        st.sidebar.info("No projects found")
+        return data
+
+    # =========================
+    # SESSION STATE FIX
+    # =========================
+    if "global_project" not in st.session_state:
+        st.session_state.global_project = "All"
+
+    # =========================
+    # SAFE SELECTBOX (IMPORTANT FIX)
+    # =========================
+    selected_project = st.sidebar.selectbox(
+        "Project",
+        ["All"] + projects,
+        index=0,
+        key="global_project_selectbox"   # 🔥 FIXED STATIC KEY
+    )
+
+    st.session_state.global_project = selected_project
+
+    # =========================
+    # FILTER DATA
+    # =========================
+    if selected_project == "All":
+        return data
 
     filtered = {}
 
     for k, df in data.items():
-        if not isinstance(df, pd.DataFrame):
-            continue
-
-        temp = df.copy()
-
-        if selected_project != "All" and "Project" in temp.columns:
-            temp = temp[temp["Project"] == selected_project]
-
-        if status != "All" and "Status" in temp.columns:
-            temp = temp[temp["Status"] == status]
-
-        filtered[k] = temp
+        if isinstance(df, __import__("pandas").DataFrame) and "Project" in df.columns:
+            filtered[k] = df[df["Project"] == selected_project]
+        else:
+            filtered[k] = df
 
     return filtered
 

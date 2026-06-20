@@ -46,10 +46,7 @@ NLNG_LOGO = ASSETS / "nlng_logo.png"
 # =========================
 data = load_master_data(EXCEL_FILE)
 
-# =========================
-# FILTERS
-# =========================
-data = global_filter_sidebar(data)
+
 # =========================
 # KPIs (EXAMPLE)
 # =========================
