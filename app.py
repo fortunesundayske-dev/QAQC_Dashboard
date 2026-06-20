@@ -54,9 +54,9 @@ st.divider()
 # =========================
 # DATA PREVIEW
 # =========================
-for name, df in data.items():
-    st.markdown(f"### {name}")
-    render_table(df, height=250)
+#for name, df in data.items():
+#    st.markdown(f"### {name}")
+#    render_table(df, height=250)
 
 def safe_path(path):
     return str(path) if path.exists() else None
@@ -136,7 +136,36 @@ kpis = [
     {"label": "Surveillance Planned", "value": int(surv_df["Status"].notna().sum()) if "Status" in surv_df.columns else 0, "color": "#a855f7"},
     {"label": "Lessons Learned", "value": len(lessons_df), "color": "#22d3ee"},
 ]
-render_kpi_cards(kpis)
+
+projects = extract_projects(data)
+project_count = len(projects)
+
+ncr_df = data.get("NCR Log", pd.DataFrame())
+obs_df = data.get("OBS Log", pd.DataFrame())
+itr_df = data.get("ITR Log", pd.DataFrame())
+concrete_df = data.get("Concrete Tracker", pd.DataFrame())
+audit_df = data.get("Audit Register", pd.DataFrame())
+surv_df = data.get("Surveillance Register", pd.DataFrame())
+doc_df = data.get("Document Register", pd.DataFrame())
+lessons_df = data.get("Lessons Learned", pd.DataFrame())
+
+kpis = [
+    {"label": "Total Projects", "value": project_count, "color": "#2563eb"},
+    {"label": "Daily Reports", "value": len(data.get("Daily Reports", pd.DataFrame())), "color": "#047857"},
+    {"label": "Open NCR", "value": int((ncr_df["Status"] == "Open").sum()) if "Status" in ncr_df.columns else 0, "color": "#dc2626"},
+    {"label": "Closed NCR", "value": int((ncr_df["Status"] == "Closed").sum()) if "Status" in ncr_df.columns else 0, "color": "#14b8a6"},
+    {"label": "Open OBS", "value": int((obs_df["Status"] == "Open").sum()) if "Status" in obs_df.columns else 0, "color": "#f59e0b"},
+    {"label": "Closed OBS", "value": int((obs_df["Status"] == "Closed").sum()) if "Status" in obs_df.columns else 0, "color": "#10b981"},
+    {"label": "Open ITR", "value": int((itr_df["Status"] == "Open").sum()) if "Status" in itr_df.columns else 0, "color": "#f97316"},
+    {"label": "Closed ITR", "value": int((itr_df["Status"] == "Closed").sum()) if "Status" in itr_df.columns else 0, "color": "#22c55e"},
+    {"label": "Cancelled ITR", "value": int((itr_df["Status"] == "Cancelled").sum()) if "Status" in itr_df.columns else 0, "color": "#e22b13"},
+    {"label": "Awaiting Survey Report ITR", "value": int((itr_df["Status"] == "Awaiting Survey Report").sum()) if "Status" in itr_df.columns else 0, "color": "#e0d63e"},
+    {"label": "Concrete Pours", "value": len(concrete_df), "color": "#0ea5e9"},
+    {"label": "Audits Planned", "value": int(audit_df["Status"].notna().sum()) if "Status" in audit_df.columns else 0, "color": "#8b5cf6"},
+    {"label": "Surveillance Planned", "value": int(surv_df["Status"].notna().sum()) if "Status" in surv_df.columns else 0, "color": "#a855f7"},
+    {"label": "Lessons Learned", "value": len(lessons_df), "color": "#22d3ee"},
+]
+
 def render_kpi_card(kpis):
     st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
 
@@ -152,6 +181,30 @@ def render_kpi_card(kpis):
             """, unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
+st.markdown("""
+<style>
+
+/* KPI Hover Effect */
+.kpi-card {
+    transition: all 0.25s ease;
+    cursor: pointer;
+}
+
+.kpi-card:hover {
+    transform: translateY(-6px) scale(1.03);
+    box-shadow: 0 0 25px rgba(255,255,255,0.15);
+}
+            
+<div class="kpi-card" style="
+    background: linear-gradient(135deg, {kpi['color']}, #111827);
+    padding:18px;
+    border-radius:16px;
+    color:white;
+    border-left:5px solid {kpi['color']};
+">
+
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown("---")
 st.subheader("Data Source Overview")
@@ -160,8 +213,7 @@ cols[0].metric("Data Sheets", len(data))
 cols[1].metric("Last Refresh", st.session_state.get("last_refresh", "On load"))
 cols[2].metric("Records Loaded", sum(len(df) for df in data.values()))
 
-st.markdown("---")
-st.subheader("Source Data Preview")
+
 if "Daily Reports" in data:
     render_table(data["Daily Reports"].head(10), height=300)
 else:
@@ -186,6 +238,16 @@ def render_top_nav():
 
     if st.button("📋 Audit"):
         st.switch_page("pages/Audit.py")
+
+    if st.button("🔍 Surveillance"):
+        st.switch_page("pages/Surveillance.py")
+
+    if st.button("📚 Lessons Learned"):
+        st.switch_page("pages/Lessons_Learned.py")
+
+    if st.button("📁 Document Register"):
+        st.switch_page("pages/Document_Register.py")
+    
 
 def render_workspace():
     tab1, tab2, tab3 = st.tabs([

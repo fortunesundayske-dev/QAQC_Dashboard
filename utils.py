@@ -40,7 +40,7 @@ def inject_enterprise_theme():
     <style>
 
     .main {
-        background: #0b1320;
+        background: #e5e7eb;
     }
 
     #MainMenu, footer, header {
@@ -309,14 +309,22 @@ def extract_projects(data):
 import streamlit as st
 
 def render_navigation():
-    st.markdown("### 🧭 Navigation")
+    st.markdown("### 🧭 Page Navigation")
 
     pages = {
-        "🏠 Dashboard": "app.py",
         "🏗 Concrete": "pages/Concrete_Tracker.py",
         "📛 NCR": "pages/NCR_Tracker.py",
         "👁 OBS": "pages/OBS_Tracker.py",
         "📋 Audit": "pages/Audit_Surveillance.py",
+        "🏠 Executive Dashboard": "app.py",
+        "📊 CTQ Dashboard": "pages/CTR_Dashboard.py",
+        "📅 Daily Reports": "pages/Daily_Reports.py",
+        "🔧 Defect Rework": "pages/Defect_Rework_Tracker.py",
+        "📄 Document Status": "pages/Document_Status.py",
+        "📊 Executive Summary": "pages/Executive_Summary.py",
+        "📦 ITR Tracker": "pages/ITR_Tracker.py",
+        "📘 Lessons Learnt": "pages/Lessons_Learnt.py",
+        "📋 Management Summary": "pages/Management_Summary.py"
     }
 
     for label, page in pages.items():
@@ -451,7 +459,7 @@ def inject_global_ui():
        FILTER BAR
     ========================== */
     section[data-testid="stSidebar"] {
-        background: #0f172a;
+        background: #2d2d2d;
         border-right: 1px solid #1e293b;
     }
 
