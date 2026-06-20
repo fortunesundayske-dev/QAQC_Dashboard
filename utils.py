@@ -306,24 +306,24 @@ def extract_projects(data):
 # =========================
 # NAV (FULL)
 # =========================
+import streamlit as st
+
 def render_navigation():
-    st.sidebar.title("Navigation")
+    st.markdown("### 🧭 Navigation")
 
     pages = {
-        "Dashboard": "app.py",
-        "Audit": "pages/Audit_Surveillance.py",
-        "Concrete": "pages/Concrete_Tracker.py",
-        "CTQ": "pages/CTQ_Dashboard.py",
-        "NCR": "pages/NCR_Tracker.py",
-        "OBS": "pages/OBS_Tracker.py",
+        "🏠 Dashboard": "app.py",
+        "🏗 Concrete": "pages/Concrete_Tracker.py",
+        "📛 NCR": "pages/NCR_Tracker.py",
+        "👁 OBS": "pages/OBS_Tracker.py",
+        "📋 Audit": "pages/Audit_Surveillance.py",
     }
 
-    choice = st.sidebar.selectbox("Go to page", list(pages.keys()))
+    for label, page in pages.items():
+        if st.button(label, key=f"nav_{label}"):
+            st.switch_page(page)
 
-    if choice:
-        st.switch_page(pages[choice])
-
- 
+    
     st.markdown("""
     <div style="
         display:flex;

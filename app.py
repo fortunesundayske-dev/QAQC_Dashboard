@@ -14,6 +14,7 @@ ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
 
+render_navigation()
 # =========================
 # DATA LOAD
 # =========================
