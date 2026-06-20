@@ -1,3 +1,4 @@
+print("UTILS VERSION 20-JUN-2026")
 from click import style
 import streamlit as st
 import pandas as pd
@@ -101,8 +102,8 @@ def render_kpi_cards(kpis):
                 st.markdown(f"""
                 <div style="
                     background: linear-gradient(135deg, {color}, #111827);
-                    padding: 18px;
-                    border-radius: 14px;
+                    padding: 20px;
+                    border-radius: 16px;
                     color: white;
                 ">
                     <div style="font-size:13px; opacity:0.8;">
@@ -113,7 +114,8 @@ def render_kpi_cards(kpis):
                         {kpi['value']}
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """, 
+                unsafe_allow_html=True)
 
 # =========================
 # SECTION WRAPPER
@@ -122,65 +124,6 @@ def render_section_container(title):
     st.markdown(f"### {title}")
     st.markdown("---")
 
-
-# =========================
-# FILTERS (SAFE)
-# =========================
-def global_filter_sidebar(data, page="main"):
-    
-    st.sidebar.header("Global Filters")
-
-    if not isinstance(data, dict):
-        return data
-
-    # =========================
-    # EXTRACT PROJECTS SAFELY
-    # =========================
-    projects = set()
-
-    for df in data.values():
-        if isinstance(df, __import__("pandas").DataFrame) and "Project" in df.columns:
-            projects.update(df["Project"].dropna().astype(str).unique())
-
-    projects = sorted(list(projects))
-
-    if not projects:
-        st.sidebar.info("No projects found")
-        return data
-
-    # =========================
-    # SESSION STATE FIX
-    # =========================
-    if "global_project" not in st.session_state:
-        st.session_state.global_project = "All"
-
-    # =========================
-    # SAFE SELECTBOX (IMPORTANT FIX)
-    # =========================
-    selected_project = st.sidebar.selectbox(
-        "Project",
-        ["All"] + projects,
-        index=0,
-        key="global_project_selectbox"   # 🔥 FIXED STATIC KEY
-    )
-
-    st.session_state.global_project = selected_project
-
-    # =========================
-    # FILTER DATA
-    # =========================
-    if selected_project == "All":
-        return data
-
-    filtered = {}
-
-    for k, df in data.items():
-        if isinstance(df, __import__("pandas").DataFrame) and "Project" in df.columns:
-            filtered[k] = df[df["Project"] == selected_project]
-        else:
-            filtered[k] = df
-
-    return filtered
 
 # =========================
 # TABLES
@@ -224,7 +167,6 @@ def render_table_with_details(
 
         return selected_row
 
-    return display_df
 
 # =========================
 # UTILITIES
@@ -482,6 +424,7 @@ def inject_global_ui():
     </style>
     """, unsafe_allow_html=True)
 
+
 # =========================
 # IMAGE FINDER
 # =========================
@@ -528,22 +471,6 @@ def apply_filters(df, filters=None, date_column=None):
     return filtered_df
 
 
-#def render_kpi_strip(kpis):
-    #st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
-
-    #cols = st.columns(len(kpis))
-
-    #for i, kpi in enumerate(kpis):
-        #with cols[i]:
-           # st.markdown(f"""
-            #<div class="kpi-card">
-                #<div class="kpi-title">{kpi['label']}</div>
-                #<div class="kpi-value">{kpi['value']}</div>
-            #</div>
-            #""", unsafe_allow_html=True)
-
-
-import plotly.express as px
 
 def render_line_chart(df, x, y, title="Trend"):
     if df.empty:
@@ -570,3 +497,63 @@ def render_pie_chart(df, names, values, title="Distribution"):
 
     fig = px.pie(df, names=names, values=values, title=title)
     st.plotly_chart(fig, use_container_width=True)
+
+
+# =========================
+# FILTERS (SAFE)
+# =========================
+def global_filter_sidebar(data, page="main"):
+    
+    st.sidebar.header("Global Filters")
+
+    if not isinstance(data, dict):
+        return data
+
+    # =========================
+    # EXTRACT PROJECTS SAFELY
+    # =========================
+    projects = set()
+
+    for df in data.values():
+        if isinstance(df, __import__("pandas").DataFrame) and "Project" in df.columns:
+            projects.update(df["Project"].dropna().astype(str).unique())
+
+    projects = sorted(list(projects))
+
+    if not projects:
+        st.sidebar.info("No projects found")
+        return data
+
+    # =========================
+    # SESSION STATE FIX
+    # =========================
+    if "global_project" not in st.session_state:
+        st.session_state.global_project = "All"
+
+    # =========================
+    # SAFE SELECTBOX (IMPORTANT FIX)
+    # =========================
+    selected_project = st.sidebar.selectbox(
+        "Project",
+        ["All"] + projects,
+        index=0,
+        key="global_project_selectbox"   # 🔥 FIXED STATIC KEY
+    )
+
+    st.session_state.global_project = selected_project
+
+    # =========================
+    # FILTER DATA
+    # =========================
+    if selected_project == "All":
+        return data
+
+    filtered = {}
+
+    for k, df in data.items():
+        if isinstance(df, __import__("pandas").DataFrame) and "Project" in df.columns:
+            filtered[k] = df[df["Project"] == selected_project]
+        else:
+            filtered[k] = df
+
+    return filtered

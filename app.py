@@ -140,9 +140,9 @@ kpis = [
     {"label": "Lessons Learned", "value": len(lessons_df), "color": "#22d3ee"},
 ]
 
+inject_global_ui()
 render_kpi_cards(kpis)
 st.write("DEBUG AFTER KPI")
-inject_global_ui()
 
 st.markdown("---")
 st.subheader("Data Source Overview")
