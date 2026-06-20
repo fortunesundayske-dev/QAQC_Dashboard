@@ -118,20 +118,21 @@ def render_header():
 # NAVIGATION (TOP)
 # =========================
 def render_top_nav():
-    
     tabs = [
         "Dashboard","Audit","Concrete","CTQ",
         "NCR","OBS","ITR","Reports","Rework","Lessons"
     ]
+
     if "page" not in st.session_state:
         st.session_state.page = "Dashboard"
 
     cols = st.columns(len(tabs))
 
-    for i, tab in enumerate(tabs):   # 👈 tab is defined HERE
+    for i, tab in enumerate(tabs):
         with cols[i]:
             if st.button(tab, key=f"nav_{tab}"):
                 st.session_state.page = tab
+                st.rerun()   # 🔥 THIS FIXES NAVIGATION
 
     st.divider()
 

@@ -3,38 +3,6 @@ import utils
 from pathlib import Path
 from utils import load_master_data, load_company_logo, render_line_chart, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation, inject_enterprise_theme, render_top_nav, extract_projects, render_bar_chart, render_kpi_cards, render_header, render_kpi_strip
 from auth import login
-page_map = {
-    "Dashboard": "app",
-    "Audit": "audit",
-    "Concrete": "concrete",
-    "CTQ": "ctq",
-    "NCR": "ncr",
-    "OBS": "obs"
-}
-# =========================
-# INIT STATE (FIRST THING)
-# =========================
-if "page" not in st.session_state:
-    st.session_state.page = "Dashboard"
-
-# =========================
-# READ STATE
-# =========================
-page = st.session_state.page
-
-# =========================
-# NAV / UI
-# =========================
-st.write("Current page:", page)
-
-# =========================
-# ROUTER
-# =========================
-if page == "Dashboard":
-    st.write("Dashboard content")
-
-elif page == "Audit":
-    st.write("Audit content")
 # =========================
 # CONFIG (MUST BE FIRST)
 # =========================
@@ -44,15 +12,74 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
 if not login():
     st.stop()
 
+page_map = {
+    "Dashboard": "app",
+    "Audit": "audit",
+    "Concrete": "concrete",
+    "CTQ": "ctq",
+    "NCR": "ncr",
+    "OBS": "obs",
+    "Lessons Learned": "lessons",
+    "Document Register": "documents",
+    "Data Explorer": "explorer",
+    "ITR log": "itr"
+}
+# =========================
+# INIT STATE (FIRST THING)
+# =========================
+if "page" not in st.session_state:
+    st.session_state.page = "Dashboard"
+# =========================
+# DATA LOAD
+# =========================
+data = load_master_data("data/QAQC_Master.xlsx")
+# =========================
+# READ STATE
+# =========================
+page = st.session_state.page
+
+if page == "Dashboard":
+    st.title("Dashboard Page")
+    st.write("Main dashboard content")
+
+elif page == "Audit":
+    st.title("Audit Page")
+    st.write(data.get("Audit Register"))
+
+elif page == "Concrete":
+    st.title("Concrete Tracker")
+    st.write(data.get("Concrete Tracker"))
+
+elif page == "NCR":
+    st.title("NCR Page")
+    st.write(data.get("NCR Log"))
+elif page == "OBS":
+    st.title("OBS Page")
+    st.write(data.get("OBS Log"))
+elif page == "CTQ":
+    st.title("CTQ Page")
+    st.write(data.get("CTQ Log"))
+elif page == "Document Register":
+    st.title("Document Register")
+    st.write(data.get("Document Register"))
+elif page == "Lessons Learned":
+    st.title("Lessons Learned")
+    st.write(data.get("Lessons Learned"))
+elif page == "Data Explorer":
+    st.title("Data Explorer")
+    st.write("Raw data tables and exploration tools")
+elif page == "ITR log":
+    st.title("ITR Log")
+    st.write(data.get("ITR Log"))
 # =========================
 # THEME
 # =========================
 inject_enterprise_theme()
-
+utils.render_header()
+utils.render_top_nav()
 # =========================
 # HEADER + NAV
 # =========================
@@ -70,10 +97,7 @@ ASSETS = BASE_DIR / "assets"
 
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
-# =========================
-# DATA LOAD
-# =========================
-data = load_master_data("data/QAQC_Master.xlsx")
+
 
 
 # =========================
