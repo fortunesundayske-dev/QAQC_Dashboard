@@ -14,7 +14,6 @@ from utils import (
     render_table,
     render_kpi_cards,
     render_drilldown,
-    render_workspace
 )
 from auth import login
 # =========================
@@ -56,7 +55,6 @@ if not login():
 # =========================
 inject_enterprise_theme()
 render_header()
-render_workspace()
 render_top_nav()
 st.divider()
 
@@ -164,7 +162,7 @@ else:
 
 st.markdown("---")
 
-render_workspace()
+# render_workspace()
 
 sheet_names = list(data.keys())
 

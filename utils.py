@@ -89,7 +89,6 @@ def render_mobile_nav():
 # KPI CARDS
 # =========================
 def render_kpi_cards(kpis):
-
     rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
 
     for row in rows:
@@ -98,28 +97,11 @@ def render_kpi_cards(kpis):
         for i, kpi in enumerate(row):
             with cols[i]:
                 st.markdown(f"""
-                <div class="kpi-card" style="
-                    background: linear-gradient(135deg, {kpi['color']}, #111827);
-                    padding:20px;
-                    border-radius:16px;
-                    color:white;
-                    border-left:5px solid {kpi['color']};
-                    transition: all 0.25s ease;
-                ">
-                    <div style="font-size:14px; opacity:0.8;">
-                        {kpi['label']}
-                    </div>
-
-                    <div style="
-                        font-size:32px;
-                        font-weight:700;
-                        margin-top:8px;
-                    ">
-                        {kpi['value']}
-                    </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">{kpi['label']}</div>
+                    <div class="kpi-value">{kpi['value']}</div>
                 </div>
                 """, unsafe_allow_html=True)
-       
 
 # =========================
 # SECTION WRAPPER
@@ -421,7 +403,6 @@ def project_filter_sidebar(projects, page="main"):
 # =========================
 # UI STYLING
 # =========================
-
 def inject_global_ui():
     
     st.markdown("""
@@ -534,7 +515,9 @@ def inject_global_ui():
         transform: translateY(-6px) scale(1.03);
         box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     }
-
+    .kpi-card {
+    transition: all 0.25s ease;
+}
     </style>
     """, unsafe_allow_html=True)
 
@@ -545,34 +528,41 @@ def inject_global_ui():
 
 
 def apply_filters(df, filters=None, date_column=None):
-
     if not isinstance(df, pd.DataFrame):
         return df
 
     filtered_df = df.copy()
 
     # =========================
-    # 1. GLOBAL FILTERS (SAFE)
+    # 1. COLUMN FILTERS
     # =========================
-    if isinstance(filters, dict):
+    if isinstance(filters, dict) and filters:
 
         for col, value in filters.items():
 
-            # 🚨 SAFE CHECK (FIXES YOUR ERROR)
-            if value is not None and col in filtered_df.columns:
-
+            if (
+                value is not None
+                and col in filtered_df.columns
+                and value != "All"
+            ):
                 filtered_df = filtered_df[filtered_df[col] == value]
 
     # =========================
-    # 2. DATE FILTER (SAFE)
+    # 2. DATE CLEANING (SAFE)
     # =========================
     if date_column and date_column in filtered_df.columns:
+
+        filtered_df = filtered_df.copy()
+
         filtered_df[date_column] = pd.to_datetime(
             filtered_df[date_column],
             errors="coerce"
         )
 
         filtered_df = filtered_df.dropna(subset=[date_column])
+
+        # OPTIONAL: sort for charts (VERY IMPORTANT)
+        filtered_df = filtered_df.sort_values(by=date_column)
 
     return filtered_df
     """
@@ -636,26 +626,6 @@ def render_kpi_strip(kpis):
             </div>
             """, unsafe_allow_html=True)
 
-
-
-def render_workspace():
-    tab1, tab2, tab3 = st.tabs([
-        "📊 Overview",
-        "📁 Data Explorer",
-        "📈 Analytics"
-    ])
-
-    with tab1:
-        st.subheader("Project Overview")
-        st.info("KPIs, trends, and summary insights go here")
-
-    with tab2:
-        st.subheader("Raw Data")
-        st.dataframe(st.session_state.get("data", {}))
-
-    with tab3:
-        st.subheader("Analytics")
-        st.write("Charts (Plotly recommended)")
 
 import plotly.express as px
 
