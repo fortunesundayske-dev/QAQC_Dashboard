@@ -1,5 +1,13 @@
 import streamlit as st
-import utils
+# =========================
+# CONFIG (MUST BE FIRST)
+# =========================
+st.set_page_config(
+    page_title="Evomec QA/QC Executive Dashboard",
+    page_icon="🏗️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 from pathlib import Path
 from utils import (
     load_master_data,
@@ -27,20 +35,8 @@ ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
 
-# =========================
-# DATA LOAD
-# =========================
-data = load_master_data("data/QAQC_Master.xlsx")
 
-# =========================
-# CONFIG (MUST BE FIRST)
-# =========================
-st.set_page_config(
-    page_title="Evomec QA/QC Executive Dashboard",
-    page_icon="🏗️",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+
 if not login():
     st.stop()
 
@@ -145,6 +141,7 @@ kpis = [
 ]
 
 render_kpi_cards(kpis)
+st.write("DEBUG AFTER KPI")
 inject_global_ui()
 
 st.markdown("---")
@@ -192,11 +189,7 @@ project_count = len(projects)
 
 st.sidebar.caption(f"Total Projects: {project_count}")
 
-# =========================
-# SESSION STATE
-# =========================
-if "global_project" not in st.session_state:
-    st.session_state.global_project = "All"
+filtered_data = global_filter_sidebar(data)
 
 # =========================
 # FILTER UI
