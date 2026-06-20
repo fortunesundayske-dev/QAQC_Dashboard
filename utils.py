@@ -112,7 +112,10 @@ def render_mobile_nav():
 
 def render_kpi_cards(kpis):
 
-    cols = st.columns(len(kpis))
+    rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
+
+    for row in rows:
+        cols = st.columns(2)
 
     for i, kpi in enumerate(kpis):
 
