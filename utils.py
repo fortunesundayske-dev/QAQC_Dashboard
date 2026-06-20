@@ -96,23 +96,20 @@ def render_kpi_cards(kpis):
 
         for i, kpi in enumerate(row):
             with cols[i]:
-
                 color = kpi.get("color", "#2563eb")
 
                 st.markdown(f"""
                 <div style="
-                    background: {color};
+                    background: linear-gradient(135deg, {color}, #111827);
                     padding: 18px;
-                    border-radius: 16px;
+                    border-radius: 14px;
                     color: white;
-                    min-height: 110px;
-                    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
                 ">
-                    <div style="font-size:13px; opacity:0.9;">
+                    <div style="font-size:13px; opacity:0.8;">
                         {kpi['label']}
                     </div>
 
-                    <div style="font-size:13px; font-weight:500; margin-top:6px;">
+                    <div style="font-size:30px; font-weight:700; margin-top:6px;">
                         {kpi['value']}
                     </div>
                 </div>
