@@ -118,10 +118,7 @@ def render_header():
 # NAVIGATION (TOP)
 # =========================
 def render_top_nav():
-    tabs = [
-        "Dashboard","Audit","Concrete","CTQ",
-        "NCR","OBS","ITR","Reports","Rework","Lessons"
-    ]
+    tabs = ["Dashboard", "Audit", "Concrete", "CTQ", "NCR", "OBS", "ITR", "Reports"]
 
     if "page" not in st.session_state:
         st.session_state.page = "Dashboard"
@@ -132,9 +129,6 @@ def render_top_nav():
         with cols[i]:
             if st.button(tab, key=f"nav_{tab}"):
                 st.session_state.page = tab
-                st.rerun()   # 🔥 THIS FIXES NAVIGATION
-
-    st.divider()
 
 # =========================
 # MOBILE NAV
@@ -345,10 +339,6 @@ def render_navigation():
         <div>Executive View</div>
     </div>
     """, unsafe_allow_html=True)
-inject_enterprise_theme()
-render_header()
-render_top_nav()
-render_mobile_nav()
 
 # =========================
 # KPI CARDS

@@ -4,6 +4,22 @@ from pathlib import Path
 from utils import load_master_data, load_company_logo, render_line_chart, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation, inject_enterprise_theme, render_top_nav, extract_projects, render_bar_chart, render_kpi_cards, render_header, render_kpi_strip
 from auth import login
 # =========================
+# PATHS
+# =========================
+BASE_DIR = Path(__file__).resolve().parent
+
+EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
+ASSETS = BASE_DIR / "assets"
+
+EVOMEC_LOGO = ASSETS / "evomec_logo.png"
+NLNG_LOGO = ASSETS / "nlng_logo.png"
+
+# =========================
+# DATA LOAD
+# =========================
+data = load_master_data("data/QAQC_Master.xlsx")
+
+# =========================
 # CONFIG (MUST BE FIRST)
 # =========================
 st.set_page_config(
@@ -14,28 +30,6 @@ st.set_page_config(
 )
 if not login():
     st.stop()
-
-page_map = {
-    "Dashboard": "app",
-    "Audit": "audit",
-    "Concrete": "concrete",
-    "CTQ": "ctq",
-    "NCR": "ncr",
-    "OBS": "obs",
-    "Lessons Learned": "lessons",
-    "Document Register": "documents",
-    "Data Explorer": "explorer",
-    "ITR log": "itr"
-}
-# =========================
-# INIT STATE (FIRST THING)
-# =========================
-if "page" not in st.session_state:
-    st.session_state.page = "Dashboard"
-# =========================
-# DATA LOAD
-# =========================
-data = load_master_data("data/QAQC_Master.xlsx")
 # =========================
 # READ STATE
 # =========================
@@ -74,31 +68,31 @@ elif page == "Data Explorer":
 elif page == "ITR log":
     st.title("ITR Log")
     st.write(data.get("ITR Log"))
+
+page_map = {
+    "Dashboard": "app",
+    "Audit": "audit",
+    "Concrete": "concrete",
+    "CTQ": "ctq",
+    "NCR": "ncr",
+    "OBS": "obs",
+    "Lessons Learned": "lessons",
+    "Document Register": "documents",
+    "Data Explorer": "explorer",
+    "ITR log": "itr"
+}
+# =========================
+# INIT STATE (FIRST THING)
+# =========================
+if "page" not in st.session_state:
+    st.session_state.page = "Dashboard"
+
+
 # =========================
 # THEME
 # =========================
 inject_enterprise_theme()
-utils.render_header()
-utils.render_top_nav()
-# =========================
-# HEADER + NAV
-# =========================
-render_top_nav()
-
-st.divider()
-
-# =========================
-# PATHS
-# =========================
-BASE_DIR = Path(__file__).resolve().parent
-
-EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
-ASSETS = BASE_DIR / "assets"
-
-EVOMEC_LOGO = ASSETS / "evomec_logo.png"
-NLNG_LOGO = ASSETS / "nlng_logo.png"
-
-
+render_header()
 
 # =========================
 # KPIs (EXAMPLE)
