@@ -1,30 +1,39 @@
 import streamlit as st
 import utils
 from pathlib import Path
-from utils import load_master_data, load_company_logo, render_line_chart, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation, inject_enterprise_theme, render_top_nav, extract_projects, render_bar_chart, render_kpi_cards
+from utils import load_master_data, load_company_logo, render_line_chart, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation, inject_enterprise_theme, render_top_nav, extract_projects, render_bar_chart, render_kpi_cards, render_header, render_kpi_strip
 from auth import login
+# =========================
+# CONFIG (MUST BE FIRST)
+# =========================
 st.set_page_config(
     page_title="Evomec QA/QC Executive Dashboard",
     page_icon="🏗️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-inject_enterprise_theme()
-render_top_nav()
 
-utils.inject_enterprise_theme()
-utils.render_header()
-utils.render_top_nav()
-
-data = utils.load_master_data(utils.EXCEL_FILE)
-
-data = utils.global_filter_sidebar(data)
-
-utils.render_kpi_cards(render_kpi_cards)
+# =========================
+# AUTH (DO FIRST)
+# =========================
 if not login():
     st.stop()
 
+# =========================
+# THEME
+# =========================
+inject_enterprise_theme()
 
+# =========================
+# HEADER + NAV
+# =========================
+render_top_nav()
+
+st.divider()
+
+# =========================
+# PATHS
+# =========================
 BASE_DIR = Path(__file__).resolve().parent
 
 EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
@@ -32,7 +41,27 @@ ASSETS = BASE_DIR / "assets"
 
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
+# =========================
+# DATA LOAD
+# =========================
+data = load_master_data(EXCEL_FILE)
 
+# =========================
+# FILTERS
+# =========================
+data = global_filter_sidebar(data)
+# =========================
+# KPIs (EXAMPLE)
+# =========================
+
+st.divider()
+
+# =========================
+# DATA PREVIEW
+# =========================
+for name, df in data.items():
+    st.markdown(f"### {name}")
+    render_table(df, height=250)
 
 def safe_path(path):
     return str(path) if path.exists() else None
