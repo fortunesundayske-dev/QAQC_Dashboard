@@ -1,7 +1,7 @@
 import streamlit as st
 import utils
 from pathlib import Path
-from utils import load_master_data, load_company_logo, render_line_chart, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation, inject_enterprise_theme, render_top_nav, extract_projects, render_bar_chart, render_kpi_cards, render_header, render_kpi_strip
+from utils import load_master_data, load_company_logo, render_line_chart, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation, inject_enterprise_theme, render_top_nav, extract_projects, render_bar_chart, render_kpi_cards, render_header, render_kpi_strip, render_workspace, render_top_nav, render_drilldown
 from auth import login
 # =========================
 # PATHS
@@ -43,10 +43,7 @@ if not login():
 # =========================
 inject_enterprise_theme()
 render_header()
-
-# =========================
-# KPIs (EXAMPLE)
-# =========================
+render_workspace()
 
 st.divider()
 
@@ -154,106 +151,11 @@ else:
 
 st.markdown("---")
 
-def render_top_nav():
-    st.markdown("### QA/QC Dashboard Navigation")
+render_top_nav()
+render_workspace()
 
-    if st.button("🏠 Dashboard"):
-        st.switch_page("app.py")
 
-    if st.button("🏗 Concrete Tracker"):
-        st.switch_page("pages/Concrete_Tracker.py")
 
-    if st.button("📛 NCR Log"):
-        st.switch_page("pages/NCR_Tracker.py")
-
-    if st.button("👁 OBS Log"):
-        st.switch_page("pages/OBS_Tracker.py")
-
-    if st.button("📋 Audit"):
-        st.switch_page("pages/Audit.py")
-
-    if st.button("🔍 Surveillance"):
-        st.switch_page("pages/Surveillance.py")
-
-    if st.button("📚 Lessons Learned"):
-        st.switch_page("pages/Lessons_Learned.py")
-
-    if st.button("📁 Document Register"):
-        st.switch_page("pages/Document_Register.py")
-    
-
-def render_workspace():
-    tab1, tab2, tab3 = st.tabs([
-        "📊 Overview",
-        "📁 Data Explorer",
-        "📈 Analytics"
-    ])
-
-    with tab1:
-        st.subheader("Project Overview")
-        st.write("KPIs, trends, and summary insights go here")
-
-    with tab2:
-        st.subheader("Raw Data")
-        st.dataframe(st.session_state.get("data", {}))
-
-    with tab3:
-        st.subheader("Analytics")
-        st.write("Charts (Plotly recommended)")
-with st.sidebar:
-    st.title("🔍 Global Controls")
-    data = global_filter_sidebar(data)
-
-def render_drilldown(df, id_col="ID"):
-
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        st.info("No data available")
-        return
-
-    if id_col not in df.columns:
-        st.error(f"Column '{id_col}' not found")
-        return
-
-    # =========================
-    # SAFE ID CLEANING
-    # =========================
-    ids = df[id_col].dropna().astype(str).unique().tolist()
-
-    selected = st.selectbox(
-    f"Select {id_col}",
-    options=["-- Select --"] + ids,
-    key=f"drilldown_{id_col}"
-)
-
-    if selected == "-- Select --":
-        st.warning("Please select a record to view details")
-        return
-
-    # =========================
-    # FILTER SAFE MATCH
-    # =========================
-    selected_row = df[df[id_col].astype(str) == selected]
-
-    # =========================
-    # UX IMPROVEMENT: SUMMARY FIRST
-    # =========================
-    st.subheader("🔎 Record Summary")
-
-    st.dataframe(
-        selected_row.head(1),
-        use_container_width=True
-    )
-
-    # =========================
-    # FULL DETAIL EXPANDER
-    # =========================
-    with st.expander("📄 Full Record Details", expanded=True):
-        st.dataframe(
-            selected_row,
-            use_container_width=True
-        )
-
-    return selected_row
 sheet_names = list(data.keys())
 
 if len(sheet_names) > 0:
@@ -272,22 +174,7 @@ if len(sheet_names) > 0:
             num_col = first_df.select_dtypes(include="number").columns[0]
             render_bar_chart(first_df, first_df.columns[0], num_col, "Distribution")
 
-def project_filter_sidebar(projects, page="main"):
-    if "global_project" not in st.session_state:
-        st.session_state.global_project = "All"
 
-    selected = st.sidebar.selectbox(
-        "Project",
-        ["All"] + projects,
-        index=(
-            ["All"] + projects).index(st.session_state.global_project)
-            if st.session_state.global_project in projects
-            else 0,
-        key=f"global_project_filter_{page}"
-    )
-
-    st.session_state.global_project = selected
-    return selected
 
 # =========================
 # PROJECT LIST

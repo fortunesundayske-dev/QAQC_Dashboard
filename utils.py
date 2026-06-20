@@ -80,26 +80,6 @@ def render_header():
 # =========================
 # NAVIGATION (TOP)
 # =========================
-def render_top_nav():
-    st.markdown("### QA/QC Navigation")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        if st.button("🏗 Concrete"):
-            st.switch_page("pages/Concrete_Tracker.py")
-
-    with col2:
-        if st.button("📛 NCR"):
-            st.switch_page("pages/NCR_Tracker.py")
-
-    with col3:
-        if st.button("👁 OBS"):
-            st.switch_page("pages/OBS_Tracker.py")
-
-    with col4:
-        if st.button("📊 Dashboard"):
-            st.switch_page("app.py")
 
 # =========================
 # MOBILE NAV
@@ -359,6 +339,90 @@ def build_gradient_cards(kpis):
     st.markdown('</div>', unsafe_allow_html=True)
 
 
+def render_top_nav():
+    st.markdown("### QA/QC Dashboard Navigation")
+
+    if st.button("🏠 Dashboard"):
+        st.switch_page("app.py")
+
+    if st.button("🏗 Concrete Tracker"):
+        st.switch_page("pages/Concrete_Tracker.py")
+
+    if st.button("📛 NCR Log"):
+        st.switch_page("pages/NCR_Tracker.py")
+
+    if st.button("👁 OBS Log"):
+        st.switch_page("pages/OBS_Tracker.py")
+
+    if st.button("📋 Audit"):
+        st.switch_page("pages/Audit.py")
+
+    if st.button("🔍 Surveillance"):
+        st.switch_page("pages/Surveillance.py")
+
+    if st.button("📚 Lessons Learned"):
+        st.switch_page("pages/Lessons_Learned.py")
+
+    if st.button("📁 Document Register"):
+        st.switch_page("pages/Document_Register.py")
+    
+def render_drilldown(df, id_col="ID"):
+
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        st.info("No data available")
+        return
+
+    if id_col not in df.columns:
+        st.error(f"Column '{id_col}' not found")
+        return
+
+
+    # =========================
+    # SAFE ID CLEANING
+    # =========================
+    ids = df[id_col].dropna().astype(str).unique().tolist()
+
+    selected = st.selectbox(
+    f"Select {id_col}",
+    options=["-- Select --"] + ids,
+    key=f"drilldown_{id_col}"
+)
+
+    if selected == "-- Select --":
+        st.warning("Please select a record to view details")
+        return
+
+    # =========================
+    # FILTER SAFE MATCH
+    # =========================
+    selected_row = df[df[id_col].astype(str) == selected]
+
+    # =========================
+    # UX IMPROVEMENT: SUMMARY FIRST
+    # =========================
+    st.subheader("🔎 Record Summary")
+
+    st.dataframe(
+        selected_row.head(1),
+        use_container_width=True
+    )
+
+def project_filter_sidebar(projects, page="main"):
+    if "global_project" not in st.session_state:
+        st.session_state.global_project = "All"
+
+    selected = st.sidebar.selectbox(
+        "Project",
+        ["All"] + projects,
+        index=(
+            ["All"] + projects).index(st.session_state.global_project)
+            if st.session_state.global_project in projects
+            else 0,
+        key=f"global_project_filter_{page}"
+    )
+
+    st.session_state.global_project = selected
+    return selected
 # =========================
 # UI STYLING
 # =========================
@@ -579,6 +643,7 @@ def render_kpi_strip(kpis):
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+
 def render_workspace():
     tab1, tab2, tab3 = st.tabs([
         "📊 Overview",
@@ -588,7 +653,7 @@ def render_workspace():
 
     with tab1:
         st.subheader("Project Overview")
-        st.write("KPIs, trends, and summary insights go here")
+        st.info("KPIs, trends, and summary insights go here")
 
     with tab2:
         st.subheader("Raw Data")
@@ -597,6 +662,7 @@ def render_workspace():
     with tab3:
         st.subheader("Analytics")
         st.write("Charts (Plotly recommended)")
+
 import plotly.express as px
 
 def render_line_chart(df, x, y, title="Trend"):
