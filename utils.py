@@ -121,10 +121,11 @@ def render_top_nav():
     tabs = ["Dashboard","Audit","Concrete","CTQ","NCR","OBS","ITR","Reports","Rework","Lessons"]
 
     cols = st.columns(len(tabs))
+
     for i, t in enumerate(tabs):
         with cols[i]:
-            st.button(t)
-
+            if st.button(t, key=f"nav_{t}"):
+                st.session_state.page = t
 # =========================
 # MOBILE NAV
 # =========================
