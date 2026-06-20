@@ -3,6 +3,26 @@ import utils
 from pathlib import Path
 from utils import load_master_data, load_company_logo, render_line_chart, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation, inject_enterprise_theme, render_top_nav, extract_projects, render_bar_chart, render_kpi_cards, render_header, render_kpi_strip
 from auth import login
+page_map = {
+    "Dashboard": "app",
+    "Audit": "audit",
+    "Concrete": "concrete",
+    "CTQ": "ctq",
+    "NCR": "ncr",
+    "OBS": "obs"
+}
+
+current_page = st.session_state.get("page", "Dashboard")
+if current_page == "Dashboard":
+    st.write("Dashboard content here")
+
+elif current_page == "Audit":
+    st.write("Audit page content")
+
+elif current_page == "Concrete":
+    st.write("Concrete page content")
+    # 6. NAV STATE
+page = st.session_state.page
 # =========================
 # CONFIG (MUST BE FIRST)
 # =========================
@@ -138,8 +158,7 @@ kpis = [
     {"label": "Surveillance Planned", "value": int(surv_df["Status"].notna().sum()) if "Status" in surv_df.columns else 0, "color": "#a855f7"},
     {"label": "Lessons Learned", "value": len(lessons_df), "color": "#22d3ee"},
 ]
-
-build_gradient_cards(kpis)
+render_kpi_cards(kpis)
 def render_kpi_card(kpis):
     st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
 

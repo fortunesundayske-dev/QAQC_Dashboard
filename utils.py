@@ -123,16 +123,18 @@ def render_top_nav():
         "Dashboard","Audit","Concrete","CTQ",
         "NCR","OBS","ITR","Reports","Rework","Lessons"
     ]
+    if "page" not in st.session_state:
+        st.session_state.page = "Dashboard"
 
     cols = st.columns(len(tabs))
 
-    for i, t in enumerate(tabs):
+    for i, tab in enumerate(tabs):   # 👈 tab is defined HERE
         with cols[i]:
-            st.button(
-                label=str(t),              # 🔥 FORCE STRING
-                key=f"topnav_{i}_{t}"     # 🔥 GUARANTEED UNIQUE
-            )
-    
+            if st.button(tab, key=f"nav_{tab}"):
+                st.session_state.page = tab
+
+    st.divider()
+
 # =========================
 # MOBILE NAV
 # =========================
