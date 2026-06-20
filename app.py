@@ -145,7 +145,6 @@ kpis = [
 
 inject_global_ui()
 render_kpi_cards(kpis)
-st.write("DEBUG AFTER KPI")
 
 st.markdown("---")
 st.subheader("Data Source Overview")

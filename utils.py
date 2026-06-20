@@ -1,4 +1,3 @@
-print("UTILS VERSION 20-JUN-2026")
 from click import style
 import streamlit as st
 import pandas as pd
@@ -90,6 +89,7 @@ def render_mobile_nav():
 # KPI CARDS
 # =========================
 def render_kpi_cards(kpis):
+    
     rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
 
     for row in rows:
@@ -99,7 +99,8 @@ def render_kpi_cards(kpis):
             with cols[i]:
                 color = kpi.get("color", "#2563eb")
 
-                st.markdown(f"""
+            st.markdown(
+                f"""
                 <div style="
                     background: linear-gradient(135deg, {color}, #111827);
                     padding: 20px;
@@ -116,8 +117,9 @@ def render_kpi_cards(kpis):
                 </div>
                 """, 
                 unsafe_allow_html=True
-                )
+            )
 
+    st.success("KPI function running")
 # =========================
 # SECTION WRAPPER
 # =========================
