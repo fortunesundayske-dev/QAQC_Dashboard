@@ -111,8 +111,13 @@ for df in data.values():
     )
 
 
+# 1. LOAD DATA FIRST
+data = load_master_data(EXCEL_FILE)
+
+# 2. FILTER DATA (if needed)
 filtered_data = global_filter_sidebar(data)
 
+# 3. DERIVE KPI SOURCE DATA (THIS BLOCK GOES HERE ⬇️)
 projects = extract_projects(data)
 project_count = len(projects)
 
@@ -125,6 +130,7 @@ surv_df = data.get("Surveillance Register", pd.DataFrame())
 doc_df = data.get("Document Register", pd.DataFrame())
 lessons_df = data.get("Lessons Learned", pd.DataFrame())
 
+# 4. BUILD KPI LIST (THIS IS YOUR BLOCK)
 kpis = [
     {"label": "Total Projects", "value": project_count, "color": "#2563eb"},
     {"label": "Daily Reports", "value": len(data.get("Daily Reports", pd.DataFrame())), "color": "#047857"},
@@ -142,8 +148,9 @@ kpis = [
     {"label": "Lessons Learned", "value": len(lessons_df), "color": "#22d3ee"},
 ]
 
-inject_global_ui()
+# 5. RENDER UI AFTER KPI BUILD
 render_kpi_cards(kpis)
+inject_global_ui()
 
 st.markdown("---")
 st.subheader("Data Source Overview")
