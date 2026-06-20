@@ -89,16 +89,34 @@ def render_mobile_nav():
 # KPI CARDS
 # =========================
 def render_kpi_cards(kpis):
-    for kpi in kpis:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div>{kpi['label']}</div>
-            <div style="font-size:30px;font-weight:800;">
-                {kpi['value']}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
 
+    for row in rows:
+        cols = st.columns(2)
+
+        for i, kpi in enumerate(row):
+            with cols[i]:
+
+                color = kpi.get("color", "#2563eb")
+
+                st.markdown(f"""
+                <div style="
+                    background: {color};
+                    padding: 18px;
+                    border-radius: 16px;
+                    color: white;
+                    min-height: 110px;
+                    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+                ">
+                    <div style="font-size:13px; opacity:0.9;">
+                        {kpi['label']}
+                    </div>
+
+                    <div style="font-size:30px; font-weight:800; margin-top:6px;">
+                        {kpi['value']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 # =========================
 # SECTION WRAPPER
 # =========================
@@ -608,19 +626,19 @@ def apply_filters(df, filters=None, date_column=None):
 
 
 
-def render_kpi_strip(kpis):
-    st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
+#def render_kpi_strip(kpis):
+    #st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
 
-    cols = st.columns(len(kpis))
+    #cols = st.columns(len(kpis))
 
-    for i, kpi in enumerate(kpis):
-        with cols[i]:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-title">{kpi['label']}</div>
-                <div class="kpi-value">{kpi['value']}</div>
-            </div>
-            """, unsafe_allow_html=True)
+    #for i, kpi in enumerate(kpis):
+        #with cols[i]:
+           # st.markdown(f"""
+            #<div class="kpi-card">
+                #<div class="kpi-title">{kpi['label']}</div>
+                #<div class="kpi-value">{kpi['value']}</div>
+            #</div>
+            #""", unsafe_allow_html=True)
 
 
 import plotly.express as px
