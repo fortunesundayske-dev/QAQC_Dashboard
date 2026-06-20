@@ -274,57 +274,7 @@ def render_navigation():
         if st.button(label, key=f"nav_{label}"):
             st.switch_page(page)
 
-    
-    #st.markdown("""
-   # <div style="
-       # display:flex;
-       # justify-content:space-between;
-       # align-items:center;
-       # padding:10px 20px;
-        #background:#111827;
-        #border-radius:10px;
-        #margin-bottom:10px;
-        #color:white;
-    #">
-     #   <div><b>🏗 QA/QC Dashboard</b></div>
-      #  <div>Executive View</div>
-    #</div>
-    #""", unsafe_allow_html=True)
-
-# =========================
-# KPI CARDS
-# =========================
-
-#def build_gradient_cards(kpis):
-    # split into rows of 2
-    #rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
-
-    #for row in rows:
-        #cols = st.columns(2)
-
-        #for i, kpi in enumerate(row):
-            #with cols[i]:
-                #st.markdown(
-                    #f"""
-                    #<div style="
-                      #  background: {kpi.get('color', '#1f2937')};
-                       # padding: 20px;
-                       # border-radius: 16px;
-                       # color: white;
-                      #  box-shadow: 0 10px 20px rgba(0,0,0,0.15);
-                       # min-height: 110px;
-                    #">
-                     #   <div style="font-size:14px; opacity:0.9;">
-                       #     {kpi['label']}
-                      #  </div>
-                      #  <div style="font-size:32px; font-weight:700; margin-top:10px;">
-                      #      {kpi['value']}
-                      #  </div>
-                   # </div>
-                   # """,
-                   # unsafe_allow_html=True
-              #  )
-
+ 
 
 
 def render_top_nav():
