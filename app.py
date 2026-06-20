@@ -12,24 +12,34 @@ page_map = {
     "OBS": "obs"
 }
 # =========================
-# ROUTER
+# INIT STATE (FIRST THING)
+# =========================
+if "page" not in st.session_state:
+    st.session_state.page = "Dashboard"
+
+# =========================
+# READ STATE
 # =========================
 page = st.session_state.page
 
+# =========================
+# NAV / UI
+# =========================
+st.write("Current page:", page)
+
+# Example navigation
+if st.button("Go Audit"):
+    st.session_state.page = "Audit"
+    st.rerun()
+
+# =========================
+# ROUTER
+# =========================
 if page == "Dashboard":
-    st.write("Dashboard content here")
+    st.write("Dashboard content")
 
 elif page == "Audit":
-    st.write("Audit page content")
-
-elif page == "Concrete":
-    st.write("Concrete page content")
-
-elif page == "CTQ":
-    st.write("CTQ page content")
-
-elif page == "NCR":
-    st.write("NCR page content")
+    st.write("Audit content")
 # =========================
 # CONFIG (MUST BE FIRST)
 # =========================
