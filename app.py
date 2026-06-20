@@ -111,6 +111,9 @@ for df in data.values():
         df["Project"].dropna().astype(str).unique()
     )
 
+
+filtered_data = global_filter_sidebar(data)
+
 projects = extract_projects(data)
 project_count = len(projects)
 
@@ -189,7 +192,6 @@ project_count = len(projects)
 
 st.sidebar.caption(f"Total Projects: {project_count}")
 
-filtered_data = global_filter_sidebar(data)
 
 # =========================
 # FILTER UI

@@ -115,7 +115,8 @@ def render_kpi_cards(kpis):
                     </div>
                 </div>
                 """, 
-                unsafe_allow_html=True)
+                unsafe_allow_html=True
+                )
 
 # =========================
 # SECTION WRAPPER
@@ -431,47 +432,6 @@ def inject_global_ui():
 
 
 
-def apply_filters(df, filters=None, date_column=None):
-    if not isinstance(df, pd.DataFrame):
-        return df
-
-    filtered_df = df.copy()
-
-    # =========================
-    # 1. COLUMN FILTERS
-    # =========================
-    if isinstance(filters, dict) and filters:
-
-        for col, value in filters.items():
-
-            if (
-                value is not None
-                and col in filtered_df.columns
-                and value != "All"
-            ):
-                filtered_df = filtered_df[filtered_df[col] == value]
-
-    # =========================
-    # 2. DATE CLEANING (SAFE)
-    # =========================
-    if date_column and date_column in filtered_df.columns:
-
-        filtered_df = filtered_df.copy()
-
-        filtered_df[date_column] = pd.to_datetime(
-            filtered_df[date_column],
-            errors="coerce"
-        )
-
-        filtered_df = filtered_df.dropna(subset=[date_column])
-
-        # OPTIONAL: sort for charts (VERY IMPORTANT)
-        filtered_df = filtered_df.sort_values(by=date_column)
-
-    return filtered_df
-
-
-
 def render_line_chart(df, x, y, title="Trend"):
     if df.empty:
         st.info("No data for chart")
@@ -556,4 +516,29 @@ def global_filter_sidebar(data, page="main"):
         else:
             filtered[k] = df
 
-    return filtered
+
+
+def apply_filters(df, filters=None, date_column=None):
+
+    if not isinstance(df, pd.DataFrame):
+        return df
+
+    filtered_df = df.copy()
+
+    if isinstance(filters, dict):
+        for col, value in filters.items():
+            if value is not None and col in filtered_df.columns:
+                filtered_df = filtered_df[
+                    filtered_df[col] == value
+                ]
+
+    if date_column and date_column in filtered_df.columns:
+        filtered_df[date_column] = pd.to_datetime(
+            filtered_df[date_column],
+            errors="coerce"
+        )
+        filtered_df = filtered_df.dropna(
+            subset=[date_column]
+        )
+
+    return filtered_df
