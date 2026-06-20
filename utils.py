@@ -130,17 +130,25 @@ def render_header():
 # NAVIGATION (TOP)
 # =========================
 def render_top_nav():
-    tabs = ["Dashboard", "Audit", "Concrete", "CTQ", "NCR", "OBS", "ITR", "Reports"]
+    st.markdown("### QA/QC Navigation")
 
-    if "page" not in st.session_state:
-        st.session_state.page = "Dashboard"
+    col1, col2, col3, col4 = st.columns(4)
 
-    cols = st.columns(len(tabs))
+    with col1:
+        if st.button("🏗 Concrete"):
+            st.switch_page("pages/Concrete_Tracker.py")
 
-    for i, tab in enumerate(tabs):
-        with cols[i]:
-            if st.button(tab, key=f"nav_{tab}"):
-                st.session_state.page = tab
+    with col2:
+        if st.button("📛 NCR"):
+            st.switch_page("pages/NCR_Tracker.py")
+
+    with col3:
+        if st.button("👁 OBS"):
+            st.switch_page("pages/OBS_Tracker.py")
+
+    with col4:
+        if st.button("📊 Dashboard"):
+            st.switch_page("app.py")
 
 # =========================
 # MOBILE NAV

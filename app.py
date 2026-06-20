@@ -35,8 +35,7 @@ if not login():
 # =========================
 # INIT STATE (FIRST THING)
 # =========================
-if "page" not in st.session_state:
-    st.session_state.page = "Dashboard"
+
 
 
 # =========================
