@@ -125,6 +125,7 @@ def render_top_nav():
         tabs,
         horizontal=True,
         key="top_nav"
+
     )
 
     st.session_state.page = selected
