@@ -186,8 +186,6 @@ if len(sheet_names) > 0:
 # =========================
 # PROJECT LIST
 # =========================
-projects = extract_projects(data)
-project_count = len(projects)
 
 st.sidebar.caption(f"Total Projects: {project_count}")
 
