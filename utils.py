@@ -1,3 +1,4 @@
+from click import style
 import streamlit as st
 import pandas as pd
 from pathlib import Path
@@ -68,6 +69,17 @@ def inject_enterprise_theme():
         background: linear-gradient(135deg, #1f2937, #111827);
         box-shadow: 0 8px 20px rgba(0,0,0,0.35);
     }
+
+    .kpi-card {
+        transition: all 0.25s ease;
+        cursor: pointer;
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-6px) scale(1.03);
+        box-shadow: 0 0 25px rgba(255,255,255,0.15);
+    }
+
  .kpi-title {
         font-size: 13px;
         opacity: 0.8;
@@ -142,30 +154,62 @@ def render_mobile_nav():
 # KPI CARDS
 # =========================
 def render_kpi_cards(kpis):
-    cols = st.columns(len(kpis))
+    rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
 
-    for i, k in enumerate(kpis):
-        with cols[i]:
-            delta = k.get("delta", None)
-            trend = ""
+    for row in rows:
+        cols = st.columns(2)
 
-            if delta is not None:
-                trend = f"<div style='font-size:12px;color:#22c55e;'>▲ {delta}%</div>"
+        for i, kpi in enumerate(row):
+            with cols[i]:
+                st.markdown(
+                f"""
+                <div class="kpi-card" style="
+                    background: linear-gradient(135deg, {kpi.get('color', '#2563eb')}, #111827);
+                    padding: 20px;
+                    border-radius: 16px;
+                    color: white;
+                    border-left: 5px solid {kpi.get('color', '#2563eb')};
+                    margin-bottom: 12px;
+                ">
+        <div style="font-size:14px; opacity:0.9;">
+            {kpi['label']}
+        </div>
 
-            st.markdown(f"""
-            <div style="
-                background: linear-gradient(135deg, #1e293b, #0f172a);
-                padding:18px;
-                border-radius:16px;
-                color:white;
-                box-shadow:0 10px 25px rgba(0,0,0,0.4);
-                border:1px solid #334155;
-            ">
-                <div style="font-size:12px;opacity:0.7">{k['label']}</div>
-                <div style="font-size:28px;font-weight:700">{k['value']}</div>
-                {trend}
-            </div>
-            """, unsafe_allow_html=True)
+        <div style="font-size:32px; font-weight:700; margin-top:8px;">
+            {kpi['value']}
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+                st.markdown(
+    f"""
+    <div class="kpi-card" style="
+        background: linear-gradient(
+            135deg,
+            {kpi.get('color', '#2563eb')},
+            #111827
+        );
+        padding:20px;
+        border-radius:16px;
+        color:white;
+        border-left:5px solid {kpi.get('color', '#2563eb')};
+    ">
+        <div style="font-size:14px;">
+            {kpi['label']}
+        </div>
+
+        <div style="
+            font-size:32px;
+            font-weight:700;
+            margin-top:10px;
+        ">
+            {kpi['value']}
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 st.divider()
 
 st.subheader("📊 Executive Analytics")
@@ -306,7 +350,6 @@ def extract_projects(data):
 # =========================
 # NAV (FULL)
 # =========================
-import streamlit as st
 
 def render_navigation():
     st.markdown("### 🧭 Page Navigation")
@@ -392,7 +435,17 @@ def build_gradient_cards(kpis):
 def inject_global_ui():
     st.markdown("""
     <style>
+    
+    /* KPI Hover Effect */
+    .kpi-card {
+        transition: all 0.25s ease;
+        cursor: pointer;
+    }
 
+    .kpi-card:hover {
+        transform: translateY(-6px) scale(1.03);
+        box-shadow: 0 0 25px rgba(255,255,255,0.15);
+    }
     /* =========================
        ENTERPRISE DARK THEME
     ========================== */

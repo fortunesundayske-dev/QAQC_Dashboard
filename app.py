@@ -165,46 +165,9 @@ kpis = [
     {"label": "Surveillance Planned", "value": int(surv_df["Status"].notna().sum()) if "Status" in surv_df.columns else 0, "color": "#a855f7"},
     {"label": "Lessons Learned", "value": len(lessons_df), "color": "#22d3ee"},
 ]
-
-def render_kpi_card(kpis):
-    st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
-
-    cols = st.columns(len(kpis))
-
-    for i, kpi in enumerate(kpis):
-        with cols[i]:
-            st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-title">{kpi['label']}</div>
-                <div class="kpi-value">{kpi['value']}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-st.markdown("""
-<style>
-
-/* KPI Hover Effect */
-.kpi-card {
-    transition: all 0.25s ease;
-    cursor: pointer;
-}
-
-.kpi-card:hover {
-    transform: translateY(-6px) scale(1.03);
-    box-shadow: 0 0 25px rgba(255,255,255,0.15);
-}
-            
-<div class="kpi-card" style="
-    background: linear-gradient(135deg, {kpi['color']}, #111827);
-    padding:18px;
-    border-radius:16px;
-    color:white;
-    border-left:5px solid {kpi['color']};
-">
-
-</style>
-""", unsafe_allow_html=True)
+st.write(kpis)
+render_kpi_cards(kpis)
+inject_global_ui()
 
 st.markdown("---")
 st.subheader("Data Source Overview")
