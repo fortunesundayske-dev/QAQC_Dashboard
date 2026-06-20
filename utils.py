@@ -114,6 +114,7 @@ def render_kpi_cards(kpis):
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
 # =========================
 # SECTION WRAPPER
 # =========================
@@ -190,22 +191,18 @@ def render_table(df, height=300):
     else:
         st.info("No data")
 
-
 def render_table_with_details(
     df,
     id_col=None,
     table_columns=None,
     detail_label="Details"
 ):
-    
-    
-    if df is None or df.empty:
+    if not isinstance(df, pd.DataFrame) or df.empty:
         st.info("No data available")
-        return
+        return None
 
     display_df = df.copy()
 
-    # filter columns safely
     if table_columns:
         valid_cols = [c for c in table_columns if c in display_df.columns]
         if valid_cols:
@@ -214,17 +211,20 @@ def render_table_with_details(
     st.subheader(detail_label)
     st.dataframe(display_df, use_container_width=True)
 
-    # optional drill-down
     if id_col and id_col in df.columns:
-        selected = st.selectbox(
-            f"Select {id_col}",
+        selected_id = st.selectbox(
+            f"Select {detail_label} ID",
             df[id_col].dropna().astype(str).unique()
         )
 
-        st.dataframe(
-            df[df[id_col].astype(str) == selected],
-            use_container_width=True
-        )
+        selected_row = df[df[id_col].astype(str) == selected_id]
+
+        st.write("Selected Record")
+        st.dataframe(selected_row, use_container_width=True)
+
+        return selected_row
+
+    return display_df
 
 # =========================
 # UTILITIES
@@ -275,21 +275,21 @@ def render_navigation():
             st.switch_page(page)
 
     
-    st.markdown("""
-    <div style="
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        padding:10px 20px;
-        background:#111827;
-        border-radius:10px;
-        margin-bottom:10px;
-        color:white;
-    ">
-        <div><b>🏗 QA/QC Dashboard</b></div>
-        <div>Executive View</div>
-    </div>
-    """, unsafe_allow_html=True)
+    #st.markdown("""
+   # <div style="
+       # display:flex;
+       # justify-content:space-between;
+       # align-items:center;
+       # padding:10px 20px;
+        #background:#111827;
+        #border-radius:10px;
+        #margin-bottom:10px;
+        #color:white;
+    #">
+     #   <div><b>🏗 QA/QC Dashboard</b></div>
+      #  <div>Executive View</div>
+    #</div>
+    #""", unsafe_allow_html=True)
 
 # =========================
 # KPI CARDS
@@ -576,51 +576,6 @@ def apply_filters(df, filters=None, date_column=None):
         filtered_df = filtered_df.sort_values(by=date_column)
 
     return filtered_df
-    """
-    Flexible table renderer for QAQC dashboard pages.
-    Supports:
-    - column selection
-    - ID column awareness
-    - safe dataframe rendering
-    """
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        st.info("No data available")
-        return None
-
-    display_df = df.copy()
-
-    # =========================
-    # COLUMN FILTERING
-    # =========================
-    if table_columns:
-        valid_cols = [c for c in table_columns if c in display_df.columns]
-        if valid_cols:
-            display_df = display_df[valid_cols]
-
-    # =========================
-    # DISPLAY TABLE
-    # =========================
-    st.subheader(detail_label)
-    st.dataframe(display_df, use_container_width=True)
-
-    # =========================
-    # OPTIONAL ID INFO
-    # =========================
-    if id_col and id_col in df.columns:
-        selected_id = st.selectbox(
-            f"Select {detail_label} ID",
-            df[id_col].dropna().astype(str).unique()
-        )
-
-        selected_row = df[df[id_col].astype(str) == selected_id]
-
-        st.write("Selected Record:")
-        st.dataframe(selected_row, use_container_width=True)
-
-        return selected_row
-
-    return display_df
-
 
 
 #def render_kpi_strip(kpis):
