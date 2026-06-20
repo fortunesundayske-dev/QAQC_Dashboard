@@ -50,7 +50,7 @@ st.title("NCR Tracker")
 st.markdown("Monitor non-conformance records, aging, and closeout performance across projects.")
 
 filters = global_filter_sidebar(load_master_data(DATA_FILE))
-data = load_master_data(DATA_FILE)
+data = load_master_data("data/QAQC_Master.xlsx")
 ncr = apply_filters(data.get("NCR Log", pd.DataFrame()), filters, date_column="Date Raised")
 
 if ncr.empty:

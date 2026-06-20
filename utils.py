@@ -252,15 +252,40 @@ def render_table(df, height=300):
         st.info("No data")
 
 
-def render_table_with_details(df, id_col=None):
-    if not isinstance(df, pd.DataFrame):
+def render_table_with_details(
+    df,
+    id_col=None,
+    table_columns=None,
+    detail_label="Details"
+):
+    
+    
+    if df is None or df.empty:
+        st.info("No data available")
         return
 
-    st.dataframe(df, use_container_width=True)
+    display_df = df.copy()
 
+    # filter columns safely
+    if table_columns:
+        valid_cols = [c for c in table_columns if c in display_df.columns]
+        if valid_cols:
+            display_df = display_df[valid_cols]
+
+    st.subheader(detail_label)
+    st.dataframe(display_df, use_container_width=True)
+
+    # optional drill-down
     if id_col and id_col in df.columns:
-        sel = st.selectbox("Select Item", df[id_col].astype(str).unique())
-        return df[df[id_col].astype(str) == sel]
+        selected = st.selectbox(
+            f"Select {id_col}",
+            df[id_col].dropna().astype(str).unique()
+        )
+
+        st.dataframe(
+            df[df[id_col].astype(str) == selected],
+            use_container_width=True
+        )
 
 # =========================
 # UTILITIES

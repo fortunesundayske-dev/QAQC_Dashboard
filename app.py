@@ -27,11 +27,6 @@ page = st.session_state.page
 # =========================
 st.write("Current page:", page)
 
-# Example navigation
-if st.button("Go Audit"):
-    st.session_state.page = "Audit"
-    st.rerun()
-
 # =========================
 # ROUTER
 # =========================
@@ -50,9 +45,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# =========================
-# AUTH (DO FIRST)
-# =========================
 if not login():
     st.stop()
 
@@ -81,7 +73,7 @@ NLNG_LOGO = ASSETS / "nlng_logo.png"
 # =========================
 # DATA LOAD
 # =========================
-data = load_master_data(EXCEL_FILE)
+data = load_master_data("data/QAQC_Master.xlsx")
 
 
 # =========================
