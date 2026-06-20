@@ -41,33 +41,12 @@ def inject_enterprise_theme():
     <style>
 
     .main {
+        background: #f3f4f6;
+        color: #111827;
+    }
+
+    section[data-testid="stSidebar"] {
         background: #e5e7eb;
-    }
-
-    #MainMenu, footer, header {
-        visibility: hidden;
-    }
-
-    .block-container {
-        padding: 1rem 2rem;
-    }
-
-    /* KPI CARD */
-    .kpi {
-        padding: 16px;
-        border-radius: 14px;
-        color: white;
-        background: linear-gradient(135deg, #1f2937, #111827);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.35);
-    }
-
-    /* KPI CARD */
-    .kpi {
-        padding: 16px;
-        border-radius: 14px;
-        color: white;
-        background: linear-gradient(135deg, #1f2937, #111827);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.35);
     }
 
     .kpi-card {
@@ -77,40 +56,12 @@ def inject_enterprise_theme():
 
     .kpi-card:hover {
         transform: translateY(-6px) scale(1.03);
-        box-shadow: 0 0 25px rgba(255,255,255,0.15);
-    }
-
- .kpi-title {
-        font-size: 13px;
-        opacity: 0.8;
-    }
-
-    .kpi-value {
-        font-size: 26px;
-        font-weight: 700;
-        margin-top: 5px;
-    }
-
-    /* NAV TABS */
-    .nav-bar {
-        display:flex;
-        gap:18px;
-        padding:10px 0;
-        font-weight:500;
-        color:#cbd5e1;
-    }
-
-    .nav-item {
-        cursor:pointer;
-    }
-
-    .nav-item:hover {
-        color:white;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
 
     </style>
     """, unsafe_allow_html=True)
-
+    
 # =========================
 # HEADER
 # =========================
@@ -193,9 +144,6 @@ def render_kpi_cards(kpis):
                 </div>
                 """, unsafe_allow_html=True)
        
-st.divider()
-
-st.subheader("📊 Executive Analytics")
 
 # =========================
 # SECTION WRAPPER
