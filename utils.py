@@ -194,7 +194,7 @@ def render_table_with_details(
 
         selected_row = df[df[id_col].astype(str) == selected_id]
 
-        st.write("Selected Record")
+        st.markdown("Selected Record")
         st.dataframe(selected_row, use_container_width=True)
 
         return selected_row
@@ -249,7 +249,6 @@ def render_navigation():
             st.switch_page(page)
 
  
-
 
 def render_top_nav():
     st.markdown("### QA/QC Dashboard Navigation", unsafe_allow_html=True)
@@ -341,15 +340,9 @@ def project_filter_sidebar(projects, page="main"):
 def inject_global_ui():
     
     st.markdown(
-        """
-        <style>
+    """
+    <style>
     
-            /* KPI Hover Effect */
-            .kpi-card {
-            transition: all 0.25s ease;
-            cursor: pointer;
-    }
-
     /* =========================
        ENTERPRISE DARK THEME
     ========================== */
@@ -453,7 +446,8 @@ def inject_global_ui():
     }
     .kpi-card {
     transition: all 0.25s ease;
-}
+    cursor: pointer;
+    }
     </style>
     """, unsafe_allow_html=True)
 
