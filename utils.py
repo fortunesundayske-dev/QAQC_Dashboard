@@ -109,7 +109,6 @@ def render_mobile_nav():
 # =========================
 # KPI CARDS
 # =========================
-
 def render_kpi_cards(kpis):
 
     rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
@@ -117,72 +116,30 @@ def render_kpi_cards(kpis):
     for row in rows:
         cols = st.columns(2)
 
-    for i, kpi in enumerate(kpis):
+        for i, kpi in enumerate(row):
 
-        value = kpi.get("value", 0)
-        label = kpi.get("label", "")
-        color = kpi.get("color", "#2563eb")
-        delta = kpi.get("delta", None)
+            color = kpi.get("color", "#2563eb")
 
-        # -------------------------
-        # ANIMATION (simple count-up effect)
-        # -------------------------
-        placeholder = cols[i].empty()
-
-        animated_value = 0
-        step = max(1, int(value / 30)) if isinstance(value, (int, float)) else 1
-
-        if isinstance(value, (int, float)):
-            for v in range(0, int(value) + 1, step):
-                animated_value = v
-
-                placeholder.markdown(
+            with cols[i]:
+                st.markdown(
                     f"""
                     <div style="
                         background: linear-gradient(135deg, {color}, #111827);
-                        padding: 18px;
+                        padding: 20px;
                         border-radius: 16px;
                         color: white;
-                        box-shadow: 0 8px 20px rgba(0,0,0,0.35);
-                        transition: 0.3s;
                     ">
                         <div style="font-size:13px; opacity:0.8;">
-                            {label}
+                            {kpi['label']}
                         </div>
 
-                        <div style="font-size:30px; font-weight:700;">
-                            {animated_value}
+                        <div style="font-size:30px; font-weight:700; margin-top:6px;">
+                            {kpi['value']}
                         </div>
-
-                        {f"<div style='font-size:12px;color:#22c55e;'>▲ {delta}%</div>" if delta else ""}
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
-
-                time.sleep(0.01)
-
-        else:
-            placeholder.markdown(
-                f"""
-                <div style="
-                    background: linear-gradient(135deg, {color}, #111827);
-                    padding: 18px;
-                    border-radius: 16px;
-                    color: white;
-                    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
-                ">
-                    <div style="font-size:13px; opacity:0.8;">
-                        {label}
-                    </div>
-
-                    <div style="font-size:30px; font-weight:700;">
-                        {value}
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
 
 # =========================
 # SECTION WRAPPER
