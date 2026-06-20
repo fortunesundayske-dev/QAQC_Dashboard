@@ -139,6 +139,9 @@ def render_kpi_cards(kpis, cols_per_row=2):
                             {label}
                         </div>
 
+                        <div style="font-size:10px; font-weight:200; margin-top:3px;">
+                            {value}
+                        </div>
                         
                         {f"<div style='font-size:12px;color:#22c55e;'>▲ {delta}%</div>" if delta is not None else ""}
                     </div>
