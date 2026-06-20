@@ -68,15 +68,11 @@ def inject_enterprise_theme():
 def render_header():
     col1, col2, col3 = st.columns([1,3,1])
 
-    with col1:
-        st.markdown("**🏗 EVOMEC**")
-
+    
     with col2:
         st.markdown("<h3 style='text-align:center;color:white;'>QA/QC DASHBOARD</h3>", unsafe_allow_html=True)
 
-    with col3:
-        st.markdown("**NLNG 🔷**")
-        
+            
 # =========================
 # NAVIGATION (TOP)
 # =========================
@@ -336,7 +332,6 @@ def build_gradient_cards(kpis):
                     unsafe_allow_html=True
                 )
 
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_top_nav():
@@ -641,7 +636,6 @@ def render_kpi_strip(kpis):
             </div>
             """, unsafe_allow_html=True)
 
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_workspace():
