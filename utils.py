@@ -112,7 +112,7 @@ def render_kpi_cards(kpis):
                         {kpi['label']}
                     </div>
 
-                    <div style="font-size:30px; font-weight:800; margin-top:6px;">
+                    <div style="font-size:13px; font-weight:500; margin-top:6px;">
                         {kpi['value']}
                     </div>
                 </div>
