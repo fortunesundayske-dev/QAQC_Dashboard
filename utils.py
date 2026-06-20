@@ -1,145 +1,296 @@
-from pathlib import Path
-import pandas as pd
 import streamlit as st
+import pandas as pd
+from pathlib import Path
+import plotly.express as px
 import uuid
 
+BASE_DIR = Path(__file__).resolve().parent
+
+EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
+ASSETS = BASE_DIR / "assets"
+EVOMEC_LOGO = ASSETS / "evomec_logo.png"
+NLNG_LOGO = ASSETS / "nlng_logo.png"
 # =========================
 # DATA LOADING (DICT SYSTEM)
 # =========================
 
 def load_master_data(file_path):
-    """
-    Load Excel file and return a DICTIONARY of DataFrames
-    based on sheet names (THIS MATCHES YOUR app.py design)
-    """
     try:
-        if not file_path or not Path(file_path).exists():
+        file_path = Path(file_path)
+
+        if not file_path.exists():
             st.error("Excel file not found")
             return {}
 
         xls = pd.ExcelFile(file_path)
 
-        data = {}
-        for sheet in xls.sheet_names:
-            data[sheet] = pd.read_excel(xls, sheet)
-
-        return data
+        return {
+            sheet: pd.read_excel(xls, sheet)
+            for sheet in xls.sheet_names
+        }
 
     except Exception as e:
         st.error(f"Error loading master data: {e}")
         return {}
+# =========================
+# THEME
+# =========================
+def inject_enterprise_theme():
+    st.markdown("""
+    <style>
+
+    .main {
+        background: #0b1320;
+    }
+
+    #MainMenu, footer, header {
+        visibility: hidden;
+    }
+
+    .block-container {
+        padding: 1rem 2rem;
+    }
+
+    /* KPI CARD */
+    .kpi {
+        padding: 16px;
+        border-radius: 14px;
+        color: white;
+        background: linear-gradient(135deg, #1f2937, #111827);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    }
+
+    /* KPI CARD */
+    .kpi {
+        padding: 16px;
+        border-radius: 14px;
+        color: white;
+        background: linear-gradient(135deg, #1f2937, #111827);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    }
+ .kpi-title {
+        font-size: 13px;
+        opacity: 0.8;
+    }
+
+    .kpi-value {
+        font-size: 26px;
+        font-weight: 700;
+        margin-top: 5px;
+    }
+
+    /* NAV TABS */
+    .nav-bar {
+        display:flex;
+        gap:18px;
+        padding:10px 0;
+        font-weight:500;
+        color:#cbd5e1;
+    }
+
+    .nav-item {
+        cursor:pointer;
+    }
+
+    .nav-item:hover {
+        color:white;
+    }
+
+    </style>
+    """, unsafe_allow_html=True)
+
+# =========================
+# HEADER
+# =========================
+def render_header():
+    col1, col2, col3 = st.columns([1,3,1])
+
+    with col1:
+        st.markdown("**🏗 EVOMEC**")
+
+    with col2:
+        st.markdown("<h3 style='text-align:center;color:white;'>QA/QC DASHBOARD</h3>", unsafe_allow_html=True)
+
+    with col3:
+        st.markdown("**NLNG 🔷**")
+        
+# =========================
+# NAVIGATION (TOP)
+# =========================
+def render_top_nav():
+    tabs = ["Dashboard","Audit","Concrete","CTQ","NCR","OBS","ITR","Reports","Rework","Lessons"]
+
+    cols = st.columns(len(tabs))
+    for i, t in enumerate(tabs):
+        with cols[i]:
+            st.button(t)
+
+# =========================
+# MOBILE NAV
+# =========================
+def render_mobile_nav():
+    st.selectbox("Quick Navigation",
+        ["Dashboard","Audit","Concrete","CTQ","NCR","OBS","ITR","Reports"]
+    )
+
+# =========================
+# KPI CARDS
+# =========================
+def render_kpi_cards(kpis):
+    cols = st.columns(len(kpis))
+
+    for i, k in enumerate(kpis):
+        with cols[i]:
+            delta = k.get("delta", None)
+            trend = ""
+
+            if delta is not None:
+                trend = f"<div style='font-size:12px;color:#22c55e;'>▲ {delta}%</div>"
+
+            st.markdown(f"""
+            <div style="
+                background: linear-gradient(135deg, #1e293b, #0f172a);
+                padding:18px;
+                border-radius:16px;
+                color:white;
+                box-shadow:0 10px 25px rgba(0,0,0,0.4);
+                border:1px solid #334155;
+            ">
+                <div style="font-size:12px;opacity:0.7">{k['label']}</div>
+                <div style="font-size:28px;font-weight:700">{k['value']}</div>
+                {trend}
+            </div>
+            """, unsafe_allow_html=True)
+st.divider()
+
+st.subheader("📊 Executive Analytics")
+
+# =========================
+# SECTION WRAPPER
+# =========================
+def render_section_container(title):
+    st.markdown(f"### {title}")
+    st.markdown("---")
 
 
 # =========================
-# LOGO
+# FILTERS (SAFE)
 # =========================
+def global_filter_sidebar(data):
+    st.sidebar.markdown("## 🎛 Filters")
+
+    if not isinstance(data, dict):
+        return data
+    projects = set()
+
+    for df in data.values():
+        if isinstance(df, pd.DataFrame) and "Project" in df.columns:
+            projects.update(df["Project"].dropna().astype(str))
+
+    selected_project = st.sidebar.selectbox("Project", ["All"] + sorted(projects))
+
+    st.sidebar.markdown("---")
+    status = st.sidebar.selectbox("Status", ["All", "Open", "Closed"])
+
+    filtered = {}
+
+    for k, df in data.items():
+        if not isinstance(df, pd.DataFrame):
+            continue
+
+        temp = df.copy()
+
+        if selected_project != "All" and "Project" in temp.columns:
+            temp = temp[temp["Project"] == selected_project]
+
+        if status != "All" and "Status" in temp.columns:
+            temp = temp[temp["Status"] == status]
+
+        filtered[k] = temp
+
+    return filtered
+
+# =========================
+# TABLES
+# =========================
+def render_table(df, height=300):
+    if isinstance(df, pd.DataFrame) and not df.empty:
+        st.dataframe(df, height=height, use_container_width=True)
+    else:
+        st.info("No data")
+
+
+def render_table_with_details(df, id_col=None):
+    if not isinstance(df, pd.DataFrame):
+        return
+
+    st.dataframe(df, use_container_width=True)
+
+    if id_col and id_col in df.columns:
+        sel = st.selectbox("Select Item", df[id_col].astype(str).unique())
+        return df[df[id_col].astype(str) == sel]
+
+# =========================
+# UTILITIES
+# =========================
+def _find_image_path(path):
+    p = Path(path)
+    return str(p) if p.exists() else None
 
 def load_company_logo(path):
     p = Path(path)
     return str(p) if p.exists() else None
 
 
-# =========================
-# TABLE RENDERING
-# =========================
-
-def render_table(df, height=300):
-    if isinstance(df, pd.DataFrame) and not df.empty:
-        st.dataframe(df, height=height, use_container_width=True)
-    else:
-        st.info("No data available")
-
-
-# =========================
-# GLOBAL FILTERS
-# =========================
-def global_filter_sidebar(data, page="main"):
-
-    st.sidebar.header("Global Filters")
-
-    if not isinstance(data, dict):
-        return data
-
-    projects = extract_projects(data) or []
-    projects = sorted(list(set(str(p) for p in projects if p)))
-
-    if not projects:
-        st.sidebar.info("No projects found")
-        return data
-
-    # =========================
-    # SESSION STATE (STABLE UX)
-    # =========================
-    if "global_project" not in st.session_state:
-        st.session_state.global_project = "All"
-
-    selected_project = st.sidebar.selectbox(
-        "Project",
-        ["All"] + projects,
-        index=(
-            ["All"] + projects).index(st.session_state.global_project)
-            if st.session_state.global_project in projects
-            else 0,
-        key=f"global_project_filter_{page}"
-    )
-
-    st.session_state.global_project = selected_project
-
-    # =========================
-    # FILTER LOGIC
-    # =========================
-    if selected_project == "All":
-        return data
-
-    return {
-        k: df[df["Project"] == selected_project]
-        if isinstance(df, pd.DataFrame) and "Project" in df.columns
-        else df
-        for k, df in data.items()
-    }
-
-    # =========================
-    # STEP 1: COLLECT PROJECTS
-    # =========================
+def extract_projects(data):
     projects = set()
 
     for df in data.values():
         if isinstance(df, pd.DataFrame) and "Project" in df.columns:
-            projects.update(
-                df["Project"].dropna().astype(str).unique()
-            )
+            projects.update(df["Project"].dropna().astype(str))
 
-    # FINAL SORT (ONLY ONCE)
-    projects = extract_projects(data)
-    project_count = len(projects)
+    return sorted(projects)
 
-    # Optional display (debug/info)
-    st.sidebar.caption(f"Total Projects: {project_count}")
+# =========================
+# NAV (FULL)
+# =========================
+def render_navigation():
+    st.sidebar.title("Navigation")
 
-    # =========================
-    # STEP 2: UI SELECTOR
-    # =========================
-    selected_project = st.sidebar.selectbox(
-    "Project",
-    ["All"] + list(projects),
-    key=f"global_project_filter_{id(data)}"
-)
-    # =========================
-    # STEP 3: RETURN DATA
-    # =========================
-    if selected_project == "All":
-        return data
+    pages = {
+        "Dashboard": "app.py",
+        "Audit": "pages/Audit_Surveillance.py",
+        "Concrete": "pages/Concrete_Tracker.py",
+        "CTQ": "pages/CTQ_Dashboard.py",
+        "NCR": "pages/NCR_Tracker.py",
+        "OBS": "pages/OBS_Tracker.py",
+    }
 
-    filtered = {}
+    choice = st.sidebar.selectbox("Go to page", list(pages.keys()))
 
-    for k, df in data.items():
-        if isinstance(df, pd.DataFrame) and "Project" in df.columns:
-            filtered[k] = df[df["Project"] == selected_project]
-        else:
-            filtered[k] = df
+    if choice:
+        st.switch_page(pages[choice])
 
-    return filtered
-
+ 
+    st.markdown("""
+    <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        padding:10px 20px;
+        background:#111827;
+        border-radius:10px;
+        margin-bottom:10px;
+        color:white;
+    ">
+        <div><b>🏗 QA/QC Dashboard</b></div>
+        <div>Executive View</div>
+    </div>
+    """, unsafe_allow_html=True)
+inject_enterprise_theme()
+render_header()
+render_top_nav()
+render_mobile_nav()
 
 # =========================
 # KPI CARDS
@@ -296,31 +447,7 @@ def inject_global_ui():
 # IMAGE FINDER
 # =========================
 
-def _find_image_path(path_like):
-    p = Path(path_like)
 
-    if p.exists():
-        return str(p)
-
-    for ext in [".png", ".jpg", ".jpeg", ".webp"]:
-        if p.with_suffix(ext).exists():
-            return str(p.with_suffix(ext))
-
-    return None
-def extract_projects(data):
-    """
-    Safely extract unique project names from dict of DataFrames
-    """
-    if not isinstance(data, dict):
-        return []
-
-    projects = set()
-
-    for df in data.values():
-        if isinstance(df, pd.DataFrame) and "Project" in df.columns:
-            projects.update(df["Project"].dropna().astype(str).unique())
-
-    return sorted(projects)
 
 def apply_filters(df, filters=None, date_column=None):
 
@@ -353,14 +480,6 @@ def apply_filters(df, filters=None, date_column=None):
         filtered_df = filtered_df.dropna(subset=[date_column])
 
     return filtered_df
-
-
-def render_table_with_details(
-    df,
-    id_col=None,
-    table_columns=None,
-    detail_label="Details"
-):
     """
     Flexible table renderer for QAQC dashboard pages.
     Supports:
@@ -368,7 +487,6 @@ def render_table_with_details(
     - ID column awareness
     - safe dataframe rendering
     """
-
     if not isinstance(df, pd.DataFrame) or df.empty:
         st.info("No data available")
         return None
@@ -407,29 +525,7 @@ def render_table_with_details(
 
     return display_df
 
-def render_navigation():
-    st.markdown("""
-    <div class="topbar">
-        <div class="brand">🏗 EVOMEC QAQC DASHBOARD</div>
-    </div>
-    """, unsafe_allow_html=True)
 
-    col1, col2, col3, col4, col5 = st.columns(5)
-
-    pages = [
-        ("📊 Dashboard", "app.py"),
-        ("📋 Audit", "pages/Audit_Surveillance.py"),
-        ("🏗 Concrete", "pages/Concrete_Tracker.py"),
-        ("📦 CTQ", "pages/CTQ_Dashboard.py"),
-        ("📑 Reports", "pages/Daily_Reports.py"),
-    ]
-
-    for i, (label, page) in enumerate(pages):
-        with [col1, col2, col3, col4, col5][i]:
-            if st.button(label):
-                st.switch_page(page)
-
-    st.divider()
 
 def render_kpi_strip(kpis):
     st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
@@ -465,3 +561,30 @@ def render_workspace():
     with tab3:
         st.subheader("Analytics")
         st.write("Charts (Plotly recommended)")
+import plotly.express as px
+
+def render_line_chart(df, x, y, title="Trend"):
+    if df.empty:
+        st.info("No data for chart")
+        return
+
+    fig = px.line(df, x=x, y=y, title=title, markers=True)
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def render_bar_chart(df, x, y, title="Bar Chart"):
+    if df.empty:
+        st.info("No data for chart")
+        return
+
+    fig = px.bar(df, x=x, y=y, title=title)
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def render_pie_chart(df, names, values, title="Distribution"):
+    if df.empty:
+        st.info("No data for chart")
+        return
+
+    fig = px.pie(df, names=names, values=values, title=title)
+    st.plotly_chart(fig, use_container_width=True)

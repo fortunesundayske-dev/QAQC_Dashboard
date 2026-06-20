@@ -1,13 +1,26 @@
 import streamlit as st
 import utils
 from pathlib import Path
-from utils import load_master_data, load_company_logo, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation
+from utils import load_master_data, load_company_logo, render_line_chart, render_table, global_filter_sidebar, build_gradient_cards, inject_global_ui, _find_image_path, render_navigation, inject_enterprise_theme, render_top_nav, extract_projects, render_bar_chart, render_kpi_cards
 from auth import login
-from utils import extract_projects
-from utils import render_navigation
+st.set_page_config(
+    page_title="Evomec QA/QC Executive Dashboard",
+    page_icon="🏗️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+inject_enterprise_theme()
+render_top_nav()
 
+utils.inject_enterprise_theme()
+utils.render_header()
+utils.render_top_nav()
 
+data = utils.load_master_data(utils.EXCEL_FILE)
 
+data = utils.global_filter_sidebar(data)
+
+utils.render_kpi_cards(render_kpi_cards)
 if not login():
     st.stop()
 
@@ -36,122 +49,6 @@ with col1:
 with col2:
     if NLNG_LOGO:
         st.image(NLNG_LOGO, width=140)
-
-st.set_page_config(
-    page_title="Evomec QA/QC Executive Dashboard",
-    page_icon="🏗️",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-def inject_global_ui():
-    st.markdown("""
-    <style>
-
-    /* =========================
-       ENTERPRISE DARK THEME
-    ========================== */
-    .main {
-        background: #0a0f1c;
-        color: #e5e7eb;
-        font-family: "Inter", sans-serif;
-    }
-
-    /* Hide Streamlit chrome */
-    #MainMenu, footer, header {
-        visibility: hidden;
-    }
-
-    /* =========================
-       TOP APP BAR
-    ========================== */
-    .topbar {
-        background: #0f172a;
-        padding: 12px 20px;
-        border-bottom: 1px solid #1f2937;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .brand {
-        font-size: 18px;
-        font-weight: 700;
-        color: #60a5fa;
-    }
-
-    /* =========================
-       KPI STRIP
-    ========================== */
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-        margin-top: 10px;
-    }
-
-    .kpi-card {
-        background: linear-gradient(145deg, #111827, #0b1220);
-        border: 1px solid #1f2937;
-        border-radius: 14px;
-        padding: 14px;
-        box-shadow: 0 8px 18px rgba(0,0,0,0.25);
-    }
-
-    .kpi-title {
-        font-size: 12px;
-        color: #94a3b8;
-    }
-
-    .kpi-value {
-        font-size: 22px;
-        font-weight: 700;
-        margin-top: 6px;
-        color: #f8fafc;
-    }
-
-    /* =========================
-       FILTER BAR
-    ========================== */
-    section[data-testid="stSidebar"] {
-        background: #0f172a;
-        border-right: 1px solid #1e293b;
-    }
-
-    /* =========================
-       DATA TABLE
-    ========================== */
-    .stDataFrame {
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid #1f2937;
-    }
-
-    /* =========================
-       BUTTONS
-    ========================== */
-    .stButton button {
-        background: #2563eb;
-        color: white;
-        border-radius: 8px;
-        border: none;
-        padding: 6px 12px;
-    }
-
-    .stButton button:hover {
-        background: #1d4ed8;
-    }
-
-    /* =========================
-       CARDS HOVER EFFECT
-    ========================== */
-    .kpi-card:hover {
-        transform: translateY(-2px);
-        border: 1px solid #3b82f6;
-        transition: 0.2s ease-in-out;
-    }
-
-    </style>
-    """, unsafe_allow_html=True)
 
 st.sidebar.title("Evomec QA/QC Executive")
 st.title("Evomec QA/QC Executive Dashboard")
@@ -190,19 +87,6 @@ for df in data.values():
 projects = extract_projects(data)
 project_count = len(projects)
 
-import pandas as pd
-
-projects = set()
-
-for df in data.values():
-    if isinstance(df, pd.DataFrame) and "Project" in df.columns:
-        projects.update(
-            df["Project"].dropna().astype(str).unique()
-        )
-
-projects = sorted(projects)
-project_count = len(projects)
-
 ncr_df = data.get("NCR Log", pd.DataFrame())
 obs_df = data.get("OBS Log", pd.DataFrame())
 itr_df = data.get("ITR Log", pd.DataFrame())
@@ -230,7 +114,7 @@ kpis = [
 ]
 
 build_gradient_cards(kpis)
-def render_kpi_strip(kpis):
+def render_kpi_card(kpis):
     st.markdown('<div class="kpi-grid">', unsafe_allow_html=True)
 
     cols = st.columns(len(kpis))
@@ -335,3 +219,79 @@ def render_drilldown(df, id_col="ID"):
         )
 
     return selected_row
+sheet_names = list(data.keys())
+
+if len(sheet_names) > 0:
+    first_df = data[sheet_names[0]]
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if "Date" in first_df.columns and len(first_df.columns) > 1:
+            num_col = first_df.select_dtypes(include="number").columns
+            if len(num_col) > 0:
+                render_line_chart(first_df, "Date", num_col[0], "Trend Analysis")
+
+    with col2:
+        if len(first_df.select_dtypes(include="number").columns) > 0:
+            num_col = first_df.select_dtypes(include="number").columns[0]
+            render_bar_chart(first_df, first_df.columns[0], num_col, "Distribution")
+
+def project_filter_sidebar(projects, page="main"):
+    if "global_project" not in st.session_state:
+        st.session_state.global_project = "All"
+
+    selected = st.sidebar.selectbox(
+        "Project",
+        ["All"] + projects,
+        index=(
+            ["All"] + projects).index(st.session_state.global_project)
+            if st.session_state.global_project in projects
+            else 0,
+        key=f"global_project_filter_{page}"
+    )
+
+    st.session_state.global_project = selected
+    return selected
+
+# =========================
+# PROJECT LIST
+# =========================
+projects = extract_projects(data)
+project_count = len(projects)
+
+st.sidebar.caption(f"Total Projects: {project_count}")
+
+# =========================
+# SESSION STATE
+# =========================
+if "global_project" not in st.session_state:
+    st.session_state.global_project = "All"
+
+# =========================
+# FILTER UI
+# =========================
+selected_project = st.sidebar.selectbox(
+    "Project",
+    ["All"] + projects,
+    index=(
+        ["All"] + projects).index(st.session_state.global_project)
+        if st.session_state.global_project in projects
+        else 0,
+    key="global_project_filter"
+)
+
+st.session_state.global_project = selected_project
+
+# =========================
+# FILTER LOGIC
+# =========================
+if selected_project == "All":
+    filtered_data = data
+else:
+    filtered_data = {
+        k: df[df["Project"] == selected_project]
+        if isinstance(df, pd.DataFrame) and "Project" in df.columns
+        else df
+        for k, df in data.items()
+    }
