@@ -30,57 +30,7 @@ st.set_page_config(
 )
 if not login():
     st.stop()
-# =========================
-# READ STATE
-# =========================
-page = st.session_state.page
 
-if page == "Dashboard":
-    st.title("Dashboard Page")
-    st.write("Main dashboard content")
-
-elif page == "Audit":
-    st.title("Audit Page")
-    st.write(data.get("Audit Register"))
-
-elif page == "Concrete":
-    st.title("Concrete Tracker")
-    st.write(data.get("Concrete Tracker"))
-
-elif page == "NCR":
-    st.title("NCR Page")
-    st.write(data.get("NCR Log"))
-elif page == "OBS":
-    st.title("OBS Page")
-    st.write(data.get("OBS Log"))
-elif page == "CTQ":
-    st.title("CTQ Page")
-    st.write(data.get("CTQ Log"))
-elif page == "Document Register":
-    st.title("Document Register")
-    st.write(data.get("Document Register"))
-elif page == "Lessons Learned":
-    st.title("Lessons Learned")
-    st.write(data.get("Lessons Learned"))
-elif page == "Data Explorer":
-    st.title("Data Explorer")
-    st.write("Raw data tables and exploration tools")
-elif page == "ITR log":
-    st.title("ITR Log")
-    st.write(data.get("ITR Log"))
-
-page_map = {
-    "Dashboard": "app",
-    "Audit": "audit",
-    "Concrete": "concrete",
-    "CTQ": "ctq",
-    "NCR": "ncr",
-    "OBS": "obs",
-    "Lessons Learned": "lessons",
-    "Document Register": "documents",
-    "Data Explorer": "explorer",
-    "ITR log": "itr"
-}
 # =========================
 # INIT STATE (FIRST THING)
 # =========================
@@ -217,7 +167,24 @@ else:
     st.info("Daily Reports sheet is not available in the data source.")
 
 st.markdown("---")
-st.write("Use the Streamlit sidebar to navigate to modules and apply global filters across pages.")
+
+def render_top_nav():
+    st.markdown("### QA/QC Dashboard Navigation")
+
+    if st.button("🏠 Dashboard"):
+        st.switch_page("app.py")
+
+    if st.button("🏗 Concrete Tracker"):
+        st.switch_page("pages/Concrete_Tracker.py")
+
+    if st.button("📛 NCR Log"):
+        st.switch_page("pages/NCR_Tracker.py")
+
+    if st.button("👁 OBS Log"):
+        st.switch_page("pages/OBS_Tracker.py")
+
+    if st.button("📋 Audit"):
+        st.switch_page("pages/Audit.py")
 
 def render_workspace():
     tab1, tab2, tab3 = st.tabs([
