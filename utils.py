@@ -154,6 +154,7 @@ def render_mobile_nav():
 # KPI CARDS
 # =========================
 def render_kpi_cards(kpis):
+
     rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
 
     for row in rows:
@@ -161,55 +162,29 @@ def render_kpi_cards(kpis):
 
         for i, kpi in enumerate(row):
             with cols[i]:
-                st.markdown(
-                f"""
+                st.markdown(f"""
                 <div class="kpi-card" style="
-                    background: linear-gradient(135deg, {kpi.get('color', '#2563eb')}, #111827);
-                    padding: 20px;
-                    border-radius: 16px;
-                    color: white;
-                    border-left: 5px solid {kpi.get('color', '#2563eb')};
-                    margin-bottom: 12px;
+                    background: linear-gradient(135deg, {kpi['color']}, #111827);
+                    padding:20px;
+                    border-radius:16px;
+                    color:white;
+                    border-left:5px solid {kpi['color']};
+                    transition: all 0.25s ease;
                 ">
-        <div style="font-size:14px; opacity:0.9;">
-            {kpi['label']}
-        </div>
+                    <div style="font-size:14px; opacity:0.8;">
+                        {kpi['label']}
+                    </div>
 
-        <div style="font-size:32px; font-weight:700; margin-top:8px;">
-            {kpi['value']}
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-                st.markdown(
-    f"""
-    <div class="kpi-card" style="
-        background: linear-gradient(
-            135deg,
-            {kpi.get('color', '#2563eb')},
-            #111827
-        );
-        padding:20px;
-        border-radius:16px;
-        color:white;
-        border-left:5px solid {kpi.get('color', '#2563eb')};
-    ">
-        <div style="font-size:14px;">
-            {kpi['label']}
-        </div>
-
-        <div style="
-            font-size:32px;
-            font-weight:700;
-            margin-top:10px;
-        ">
-            {kpi['value']}
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+                    <div style="
+                        font-size:32px;
+                        font-weight:700;
+                        margin-top:8px;
+                    ">
+                        {kpi['value']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+       
 st.divider()
 
 st.subheader("📊 Executive Analytics")
@@ -433,6 +408,7 @@ def build_gradient_cards(kpis):
 # =========================
 
 def inject_global_ui():
+    
     st.markdown("""
     <style>
     
@@ -442,10 +418,6 @@ def inject_global_ui():
         cursor: pointer;
     }
 
-    .kpi-card:hover {
-        transform: translateY(-6px) scale(1.03);
-        box-shadow: 0 0 25px rgba(255,255,255,0.15);
-    }
     /* =========================
        ENTERPRISE DARK THEME
     ========================== */
@@ -544,9 +516,8 @@ def inject_global_ui():
        CARDS HOVER EFFECT
     ========================== */
     .kpi-card:hover {
-        transform: translateY(-2px);
-        border: 1px solid #3b82f6;
-        transition: 0.2s ease-in-out;
+        transform: translateY(-6px) scale(1.03);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     }
 
     </style>
