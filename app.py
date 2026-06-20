@@ -137,7 +137,7 @@ kpis = [
     {"label": "Lessons Learned", "value": len(lessons_df), "color": "#22d3ee"},
 ]
 
-#render_kpi_cards(kpis)
+render_kpi_cards(kpis)
 inject_global_ui()
 
 st.markdown("---")
