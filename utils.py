@@ -41,27 +41,47 @@ def inject_enterprise_theme():
     <style>
 
     .main {
-        background: #f3f4f6;
-        color: #111827;
+        background: #0b1320;
     }
 
-    section[data-testid="stSidebar"] {
-        background: #e5e7eb;
+    #MainMenu, footer, header {
+        visibility: hidden;
     }
 
+    .block-container {
+        padding: 1rem 2rem;
+    }
+
+    /* KPI CARD */
     .kpi-card {
-        transition: all 0.25s ease;
-        cursor: pointer;
+        padding: 16px;
+        border-radius: 14px;
+        color: white;
+        background: linear-gradient(135deg, #1f2937, #111827);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+        transition: all 0.25s ease-in-out;
     }
 
+    /* ✅ THIS is your hover effect (correct place) */
     .kpi-card:hover {
         transform: translateY(-6px) scale(1.03);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    .kpi-title {
+        font-size: 13px;
+        opacity: 0.8;
+    }
+
+    .kpi-value {
+        font-size: 26px;
+        font-weight: 700;
+        margin-top: 5px;
     }
 
     </style>
     """, unsafe_allow_html=True)
-    
+
 # =========================
 # HEADER
 # =========================
@@ -119,13 +139,12 @@ def render_kpi_cards(kpis):
                 unsafe_allow_html=True
             )
 
-    st.success("KPI function running")
 # =========================
 # SECTION WRAPPER
 # =========================
 def render_section_container(title):
-    st.markdown(f"### {title}")
-    st.markdown("---")
+    st.markdown(f"### {title}", unsafe_allow_html=True)
+    st.markdown("---", unsafe_allow_html=True)
 
 
 # =========================
@@ -197,7 +216,7 @@ def extract_projects(data):
 # =========================
 
 def render_navigation():
-    st.markdown("### 🧭 Page Navigation")
+    st.markdown("### 🧭 Page Navigation", unsafe_allow_html=True)
 
     pages = {
         "🏗 Concrete": "pages/Concrete_Tracker.py",
@@ -223,7 +242,7 @@ def render_navigation():
 
 
 def render_top_nav():
-    st.markdown("### QA/QC Dashboard Navigation")
+    st.markdown("### QA/QC Dashboard Navigation", unsafe_allow_html=True)
 
     if st.button("🏠 Dashboard"):
         st.switch_page("app.py")
@@ -311,13 +330,14 @@ def project_filter_sidebar(projects, page="main"):
 # =========================
 def inject_global_ui():
     
-    st.markdown("""
-    <style>
+    st.markdown(
+        """
+        <style>
     
-    /* KPI Hover Effect */
-    .kpi-card {
-        transition: all 0.25s ease;
-        cursor: pointer;
+            /* KPI Hover Effect */
+            .kpi-card {
+            transition: all 0.25s ease;
+            cursor: pointer;
     }
 
     /* =========================
