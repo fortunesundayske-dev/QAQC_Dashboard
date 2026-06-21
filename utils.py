@@ -138,7 +138,7 @@ def render_kpi_cards(kpis):
     }
 
     .kpi-card:hover {
-        transform: translateY(-6px) scale(1.02);
+        transform: translateY(-6px) scale(1.03);
         box-shadow: 0 0 20px rgba(59,130,246,0.6);
         border: 1px solid rgba(59,130,246,0.7);
     }
@@ -156,7 +156,6 @@ def render_kpi_cards(kpis):
     </style>
     """, unsafe_allow_html=True)
 
-    # 🔥 START GRID (IMPORTANT — THIS WAS MISSING BEFORE)
     html = '<div class="kpi-grid">'
 
     for kpi in kpis:
@@ -167,7 +166,6 @@ def render_kpi_cards(kpis):
         </div>
         """
 
-    # 🔥 CLOSE GRID (IMPORTANT)
     html += "</div>"
 
     st.markdown(html, unsafe_allow_html=True)
