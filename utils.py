@@ -5,6 +5,7 @@ import time
 from click import style
 from pathlib import Path
 import uuid
+import html
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -38,6 +39,8 @@ def load_master_data(file_path):
 # THEME
 # =========================
 def inject_enterprise_theme():
+    inject_global_ui()
+    return
     st.markdown("""
     <style>
 
@@ -87,11 +90,18 @@ def inject_enterprise_theme():
 # HEADER
 # =========================
 def render_header():
-    col1, col2, col3 = st.columns([1,3,1])
-
-    
-    with col2:
-        st.markdown("<h3 style='text-align:center;color:white;'>QA/QC DASHBOARD</h3>", unsafe_allow_html=True)
+    st.markdown(
+        """
+<div class="app-bar">
+    <div>
+        <div class="app-bar__eyebrow">EVOMEC GLOBAL SERVICES</div>
+        <div class="app-bar__title">QA/QC Executive Dashboard</div>
+    </div>
+    <div class="app-bar__status">Live Quality Console</div>
+</div>
+""",
+        unsafe_allow_html=True
+    )
 
             
 # =========================
@@ -111,31 +121,19 @@ def render_mobile_nav():
 # =========================
 def render_kpi_cards(kpis):
     cols = st.columns(4)  # 4 per row grid
+    accents = ["#38bdf8", "#22c55e", "#f59e0b", "#ef4444"]
 
     for i, kpi in enumerate(kpis):
         with cols[i % 4]:
+            accent = accents[i % len(accents)]
             st.markdown(
                 f"""
-                <div style="
-                    padding:16px;
-                    border-radius:16px;
-                    background:linear-gradient(135deg, #111827, #0b1220);
-                    border:1px solid #1f2937;
-                    color:white;
-                    box-shadow:0 6px 18px rgba(0,0,0,0.25);
-                    transition:0.3s ease;
-                " onmouseover="this.style.transform='scale(1.05)'"
-                   onmouseout="this.style.transform='scale(1)'">
-
-                    <div style="font-size:12px; color:#9ca3af;">
-                        {kpi['label']}
-                    </div>
-
-                    <div style="font-size:26px; font-weight:700;">
-                        {kpi['value']}
-                    </div>
-                </div>
-                """,
+<div class="kpi-card" style="--accent: {accent};">
+    <div class="kpi-card__topline"></div>
+    <div class="kpi-title">{html.escape(str(kpi['label']))}</div>
+    <div class="kpi-value">{html.escape(str(kpi['value']))}</div>
+</div>
+""",
                 unsafe_allow_html=True
             )
 
@@ -275,31 +273,46 @@ def render_navigation():
  
 
 def render_top_nav():
-    st.markdown("### QA/QC Dashboard Navigation", unsafe_allow_html=True)
+    pages = {
+        "Executive Dashboard": "app.py",
+        "Concrete Tracker": "pages/Concrete_Tracker.py",
+        "NCR Tracker": "pages/NCR_Tracker.py",
+        "OBS Tracker": "pages/OBS_Tracker.py",
+        "Audit & Surveillance": "pages/Audit_Surveillance.py",
+        "CTQ Dashboard": "pages/CTQ_Dashboard.py",
+        "Daily Reports": "pages/Daily_Reports.py",
+        "ITR Tracker": "pages/ITR_Tracker.py",
+        "Document Status": "pages/Document_Status.py",
+        "Defect & Rework": "pages/Defect_Rework_Tracker.py",
+        "Lessons Learned": "pages/Lessons_Learned.py",
+        "Management Summary": "pages/Management_Executive_Summary.py",
+    }
 
-    if st.button("🏠 Dashboard"):
-        st.switch_page("app.py")
+    nav_col, spacer = st.columns([1.25, 4])
 
-    if st.button("🏗 Concrete Tracker"):
-        st.switch_page("pages/Concrete_Tracker.py")
+    with nav_col:
+        if hasattr(st, "popover"):
+            with st.popover("Navigate", use_container_width=True):
+                st.caption("QA/QC modules")
+                for label, page in pages.items():
+                    if st.button(label, key=f"top_nav_{label}", use_container_width=True):
+                        st.switch_page(page)
+        else:
+            selected = st.selectbox(
+                "Navigate",
+                list(pages.keys()),
+                index=0,
+                label_visibility="collapsed",
+                key="top_nav_select"
+            )
+            if st.button("Open module", key="top_nav_open", use_container_width=True):
+                st.switch_page(pages[selected])
 
-    if st.button("📛 NCR Log"):
-        st.switch_page("pages/NCR_Tracker.py")
-
-    if st.button("👁 OBS Log"):
-        st.switch_page("pages/OBS_Tracker.py")
-
-    if st.button("📋 Audit"):
-        st.switch_page("pages/Audit.py")
-
-    if st.button("🔍 Surveillance"):
-        st.switch_page("pages/Surveillance.py")
-
-    if st.button("📚 Lessons Learned"):
-        st.switch_page("pages/Lessons_Learned.py")
-
-    if st.button("📁 Document Register"):
-        st.switch_page("pages/Document_Register.py")
+    with spacer:
+        st.markdown(
+            '<div class="nav-hint">Use the module menu to move between QA/QC registers, trackers, and summaries.</div>',
+            unsafe_allow_html=True
+        )
     
 def render_drilldown(df, id_col="ID"):
 
@@ -362,115 +375,262 @@ def project_filter_sidebar(projects, page="main"):
 # UI STYLING
 # =========================
 def inject_global_ui():
-    
     st.markdown(
     """
     <style>
-    
-    /* =========================
-       ENTERPRISE DARK THEME
-    ========================== */
-    .main {
-        background: #0a0f1c;
-        color: #e5e7eb;
-        font-family: "Inter", sans-serif;
+    :root {
+        --bg: #08111f;
+        --panel: #0f1b2d;
+        --panel-soft: #13243a;
+        --line: rgba(148, 163, 184, 0.18);
+        --text: #e5edf8;
+        --muted: #94a3b8;
+        --accent: #38bdf8;
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --danger: #ef4444;
     }
 
-    /* Hide Streamlit chrome */
     #MainMenu, footer, header {
         visibility: hidden;
     }
 
-    /* =========================
-       TOP APP BAR
-    ========================== */
-    .topbar {
-        background: #0f172a;
-        padding: 12px 20px;
-        border-bottom: 1px solid #1f2937;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+    .stApp {
+        background:
+            radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 34rem),
+            linear-gradient(135deg, #07101e 0%, #0b1728 48%, #111827 100%);
+        color: var(--text);
     }
 
-    .brand {
-        font-size: 18px;
-        font-weight: 700;
-        color: #60a5fa;
+    .block-container {
+        max-width: 1480px;
+        padding: 1.15rem 2.25rem 2.5rem;
     }
 
-    /* =========================
-       KPI STRIP
-    ========================== */
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-        margin-top: 10px;
+    h1, h2, h3, h4, p, label, span {
+        letter-spacing: 0;
     }
 
-    .kpi-card {
-        background: linear-gradient(145deg, #111827, #0b1220);
-        border: 1px solid #1f2937;
-        border-radius: 14px;
-        padding: 14px;
-        box-shadow: 0 8px 18px rgba(0,0,0,0.25);
-    }
-
-    .kpi-title {
-        font-size: 12px;
-        color: #94a3b8;
-    }
-
-    .kpi-value {
-        font-size: 22px;
-        font-weight: 700;
-        margin-top: 6px;
+    h1, h2, h3 {
         color: #f8fafc;
     }
 
-    /* =========================
-       FILTER BAR
-    ========================== */
-    section[data-testid="stSidebar"] {
-        background: #2d2d2d;
-        border-right: 1px solid #1e293b;
-    }
-
-    /* =========================
-       DATA TABLE
-    ========================== */
-    .stDataFrame {
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid #1f2937;
-    }
-
-    /* =========================
-       BUTTONS
-    ========================== */
-    .stButton button {
-        background: #2563eb;
-        color: white;
+    .app-bar {
+        align-items: center;
+        background: rgba(15, 27, 45, 0.82);
+        border: 1px solid var(--line);
         border-radius: 8px;
-        border: none;
-        padding: 6px 12px;
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.26);
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.9rem;
+        padding: 0.85rem 1rem;
     }
 
-    .stButton button:hover {
-        background: #1d4ed8;
+    .app-bar__eyebrow, .hero-eyebrow {
+        color: #7dd3fc;
+        font-size: 0.72rem;
+        font-weight: 760;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
     }
 
-    /* =========================
-       CARDS HOVER EFFECT
-    ========================== */
-    .kpi-card:hover {
-        transform: translateY(-6px) scale(1.03);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    .app-bar__title {
+        color: #f8fafc;
+        font-size: 1.05rem;
+        font-weight: 780;
+        margin-top: 0.12rem;
     }
+
+    .app-bar__status {
+        background: rgba(34, 197, 94, 0.12);
+        border: 1px solid rgba(34, 197, 94, 0.28);
+        border-radius: 999px;
+        color: #bbf7d0;
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 0.42rem 0.72rem;
+        white-space: nowrap;
+    }
+
+    .nav-hint {
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--muted);
+        display: flex;
+        min-height: 2.65rem;
+        padding: 0 0.9rem;
+    }
+
+    .dashboard-hero {
+        background: linear-gradient(135deg, rgba(15, 27, 45, 0.96), rgba(19, 36, 58, 0.76));
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 22px 55px rgba(0, 0, 0, 0.28);
+        min-height: 9.25rem;
+        padding: 1.35rem 1.5rem;
+    }
+
+    .dashboard-hero h1 {
+        color: #f8fafc;
+        font-size: 2.2rem;
+        font-weight: 800;
+        line-height: 1.08;
+        margin: 0.35rem 0 0.55rem;
+    }
+
+    .dashboard-hero p {
+        color: #b6c2d2;
+        font-size: 0.98rem;
+        margin: 0;
+        max-width: 780px;
+    }
+
+    .logo-panel {
+        align-items: center;
+        background: rgba(248, 250, 252, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.34);
+        border-radius: 8px;
+        display: flex;
+        justify-content: center;
+        min-height: 9.25rem;
+        padding: 1rem;
+    }
+
+    .section-heading {
+        color: #f8fafc;
+        font-size: 1.05rem;
+        font-weight: 780;
+        margin: 1.25rem 0 0.55rem;
+    }
+
+    .section-caption {
+        color: var(--muted);
+        font-size: 0.86rem;
+        margin-top: -0.3rem;
+        margin-bottom: 0.65rem;
+    }
+
     .kpi-card {
-    transition: all 0.25s ease;
-    cursor: pointer;
+        background: linear-gradient(180deg, rgba(19, 36, 58, 0.96), rgba(10, 19, 33, 0.98));
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+        min-height: 104px;
+        overflow: hidden;
+        padding: 15px 16px 16px;
+        position: relative;
+        transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .kpi-card:hover {
+        border-color: var(--accent);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+        transform: translateY(-3px);
+    }
+
+    .kpi-card__topline {
+        background: var(--accent);
+        height: 3px;
+        left: 0;
+        position: absolute;
+        right: 0;
+        top: 0;
+    }
+
+    .kpi-title {
+        color: #aab8ca;
+        font-size: 0.78rem;
+        font-weight: 720;
+        margin-top: 0.25rem;
+        text-transform: uppercase;
+    }
+
+    .kpi-value {
+        color: #f8fafc;
+        font-size: 1.9rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-top: 0.75rem;
+    }
+
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0b1628, #101827);
+        border-right: 1px solid var(--line);
+    }
+
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span {
+        color: #e5edf8;
+    }
+
+    div[data-testid="stMetric"] {
+        background: rgba(15, 27, 45, 0.88);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.85rem 1rem;
+    }
+
+    div[data-testid="stMetricLabel"] {
+        color: var(--muted);
+    }
+
+    div[data-testid="stDataFrame"] {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .stButton button,
+    div[data-testid="stPopover"] button {
+        background: linear-gradient(135deg, #0ea5e9, #2563eb);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        color: white;
+        font-weight: 720;
+        min-height: 2.45rem;
+    }
+
+    .stButton button:hover,
+    div[data-testid="stPopover"] button:hover {
+        border-color: rgba(125, 211, 252, 0.72);
+        color: white;
+        filter: brightness(1.06);
+    }
+
+    div[data-baseweb="select"] > div {
+        background-color: rgba(15, 27, 45, 0.96);
+        border-color: var(--line);
+        border-radius: 8px;
+    }
+
+    div[data-baseweb="select"] span {
+        color: #e5edf8;
+    }
+
+    .stAlert {
+        border-radius: 8px;
+    }
+
+    @media (max-width: 900px) {
+        .block-container {
+            padding: 0.8rem 1rem 2rem;
+        }
+
+        .app-bar {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+
+        .dashboard-hero h1 {
+            font-size: 1.65rem;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -481,6 +641,28 @@ def inject_global_ui():
 # =========================
 
 
+def style_chart(fig):
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(15, 27, 45, 0.92)",
+        plot_bgcolor="rgba(8, 17, 31, 0.5)",
+        font=dict(color="#dbe7f5", family="Inter, Arial, sans-serif"),
+        title=dict(font=dict(size=16, color="#f8fafc")),
+        margin=dict(l=32, r=24, t=54, b=34),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1")),
+    )
+    fig.update_xaxes(
+        gridcolor="rgba(148, 163, 184, 0.14)",
+        linecolor="rgba(148, 163, 184, 0.22)",
+        zerolinecolor="rgba(148, 163, 184, 0.18)",
+    )
+    fig.update_yaxes(
+        gridcolor="rgba(148, 163, 184, 0.14)",
+        linecolor="rgba(148, 163, 184, 0.22)",
+        zerolinecolor="rgba(148, 163, 184, 0.18)",
+    )
+    return fig
+
 
 def render_line_chart(df, x, y, title="Trend"):
     if df.empty:
@@ -488,6 +670,8 @@ def render_line_chart(df, x, y, title="Trend"):
         return
 
     fig = px.line(df, x=x, y=y, title=title, markers=True)
+    fig.update_traces(line=dict(color="#38bdf8", width=3), marker=dict(size=7))
+    style_chart(fig)
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -497,6 +681,8 @@ def render_bar_chart(df, x, y, title="Bar Chart"):
         return
 
     fig = px.bar(df, x=x, y=y, title=title)
+    fig.update_traces(marker_color="#22c55e")
+    style_chart(fig)
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -506,6 +692,10 @@ def render_pie_chart(df, names, values, title="Distribution"):
         return
 
     fig = px.pie(df, names=names, values=values, title=title)
+    fig.update_traces(
+        marker=dict(colors=["#38bdf8", "#22c55e", "#f59e0b", "#ef4444", "#a78bfa"])
+    )
+    style_chart(fig)
     st.plotly_chart(fig, use_container_width=True)
 
 

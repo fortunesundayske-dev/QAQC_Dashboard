@@ -1,5 +1,12 @@
 import streamlit as st
-import bcrypt
+import hashlib
+import hmac
+
+PASSWORD_SALT = "qaqc_dashboard_v1"
+
+
+def hash_password(password):
+    return hashlib.sha256(f"{PASSWORD_SALT}:{password}".encode()).hexdigest()
 
 # =========================
 # USERS DATABASE (replace later with DB)
@@ -7,17 +14,17 @@ import bcrypt
 USERS = {
     "admin": {
         "name": "Admin User",
-        "password": bcrypt.hashpw("admin123".encode(), bcrypt.gensalt()).decode(),
+        "password": "aa5b6568e7d12f34320f4c23dab3b29b598f2960277a314c8e22e29a291ffb28",
         "role": "admin"
     },
     "user": {
         "name": "Normal User",
-        "password": bcrypt.hashpw("user123".encode(), bcrypt.gensalt()).decode(),
+        "password": "82522beaaedd08c9cc7073af6e8d26d59ff83d94ad74a6eb127cefabdf7ceea7",
         "role": "user"
     },
     "viewer": {
         "name": "Viewer",
-        "password": bcrypt.hashpw("viewer123".encode(), bcrypt.gensalt()).decode(),
+        "password": "cc04baa01651396ea98efe44422d6074bddaf3fec7c9ce2c3c8ecbd28bee09d4",
         "role": "viewer"
     }
 }
@@ -62,7 +69,7 @@ def login():
     if st.button("Login"):
         user = USERS.get(username)
 
-        if user and bcrypt.checkpw(password.encode(), user["password"].encode()):
+        if user and hmac.compare_digest(hash_password(password), user["password"]):
             st.session_state.auth["logged_in"] = True
             st.session_state.auth["username"] = username
             st.session_state.auth["name"] = user["name"]
