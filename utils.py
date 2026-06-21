@@ -110,33 +110,60 @@ def render_mobile_nav():
 # KPI CARDS
 # =========================
 def render_kpi_cards(kpis):
-    rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
+    st.markdown("""
+    <style>
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-top: 10px;
+    }
 
-    for row in rows:
-        cols = st.columns(len(row))
+    .kpi-card {
+        padding: 16px;
+        border-radius: 16px;
+        background: linear-gradient(145deg, #111827, #0b1220);
+        border: 1px solid #1f2937;
+        color: white;
+        transition: all 0.25s ease;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+        position: relative;
+        overflow: hidden;
+    }
 
-        for i, kpi in enumerate(row):
-            color = kpi.get("color", "#2563eb")
+    .kpi-card:hover {
+        transform: translateY(-6px) scale(1.03);
+        box-shadow: 0 0 20px rgba(59,130,246,0.6);
+        border: 1px solid rgba(59,130,246,0.6);
+    }
 
-            with cols[i]:
-                st.markdown(f"""
-                <div style="
-                    background: linear-gradient(135deg, {color}, #111827);
-                    padding: 18px;
-                    border-radius: 14px;
-                    color: white;
-                    text-align: center;
-                    box-shadow: 0 8px 18px rgba(0,0,0,0.3);
-                ">
-                    <div style="font-size:12px; opacity:0.7;">
-                        {kpi['label']}
-                    </div>
+    .kpi-title {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-bottom: 6px;
+    }
 
-                    <div style="font-size:28px; font-weight:700; margin-top:5px;">
-                        {kpi['value']}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+    .kpi-value {
+        font-size: 26px;
+        font-weight: 700;
+        color: #ffffff;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    html = '<div class="kpi-grid">'
+
+    for kpi in kpis:
+        html += f"""
+        <div class="kpi-card">
+            <div class="kpi-title">{kpi['label']}</div>
+            <div class="kpi-value">{kpi['value']}</div>
+        </div>
+        """
+
+    html += "</div>"
+
+    st.markdown(html, unsafe_allow_html=True)
 
 # =========================
 # SECTION WRAPPER

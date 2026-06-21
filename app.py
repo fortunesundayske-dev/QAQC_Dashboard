@@ -53,7 +53,12 @@ render_header()
 render_top_nav()
 st.divider()
 
-
+# =========================
+# DATA PREVIEW
+# =========================
+#for name, df in data.items():
+#    st.markdown(f"### {name}")
+#    render_table(df, height=250)
 
 def safe_path(path):
     return str(path) if path.exists() else None
