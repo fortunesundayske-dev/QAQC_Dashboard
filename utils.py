@@ -120,15 +120,11 @@ def render_kpi_cards(kpis):
     }
 
     @media (max-width: 1200px) {
-        .kpi-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
+        .kpi-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
     @media (max-width: 600px) {
-        .kpi-grid {
-            grid-template-columns: 1fr;
-        }
+        .kpi-grid { grid-template-columns: 1fr; }
     }
 
     .kpi-card {
@@ -142,8 +138,8 @@ def render_kpi_cards(kpis):
     }
 
     .kpi-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 0 18px rgba(59,130,246,0.6);
+        transform: translateY(-6px) scale(1.02);
+        box-shadow: 0 0 20px rgba(59,130,246,0.6);
         border: 1px solid rgba(59,130,246,0.7);
     }
 
@@ -160,16 +156,18 @@ def render_kpi_cards(kpis):
     </style>
     """, unsafe_allow_html=True)
 
+    # 🔥 START GRID (IMPORTANT — THIS WAS MISSING BEFORE)
     html = '<div class="kpi-grid">'
 
     for kpi in kpis:
         html += f"""
         <div class="kpi-card">
-            <div class="kpi-title">{kpi["label"]}</div>
-            <div class="kpi-value">{kpi["value"]}</div>
+            <div class="kpi-title">{kpi['label']}</div>
+            <div class="kpi-value">{kpi['value']}</div>
         </div>
         """
 
+    # 🔥 CLOSE GRID (IMPORTANT)
     html += "</div>"
 
     st.markdown(html, unsafe_allow_html=True)
