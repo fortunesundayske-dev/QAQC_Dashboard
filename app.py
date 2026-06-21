@@ -147,7 +147,8 @@ kpis = [
     {"label": "Surveillance Planned", "value": int(surv_df["Status"].notna().sum()) if "Status" in surv_df.columns else 0, "color": "#a855f7"},
     {"label": "Lessons Learned", "value": len(lessons_df), "color": "#22d3ee"},
 ]
-
+st.write(type(filtered_data))
+st.write(list(filtered_data.keys()))
 # 5. RENDER UI AFTER KPI BUILD
 render_kpi_cards(kpis)
 inject_global_ui()

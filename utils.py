@@ -545,54 +545,6 @@ def global_filter_sidebar(data):
 
     return filtered   # 🔥 THIS WAS MISSING
 
-    # =========================
-    # EXTRACT PROJECTS SAFELY
-    # =========================
-    projects = set()
-
-    for df in data.values():
-        if isinstance(df, __import__("pandas").DataFrame) and "Project" in df.columns:
-            projects.update(df["Project"].dropna().astype(str).unique())
-
-    projects = sorted(list(projects))
-
-    if not projects:
-        st.sidebar.info("No projects found")
-        return data
-
-    # =========================
-    # SESSION STATE FIX
-    # =========================
-    if "global_project" not in st.session_state:
-        st.session_state.global_project = "All"
-
-    # =========================
-    # SAFE SELECTBOX (IMPORTANT FIX)
-    # =========================
-    selected_project = st.sidebar.selectbox(
-        "Project",
-        ["All"] + projects,
-        index=0,
-        key="global_project_selectbox"   # 🔥 FIXED STATIC KEY
-    )
-
-    st.session_state.global_project = selected_project
-
-    # =========================
-    # FILTER DATA
-    # =========================
-    if selected_project == "All":
-        return data
-
-    filtered = {}
-
-    for k, df in data.items():
-        if isinstance(df, __import__("pandas").DataFrame) and "Project" in df.columns:
-            filtered[k] = df[df["Project"] == selected_project]
-        else:
-            filtered[k] = df
-
-
 
 def apply_filters(df, filters=None, date_column=None):
 
