@@ -110,65 +110,72 @@ def render_mobile_nav():
 # KPI CARDS
 # =========================
 def render_kpi_cards(kpis):
-    st.markdown("""
-    <style>
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 16px;
-        margin-top: 10px;
-    }
+    cols = st.columns(4)  # 4 per row grid
 
-    @media (max-width: 1200px) {
-        .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    }
+    for i, kpi in enumerate(kpis):
+        with cols[i % 4]:
+            st.markdown(
+                f"""
+                <div style="
+                    padding:16px;
+                    border-radius:16px;
+                    background:linear-gradient(135deg, #111827, #0b1220);
+                    border:1px solid #1f2937;
+                    color:white;
+                    box-shadow:0 6px 18px rgba(0,0,0,0.25);
+                    transition:0.3s ease;
+                " onmouseover="this.style.transform='scale(1.05)'"
+                   onmouseout="this.style.transform='scale(1)'">
 
-    @media (max-width: 600px) {
-        .kpi-grid { grid-template-columns: 1fr; }
-    }
+                    <div style="font-size:12px; color:#9ca3af;">
+                        {kpi['label']}
+                    </div>
 
-    .kpi-card {
-        background: linear-gradient(145deg, #111827, #0b1220);
-        border: 1px solid #1f2937;
-        border-radius: 16px;
-        padding: 16px;
-        color: white;
-        transition: 0.25s ease;
-        box-shadow: 0 6px 18px rgba(0,0,0,0.25);
-    }
+                    <div style="font-size:26px; font-weight:700;">
+                        {kpi['value']}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-    .kpi-card:hover {
-        transform: translateY(-6px) scale(1.03);
-        box-shadow: 0 0 20px rgba(59,130,246,0.6);
-        border: 1px solid rgba(59,130,246,0.7);
-    }
 
-    .kpi-title {
-        font-size: 12px;
-        color: #9ca3af;
-        margin-bottom: 6px;
-    }
+    
+def build_kpis(filtered_data):
+    projects = set()
 
-    .kpi-value {
-        font-size: 26px;
-        font-weight: 700;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    for df in filtered_data.values():
+        if isinstance(df, pd.DataFrame) and "Project" in df.columns:
+            projects.update(df["Project"].dropna().astype(str))
 
-    html = '<div class="kpi-grid">'
+    project_count = len(projects)
 
-    for kpi in kpis:
-        html += f"""
-        <div class="kpi-card">
-            <div class="kpi-title">{kpi['label']}</div>
-            <div class="kpi-value">{kpi['value']}</div>
-        </div>
-        """
+    ncr_df = filtered_data.get("NCR Log", pd.DataFrame())
+    obs_df = filtered_data.get("OBS Log", pd.DataFrame())
+    itr_df = filtered_data.get("ITR Log", pd.DataFrame())
+    concrete_df = filtered_data.get("Concrete Tracker", pd.DataFrame())
+    audit_df = filtered_data.get("Audit Register", pd.DataFrame())
+    surv_df = filtered_data.get("Surveillance Register", pd.DataFrame())
+    lessons_df = filtered_data.get("Lessons Learned", pd.DataFrame())
 
-    html += "</div>"
+    return [
+        {"label": "Total Projects", "value": project_count},
+        {"label": "Daily Reports", "value": len(filtered_data.get("Daily Reports", pd.DataFrame()))},
 
-    st.markdown(html, unsafe_allow_html=True)
+        {"label": "Open NCR", "value": int((ncr_df["Status"] == "Open").sum()) if "Status" in ncr_df.columns else 0},
+        {"label": "Closed NCR", "value": int((ncr_df["Status"] == "Closed").sum()) if "Status" in ncr_df.columns else 0},
+
+        {"label": "Open OBS", "value": int((obs_df["Status"] == "Open").sum()) if "Status" in obs_df.columns else 0},
+        {"label": "Closed OBS", "value": int((obs_df["Status"] == "Closed").sum()) if "Status" in obs_df.columns else 0},
+
+        {"label": "Open ITR", "value": int((itr_df["Status"] == "Open").sum()) if "Status" in itr_df.columns else 0},
+        {"label": "Closed ITR", "value": int((itr_df["Status"] == "Closed").sum()) if "Status" in itr_df.columns else 0},
+
+        {"label": "Concrete Pours", "value": len(concrete_df)},
+        {"label": "Audits Planned", "value": len(audit_df)},
+        {"label": "Surveillance Planned", "value": len(surv_df)},
+        {"label": "Lessons Learned", "value": len(lessons_df)},
+    ]
 
 # =========================
 # SECTION WRAPPER

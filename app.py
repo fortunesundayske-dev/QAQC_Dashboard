@@ -21,6 +21,7 @@ from utils import (
     render_bar_chart,
     render_table,
     render_kpi_cards,
+    build_kpis,
 )
 from auth import login
 # =========================
@@ -110,47 +111,27 @@ for df in data.values():
         df["Project"].dropna().astype(str).unique()
     )
 
-
-# 1. LOAD DATA FIRST
+# 1. LOAD DATA
 data = load_master_data(EXCEL_FILE)
 
 # 2. APPLY FILTER
 filtered_data = global_filter_sidebar(data)
 
-# 3. DERIVE KPI SOURCE FROM FILTERED DATA (NOT RAW DATA)
+# 3. COMPUTE PROJECTS FROM FILTERED DATA
 projects = extract_projects(filtered_data)
 project_count = len(projects)
 
-ncr_df = filtered_data.get("NCR Log", pd.DataFrame())
-obs_df = filtered_data.get("OBS Log", pd.DataFrame())
-itr_df = filtered_data.get("ITR Log", pd.DataFrame())
-concrete_df = filtered_data.get("Concrete Tracker", pd.DataFrame())
-audit_df = filtered_data.get("Audit Register", pd.DataFrame())
-surv_df = filtered_data.get("Surveillance Register", pd.DataFrame())
-doc_df = filtered_data.get("Document Register", pd.DataFrame())
-lessons_df = filtered_data.get("Lessons Learned", pd.DataFrame())
+# 4. BUILD KPIs (NOW IT WORKS)
+kpis = build_kpis(filtered_data)
 
-# 4. BUILD KPI LIST (THIS IS YOUR BLOCK)
-kpis = [
-    {"label": "Total Projects", "value": project_count, "color": "#2563eb"},
-    {"label": "Daily Reports", "value": len(filtered_data.get("Daily Reports", pd.DataFrame())), "color": "#047857"},
-    {"label": "Open NCR", "value": int((ncr_df["Status"] == "Open").sum()) if "Status" in ncr_df.columns else 0, "color": "#dc2626"},
-    {"label": "Closed NCR", "value": int((ncr_df["Status"] == "Closed").sum()) if "Status" in ncr_df.columns else 0, "color": "#14b8a6"},
-    {"label": "Open OBS", "value": int((obs_df["Status"] == "Open").sum()) if "Status" in obs_df.columns else 0, "color": "#f59e0b"},
-    {"label": "Closed OBS", "value": int((obs_df["Status"] == "Closed").sum()) if "Status" in obs_df.columns else 0, "color": "#10b981"},
-    {"label": "Open ITR", "value": int((itr_df["Status"] == "Open").sum()) if "Status" in itr_df.columns else 0, "color": "#f97316"},
-    {"label": "Closed ITR", "value": int((itr_df["Status"] == "Closed").sum()) if "Status" in itr_df.columns else 0, "color": "#22c55e"},
-    {"label": "Cancelled ITR", "value": int((itr_df["Status"] == "Cancelled").sum()) if "Status" in itr_df.columns else 0, "color": "#e22b13"},
-    {"label": "Awaiting Survey Report ITR", "value": int((itr_df["Status"] == "Awaiting Survey Report").sum()) if "Status" in itr_df.columns else 0, "color": "#e0d63e"},
-    {"label": "Concrete Pours", "value": len(concrete_df), "color": "#0ea5e9"},
-    {"label": "Audits Planned", "value": int(audit_df["Status"].notna().sum()) if "Status" in audit_df.columns else 0, "color": "#8b5cf6"},
-    {"label": "Surveillance Planned", "value": int(surv_df["Status"].notna().sum()) if "Status" in surv_df.columns else 0, "color": "#a855f7"},
-    {"label": "Lessons Learned", "value": len(lessons_df), "color": "#22d3ee"},
-]
+# 5. RENDER
+render_kpi_cards(kpis)
+
+
 st.write(type(filtered_data))
 st.write(list(filtered_data.keys()))
 # 5. RENDER UI AFTER KPI BUILD
-render_kpi_cards(kpis)
+
 inject_global_ui()
 
 
