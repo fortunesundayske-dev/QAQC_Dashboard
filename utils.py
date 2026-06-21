@@ -119,22 +119,32 @@ def render_kpi_cards(kpis):
         margin-top: 10px;
     }
 
+    @media (max-width: 1200px) {
+        .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 600px) {
+        .kpi-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
     .kpi-card {
-        padding: 16px;
-        border-radius: 16px;
         background: linear-gradient(145deg, #111827, #0b1220);
         border: 1px solid #1f2937;
+        border-radius: 16px;
+        padding: 16px;
         color: white;
-        transition: all 0.25s ease;
+        transition: 0.25s ease;
         box-shadow: 0 6px 18px rgba(0,0,0,0.25);
-        position: relative;
-        overflow: hidden;
     }
 
     .kpi-card:hover {
-        transform: translateY(-6px) scale(1.03);
-        box-shadow: 0 0 20px rgba(59,130,246,0.6);
-        border: 1px solid rgba(59,130,246,0.6);
+        transform: translateY(-6px);
+        box-shadow: 0 0 18px rgba(59,130,246,0.6);
+        border: 1px solid rgba(59,130,246,0.7);
     }
 
     .kpi-title {
@@ -146,7 +156,6 @@ def render_kpi_cards(kpis):
     .kpi-value {
         font-size: 26px;
         font-weight: 700;
-        color: #ffffff;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -156,8 +165,8 @@ def render_kpi_cards(kpis):
     for kpi in kpis:
         html += f"""
         <div class="kpi-card">
-            <div class="kpi-title">{kpi['label']}</div>
-            <div class="kpi-value">{kpi['value']}</div>
+            <div class="kpi-title">{kpi["label"]}</div>
+            <div class="kpi-value">{kpi["value"]}</div>
         </div>
         """
 
