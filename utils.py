@@ -109,41 +109,33 @@ def render_mobile_nav():
 # =========================
 # KPI CARDS
 # =========================
-def render_kpi_cards(kpis, cols_per_row=2):
-
-    # split into rows of 2
-    rows = [kpis[i:i + cols_per_row] for i in range(0, len(kpis), cols_per_row)]
+def render_kpi_cards(kpis):
+    rows = [kpis[i:i+2] for i in range(0, len(kpis), 2)]
 
     for row in rows:
-        cols = st.columns(cols_per_row)
+        cols = st.columns(len(row))
 
         for i, kpi in enumerate(row):
+            color = kpi.get("color", "#2563eb")
 
             with cols[i]:
-
-                label = kpi.get("label", "")
-                value = kpi.get("value", 0)
-                color = kpi.get("color", "#2563eb")
-                delta = kpi.get("delta", None)
-
                 st.markdown(f"""
                 <div style="
                     background: linear-gradient(135deg, {color}, #111827);
                     padding: 18px;
-                    border-radius: 16px;
+                    border-radius: 14px;
                     color: white;
-                    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+                    text-align: center;
+                    box-shadow: 0 8px 18px rgba(0,0,0,0.3);
                 ">
-                    <div style="font-size:13px; opacity:0.8;">
-                        {label}
+                    <div style="font-size:12px; opacity:0.7;">
+                        {kpi['label']}
                     </div>
 
-                    <div style="font-size:30px; font-weight:200; margin-top:3px;">
-                        {value}
+                    <div style="font-size:28px; font-weight:700; margin-top:5px;">
+                        {kpi['value']}
                     </div>
-                        
-                    {f"<div style='font-size:12px;color:#22c55e;'>▲ {delta}%</div>" if delta is not None else ""}
-                    </div>
+                </div>
                 """, unsafe_allow_html=True)
 
 # =========================
