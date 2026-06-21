@@ -126,28 +126,25 @@ def render_kpi_cards(kpis, cols_per_row=2):
                 color = kpi.get("color", "#2563eb")
                 delta = kpi.get("delta", None)
 
-                st.markdown(
-                    f"""
-                    <div style="
-                        background: linear-gradient(135deg, {color}, #111827);
-                        padding: 18px;
-                        border-radius: 16px;
-                        color: white;
-                        box-shadow: 0 8px 20px rgba(0,0,0,0.35);
-                    ">
-                        <div style="font-size:13px; opacity:0.8;">
-                            {label}
-                        </div>
-
-                        <div style="font-size:10px; font-weight:200; margin-top:3px;">
-                            {value}
-                        </div>
-                        
-                        {f"<div style='font-size:12px;color:#22c55e;'>▲ {delta}%</div>" if delta is not None else ""}
+                st.markdown(f"""
+                <div style="
+                    background: linear-gradient(135deg, {color}, #111827);
+                    padding: 18px;
+                    border-radius: 16px;
+                    color: white;
+                    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+                ">
+                    <div style="font-size:13px; opacity:0.8;">
+                        {label}
                     </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+
+                    <div style="font-size:30px; font-weight:200; margin-top:3px;">
+                        {value}
+                    </div>
+                        
+                    {f"<div style='font-size:12px;color:#22c55e;'>▲ {delta}%</div>" if delta is not None else ""}
+                    </div>
+                """, unsafe_allow_html=True)
 
 # =========================
 # SECTION WRAPPER
@@ -190,7 +187,7 @@ def render_table_with_details(
 
         selected_row = df[df[id_col].astype(str) == selected_id]
 
-        st.markdown("Selected Record")
+        st.write("Selected Record")
         st.dataframe(selected_row, use_container_width=True)
 
         return selected_row
