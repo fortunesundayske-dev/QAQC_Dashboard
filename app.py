@@ -1,94 +1,125 @@
 import streamlit as st
+
 # =========================
 # CONFIG (MUST BE FIRST)
 # =========================
 st.set_page_config(
     page_title="Evomec QA/QC Executive Dashboard",
-    page_icon="🏗️",
+    page_icon="QA",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 from pathlib import Path
+
+import pandas as pd
+import plotly.express as px
+
+import auth
 from utils import (
-    load_master_data,
+    extract_projects,
     global_filter_sidebar,
     inject_enterprise_theme,
+    load_master_data,
     render_header,
-    render_top_nav,
-    extract_projects,
-    render_line_chart,
-    render_bar_chart,
     render_table,
-    render_kpi_cards,
-    build_kpis,
+    render_top_nav,
 )
-import auth
-import pandas as pd
-# =========================
-# PATHS
-# =========================
+
+
 BASE_DIR = Path(__file__).resolve().parent
-
 EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
-ASSETS = BASE_DIR / "assets"
 
-EVOMEC_LOGO = ASSETS / "evomec_logo.png"
-NLNG_LOGO = ASSETS / "nlng_logo.png"
 
+def status_count(df, status):
+    if not isinstance(df, pd.DataFrame) or df.empty or "Status" not in df.columns:
+        return 0
+    return int(df["Status"].astype(str).str.lower().eq(status.lower()).sum())
+
+
+def open_count(df):
+    return status_count(df, "Open")
+
+
+def closed_count(df):
+    return status_count(df, "Closed") + status_count(df, "Completed")
+
+
+def pct(numerator, denominator):
+    return int((numerator / denominator) * 100) if denominator else 0
+
+
+def metric_card(label, value, subtitle, accent, mark):
+    return f"""
+<div class="exec-metric" style="--metric-color: {accent};">
+    <div class="exec-metric__icon">{mark}</div>
+    <div>
+        <div class="exec-metric__label">{label}</div>
+        <div class="exec-metric__value">{value}</div>
+        <div class="exec-metric__sub">{subtitle}</div>
+    </div>
+</div>
+"""
+
+
+def module_card(title, stats, color="#2563eb", progress=70):
+    stat_html = "".join(
+        f"""
+<div class="module-card__stat">
+    <span>{label}</span>
+    <strong>{value}</strong>
+</div>
+"""
+        for label, value in stats
+    )
+    return f"""
+<div class="module-card" style="--module-color: {color};">
+    <h3>{title}</h3>
+    {stat_html}
+    <div class="module-card__bar"><span style="width: {max(0, min(progress, 100))}%;"></span></div>
+</div>
+"""
+
+
+def trend_frame(df, label, date_candidates):
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame(columns=["Month", "Count", "Type"])
+    date_col = next((col for col in date_candidates if col in df.columns), None)
+    if not date_col:
+        return pd.DataFrame(columns=["Month", "Count", "Type"])
+    frame = df.copy()
+    frame[date_col] = pd.to_datetime(frame[date_col], errors="coerce")
+    frame = frame.dropna(subset=[date_col])
+    if frame.empty:
+        return pd.DataFrame(columns=["Month", "Count", "Type"])
+    frame["Month"] = frame[date_col].dt.to_period("M").dt.to_timestamp()
+    return frame.groupby("Month").size().reset_index(name="Count").assign(Type=label)
+
+
+def project_performance(data):
+    rows = []
+    for name in ["ITR Log", "NCR Log", "OBS Log", "CTQ Log"]:
+        df = data.get(name, pd.DataFrame())
+        if not isinstance(df, pd.DataFrame) or df.empty or "Project" not in df.columns or "Status" not in df.columns:
+            continue
+        temp = df.copy()
+        temp["ClosedFlag"] = temp["Status"].astype(str).str.lower().isin(["closed", "completed", "accepted", "approved"])
+        grouped = temp.groupby("Project").agg(Total=("Status", "size"), Closed=("ClosedFlag", "sum")).reset_index()
+        grouped["Compliance %"] = grouped.apply(lambda row: pct(row["Closed"], row["Total"]), axis=1)
+        rows.append(grouped[["Project", "Compliance %"]])
+    if not rows:
+        return pd.DataFrame(columns=["Project", "Compliance %"])
+    merged = pd.concat(rows, ignore_index=True)
+    return merged.groupby("Project", as_index=False)["Compliance %"].mean().sort_values("Compliance %", ascending=False)
 
 
 inject_enterprise_theme()
 if not auth.login():
     st.stop()
 
-# =========================
-# INIT STATE (FIRST THING)
-# =========================
-
-
-
-# =========================
-# THEME
-# =========================
 render_header()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
-
-# =========================
-# DATA PREVIEW
-# =========================
-#for name, df in data.items():
-#    st.markdown(f"### {name}")
-#    render_table(df, height=250)
-
-def safe_path(path):
-    return str(path) if path.exists() else None
-
-EVOMEC_LOGO = safe_path(EVOMEC_LOGO)
-NLNG_LOGO = safe_path(NLNG_LOGO)
-
-col1, col2 = st.columns(2)
-
-with col1:
-    if EVOMEC_LOGO:
-        st.image(EVOMEC_LOGO, width=150)
-
-with col2:
-    if NLNG_LOGO:
-        st.image(NLNG_LOGO, width=140)
-
-st.markdown(
-    """
-<div class="dashboard-hero">
-    <div class="hero-eyebrow">Executive quality oversight</div>
-    <h1>Evomec QA/QC Executive Dashboard</h1>
-    <p>A consolidated quality management command centre for project quality records, inspection learning, international standards references, Lean Six Sigma tools, and controlled user access.</p>
-</div>
-""",
-    unsafe_allow_html=True
-)
-
-st.sidebar.title("Evomec QA/QC Executive")
 
 try:
     data = load_master_data(EXCEL_FILE)
@@ -98,111 +129,120 @@ except FileNotFoundError as err:
 
 filtered_data = global_filter_sidebar(data)
 projects = extract_projects(filtered_data)
-project_count = len(projects)
 
-kpis = build_kpis(filtered_data)
-st.markdown('<div class="section-heading">Quality Performance Snapshot</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="section-caption">Key project, compliance, observation, inspection, and delivery indicators.</div>',
-    unsafe_allow_html=True
-)
-render_kpi_cards(kpis)
+ncr = filtered_data.get("NCR Log", pd.DataFrame())
+obs = filtered_data.get("OBS Log", pd.DataFrame())
+itr = filtered_data.get("ITR Log", pd.DataFrame())
+ctq = filtered_data.get("CTQ Log", pd.DataFrame())
+concrete = filtered_data.get("Concrete Tracker", pd.DataFrame())
+daily = filtered_data.get("Daily Reports", pd.DataFrame())
+docs = filtered_data.get("Document Register", pd.DataFrame())
+lessons = filtered_data.get("Lessons Learned", pd.DataFrame())
 
-st.markdown('<div class="section-heading">Advanced QA/QC Workspace</div>', unsafe_allow_html=True)
-st.markdown(
-    """
-<div class="spotlight-grid smooth-panel">
-    <div class="spotlight-card">
-        <div class="card-eyebrow">Quality Tools</div>
-        <h3>Lean, PDCA, RCA, calculators</h3>
-        <p>Run DMAIC, PDCA, 5 Whys, fishbone analysis, risk scoring, concrete volume, and inspection readiness tools.</p>
-        <span class="interactive-chip">PDCA</span><span class="interactive-chip">RCA</span><span class="interactive-chip">Concrete</span>
-    </div>
-    <div class="spotlight-card">
-        <div class="card-eyebrow">Standards</div>
-        <h3>ASTM, DEP, BS summaries</h3>
-        <p>Browse discipline-based references with interactive filtering for civil, concrete, welding, piping, coatings, NDT, and quality systems.</p>
-        <span class="interactive-chip">ASTM</span><span class="interactive-chip">DEP</span><span class="interactive-chip">BS</span>
-    </div>
-    <div class="spotlight-card">
-        <div class="card-eyebrow">Learning</div>
-        <h3>Inspection academy</h3>
-        <p>Guided learning paths cover civil inspection, NDT, Barcol testing, piping, welding, CWI, SCWI, ITPs, NCRs, and audit practice.</p>
-        <span class="interactive-chip">CWI</span><span class="interactive-chip">NDT</span><span class="interactive-chip">SCWI</span>
-    </div>
-    <div class="spotlight-card">
-        <div class="card-eyebrow">Concrete Intelligence</div>
-        <h3>Forecast and procurement</h3>
-        <p>Use smarter material forecasts with lead time, safety stock, service level, and mix-design assumptions.</p>
-        <span class="interactive-chip">Forecast</span><span class="interactive-chip">Stock</span><span class="interactive-chip">Procurement</span>
-    </div>
+open_ncr = open_count(ncr)
+closed_ncr = closed_count(ncr)
+open_obs = open_count(obs)
+closed_obs = closed_count(obs)
+open_itr = open_count(itr)
+closed_itr = closed_count(itr)
+open_ctq = open_count(ctq)
+closed_ctq = closed_count(ctq)
+quality_score = pct(closed_ncr + closed_obs + closed_itr + closed_ctq, open_ncr + closed_ncr + open_obs + closed_obs + open_itr + closed_itr + open_ctq + closed_ctq)
+
+metric_html = [
+    metric_card("Total Projects", len(projects), "Active projects", "#2563eb", "P"),
+    metric_card("Daily Reports", len(daily), "Records loaded", "#16a34a", "D"),
+    metric_card("Open NCR", open_ncr, "Requires action", "#ef4444", "N"),
+    metric_card("Closed NCR", closed_ncr, "Closed records", "#14b8a6", "C"),
+    metric_card("Open OBS", open_obs, "Requires action", "#f97316", "O"),
+    metric_card("Closed OBS", closed_obs, "Closed records", "#22c55e", "O"),
+    metric_card("Open ITR", open_itr, "Requires action", "#f97316", "I"),
+    metric_card("Closed ITR", closed_itr, "Closed records", "#16a34a", "I"),
+]
+
+left, right = st.columns([4.4, 1.15], gap="small")
+
+with left:
+    st.markdown('<div class="metric-grid">' + "".join(metric_html) + "</div>", unsafe_allow_html=True)
+
+    trend = pd.concat(
+        [
+            trend_frame(ncr, "NCR", ["Date Raised", "Date_Raised", "Date"]),
+            trend_frame(obs, "OBS", ["Date Raised", "Date_Raised", "Date"]),
+        ],
+        ignore_index=True,
+    )
+    performance = project_performance(filtered_data)
+
+    chart_left, chart_right = st.columns(2)
+    with chart_left:
+        st.markdown('<div class="exec-panel"><h3>NCR / OBS Trend</h3>', unsafe_allow_html=True)
+        if not trend.empty:
+            fig = px.line(trend, x="Month", y="Count", color="Type", markers=True, template="plotly_white")
+            fig.update_layout(height=310, margin=dict(l=20, r=12, t=8, b=20), legend_title_text="")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No dated NCR/OBS records available.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with chart_right:
+        st.markdown('<div class="exec-panel"><h3>Project Performance</h3>', unsafe_allow_html=True)
+        if not performance.empty:
+            fig = px.bar(performance.head(8), x="Project", y="Compliance %", template="plotly_white", color="Compliance %", color_continuous_scale=["#ef4444", "#f59e0b", "#22c55e"])
+            fig.update_layout(height=310, margin=dict(l=20, r=12, t=8, b=20), coloraxis_showscale=False)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No project performance data available.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    concrete_volume = 0
+    if isinstance(concrete, pd.DataFrame) and "Volume" in concrete.columns:
+        concrete_volume = pd.to_numeric(concrete["Volume"], errors="coerce").fillna(0).sum()
+
+    module_cards = [
+        module_card("Audit Register", [("Planned audits", len(filtered_data.get("Audit Register", pd.DataFrame()))), ("Documents", len(docs))], "#2563eb", 83),
+        module_card("NCR Dashboard", [("Open NCR", open_ncr), ("Closed NCR", closed_ncr)], "#ef4444", pct(closed_ncr, open_ncr + closed_ncr)),
+        module_card("OBS Dashboard", [("Open OBS", open_obs), ("Closed OBS", closed_obs)], "#f97316", pct(closed_obs, open_obs + closed_obs)),
+        module_card("ITR Dashboard", [("Open ITR", open_itr), ("Closed ITR", closed_itr)], "#14b8a6", pct(closed_itr, open_itr + closed_itr)),
+        module_card("Concrete Tracker", [("Total pours", len(concrete)), ("Volume m3", f"{concrete_volume:,.0f}")], "#1d8fe8", 74),
+        module_card("CTQ Register", [("Open CTQ", open_ctq), ("Closed CTQ", closed_ctq)], "#7c3aed", pct(closed_ctq, open_ctq + closed_ctq)),
+        module_card("Learning", [("Lessons", len(lessons)), ("Library", "Active")], "#0f6eb8", 88),
+        module_card("Standards", [("PDFs", "214"), ("Viewer", "Ready")], "#0891b2", 92),
+    ]
+    st.markdown('<div class="module-grid">' + "".join(module_cards) + "</div>", unsafe_allow_html=True)
+
+with right:
+    st.markdown(
+        f"""
+<div class="exec-panel">
+    <h3>Management Summary</h3>
+    <div class="score-ring">{quality_score}%<span>Quality Score</span></div>
+    <div class="status-row"><span><i class="status-dot" style="background:#22c55e;"></i>On Track</span><strong>{max(len(projects) - open_ncr - open_obs, 0)}</strong></div>
+    <div class="status-row"><span><i class="status-dot" style="background:#f59e0b;"></i>At Risk</span><strong>{open_obs}</strong></div>
+    <div class="status-row"><span><i class="status-dot" style="background:#ef4444;"></i>Critical</span><strong>{open_ncr}</strong></div>
 </div>
 """,
-    unsafe_allow_html=True,
-)
-
-nav1, nav2, nav3, nav4 = st.columns(4)
-if nav1.button("Open Quality Tools", use_container_width=True):
-    st.switch_page("pages/Quality_Tools.py")
-if nav2.button("Open Standards Library", use_container_width=True):
-    st.switch_page("pages/Standards_Library.py")
-if nav3.button("Open Learning Academy", use_container_width=True):
-    st.switch_page("pages/Learning_Academy.py")
-if nav4.button("Open Concrete Tracker", use_container_width=True):
-    st.switch_page("pages/Concrete_Tracker.py")
-
-
-st.markdown('<div class="section-heading">Data Source Overview</div>', unsafe_allow_html=True)
-cols = st.columns(3)
-cols[0].metric("Data Sheets", len(data))
-cols[1].metric("Last Refresh", st.session_state.get("last_refresh", "On load"))
-cols[2].metric(
-    "Records Loaded",
-    sum(len(df) for df in data.values() if isinstance(df, pd.DataFrame))
-)
-
-
-if "Daily Reports" in filtered_data:
-    st.markdown('<div class="section-heading">Daily Reports Preview</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="section-caption">Recent daily report records from the active project filter.</div>',
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
-    render_table(filtered_data["Daily Reports"].head(10), height=300)
+
+    if isinstance(ncr, pd.DataFrame) and not ncr.empty and "Project" in ncr.columns:
+        ncr_for_summary = ncr.copy()
+        if "Status" in ncr_for_summary.columns:
+            ncr_for_summary = ncr_for_summary[ncr_for_summary["Status"].astype(str).str.lower().eq("open")]
+        top_ncr = ncr_for_summary["Project"].value_counts().head(5)
+        if not top_ncr.empty:
+            st.markdown('<div class="exec-panel" style="margin-top:0.75rem;"><h3>Top NCR Projects</h3>', unsafe_allow_html=True)
+            for project, count in top_ncr.items():
+                st.markdown(
+                    f'<div class="status-row"><span>{project}</span><strong>{count}</strong></div>',
+                    unsafe_allow_html=True,
+                )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown('<div class="section-heading">Recent Daily Reports</div>', unsafe_allow_html=True)
+if isinstance(daily, pd.DataFrame) and not daily.empty:
+    render_table(daily.head(8), height=260)
 else:
     st.info("Daily Reports sheet is not available in the data source.")
 
-
-# render_workspace()
-
-sheet_names = list(filtered_data.keys())
-
-if len(sheet_names) > 0:
-    first_df = filtered_data[sheet_names[0]]
-
-    st.markdown('<div class="section-heading">Trend & Distribution</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="section-caption">A quick visual readout from the first available filtered data sheet.</div>',
-        unsafe_allow_html=True
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if "Date" in first_df.columns and len(first_df.columns) > 1:
-            num_col = first_df.select_dtypes(include="number").columns
-            if len(num_col) > 0:
-                render_line_chart(first_df, "Date", num_col[0], "Trend Analysis")
-
-    with col2:
-        if len(first_df.select_dtypes(include="number").columns) > 0:
-            num_col = first_df.select_dtypes(include="number").columns[0]
-            render_bar_chart(first_df, first_df.columns[0], num_col, "Distribution")
-
-
-
-# =========================
-# PROJECT LIST
-# =========================
-
-st.sidebar.caption(f"Total Projects: {project_count}")
+st.sidebar.caption(f"Total Projects: {len(projects)}")

@@ -198,9 +198,15 @@ def login():
         unsafe_allow_html=True,
     )
 
-    tab_login, tab_register = st.tabs(["Sign in", "Request access"])
+    access_mode = st.radio(
+        "Access mode",
+        ["Sign in", "Request access"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="auth_access_mode",
+    )
 
-    with tab_login:
+    if access_mode == "Sign in":
         username = st.text_input("Username", key="login_username").strip().lower()
         password = st.text_input("Password", type="password", key="login_password")
 
@@ -228,7 +234,7 @@ def login():
         with st.expander("First local admin login"):
             st.info("Username: admin | Password: admin123. Change this password before production use.")
 
-    with tab_register:
+    else:
         with st.form("registration_form"):
             name = st.text_input("Full name")
             username = st.text_input("Preferred username").strip().lower()

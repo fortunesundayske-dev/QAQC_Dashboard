@@ -52,6 +52,11 @@ def inject_enterprise_theme():
         visibility: hidden;
     }
 
+    [data-testid="stSidebarNav"],
+    section[data-testid="stSidebar"] nav {
+        display: none;
+    }
+
     .block-container {
         padding: 1rem 2rem;
     }
@@ -94,10 +99,10 @@ def render_header():
         """
 <div class="app-bar">
     <div>
-        <div class="app-bar__eyebrow">EVOMEC GLOBAL SERVICES LIMITED</div>
+        <div class="app-bar__eyebrow">EVOMEC GLOBAL SERVICES</div>
         <div class="app-bar__title">QA/QC Executive Dashboard</div>
     </div>
-    <div class="app-bar__status">Live Quality Console</div>
+    <div class="app-bar__status">Quality Control Management System</div>
 </div>
 """,
         unsafe_allow_html=True
@@ -351,26 +356,28 @@ def render_navigation():
 def render_top_nav():
     pages = get_navigation_pages()
 
-    nav_col, open_col, spacer = st.columns([2.4, 0.9, 2.7])
+    st.sidebar.markdown(
+        """
+<div class="side-brand">
+    <div class="side-brand__mark">E</div>
+    <div>
+        <div class="side-brand__name">EVOMEC</div>
+        <div class="side-brand__sub">QA/QC Command Centre</div>
+    </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    st.sidebar.markdown('<div class="side-menu-title">Menu</div>', unsafe_allow_html=True)
 
-    with nav_col:
-        selected = st.selectbox(
-            "Navigate",
-            list(pages.keys()),
-            index=0,
-            key="top_nav_select",
-        )
+    for label, page in pages.items():
+        if st.sidebar.button(label, key=f"side_nav_{label}", use_container_width=True):
+            st.switch_page(page)
 
-    with open_col:
-        st.markdown('<div style="height: 1.78rem;"></div>', unsafe_allow_html=True)
-        if st.button("Open", key="top_nav_open", use_container_width=True):
-            st.switch_page(pages[selected])
-
-    with spacer:
-        st.markdown(
-            f'<div class="nav-hint">{len(pages)} modules available. Use the selector to move between every dashboard page.</div>',
-            unsafe_allow_html=True
-        )
+    st.sidebar.markdown(
+        f'<div class="side-status">System Status: <strong>Online</strong><br>{len(pages)} modules available</div>',
+        unsafe_allow_html=True,
+    )
     
 def render_drilldown(df, id_col="ID"):
 
@@ -965,6 +972,326 @@ def inject_global_ui():
         section[data-testid="stSidebar"] p,
         section[data-testid="stSidebar"] span {
             color: var(--text);
+        }
+    }
+
+    /* Executive dashboard skin */
+    .stApp {
+        background: #f3f6fb;
+        color: #102033;
+    }
+
+    .block-container {
+        max-width: 1560px;
+        padding: 0.9rem 1.15rem 2rem;
+    }
+
+    h1, h2, h3 {
+        color: #102033;
+    }
+
+    .app-bar {
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+        color: #102033;
+        margin-bottom: 0.75rem;
+    }
+
+    .app-bar__eyebrow {
+        color: #0f6eb8;
+    }
+
+    .app-bar__title {
+        color: #102033;
+        font-size: 1.12rem;
+    }
+
+    .app-bar__status {
+        background: #eef6ff;
+        border-color: #cfe7ff;
+        color: #0f6eb8;
+    }
+
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #09213b 0%, #06182e 100%);
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    section[data-testid="stSidebar"] .stButton button {
+        background: transparent;
+        border: 0;
+        border-radius: 8px;
+        box-shadow: none;
+        color: #d7e7f7;
+        font-size: 0.88rem;
+        font-weight: 650;
+        justify-content: flex-start;
+        min-height: 2.35rem;
+        padding-left: 0.85rem;
+        text-align: left;
+        width: 100%;
+    }
+
+    section[data-testid="stSidebar"] .stButton button:hover {
+        background: linear-gradient(135deg, #1d73e8, #1596d4);
+        color: #ffffff;
+        filter: none;
+    }
+
+    .side-brand {
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        gap: 0.7rem;
+        margin-bottom: 0.9rem;
+        padding: 0.35rem 0 0.95rem;
+    }
+
+    .side-brand__mark {
+        align-items: center;
+        background: linear-gradient(135deg, #f97316, #0ea5e9);
+        border-radius: 8px;
+        color: #ffffff;
+        display: flex;
+        font-size: 1.1rem;
+        font-weight: 900;
+        height: 2.35rem;
+        justify-content: center;
+        width: 2.35rem;
+    }
+
+    .side-brand__name {
+        color: #ffffff;
+        font-size: 1.05rem;
+        font-weight: 820;
+        letter-spacing: 0.02em;
+    }
+
+    .side-brand__sub {
+        color: #9fb8d3;
+        font-size: 0.72rem;
+        margin-top: 0.1rem;
+    }
+
+    .side-menu-title {
+        color: #6fd3ff;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        margin: 0.35rem 0 0.45rem;
+        text-transform: uppercase;
+    }
+
+    .side-status {
+        background: rgba(15, 118, 110, 0.18);
+        border: 1px solid rgba(45, 212, 191, 0.24);
+        border-radius: 8px;
+        color: #b7f5ef;
+        font-size: 0.78rem;
+        margin-top: 0.9rem;
+        padding: 0.75rem;
+    }
+
+    .dashboard-shell {
+        display: grid;
+        gap: 0.9rem;
+        grid-template-columns: minmax(0, 1fr) 250px;
+    }
+
+    .dashboard-main {
+        min-width: 0;
+    }
+
+    .dashboard-side {
+        min-width: 0;
+    }
+
+    .metric-grid {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin-bottom: 0.75rem;
+    }
+
+    .exec-metric {
+        align-items: center;
+        background: #ffffff;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+        display: flex;
+        gap: 0.8rem;
+        min-height: 5.6rem;
+        padding: 0.85rem;
+    }
+
+    .exec-metric__icon {
+        align-items: center;
+        background: var(--metric-color, #2563eb);
+        border-radius: 8px;
+        box-shadow: 0 10px 22px color-mix(in srgb, var(--metric-color, #2563eb) 28%, transparent);
+        color: #ffffff;
+        display: flex;
+        font-size: 1.15rem;
+        font-weight: 900;
+        height: 2.7rem;
+        justify-content: center;
+        width: 2.7rem;
+    }
+
+    .exec-metric__label {
+        color: #1f2f44;
+        font-size: 0.78rem;
+        font-weight: 800;
+    }
+
+    .exec-metric__value {
+        color: #0f172a;
+        font-size: 1.95rem;
+        font-weight: 900;
+        line-height: 1;
+        margin-top: 0.25rem;
+    }
+
+    .exec-metric__sub {
+        color: #64748b;
+        font-size: 0.72rem;
+        margin-top: 0.25rem;
+    }
+
+    .exec-panel {
+        background: #ffffff;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+        padding: 0.95rem;
+    }
+
+    .exec-panel h3 {
+        color: #102033;
+        font-size: 0.95rem;
+        font-weight: 900;
+        margin: 0 0 0.75rem;
+        text-transform: uppercase;
+    }
+
+    .score-ring {
+        align-items: center;
+        background:
+            radial-gradient(circle at center, #ffffff 55%, transparent 57%),
+            conic-gradient(#27ae60 0 83%, #e5edf5 83% 100%);
+        border-radius: 999px;
+        color: #102033;
+        display: flex;
+        flex-direction: column;
+        font-size: 2rem;
+        font-weight: 900;
+        height: 8.25rem;
+        justify-content: center;
+        margin: 0.6rem auto;
+        width: 8.25rem;
+    }
+
+    .score-ring span {
+        color: #64748b;
+        font-size: 0.72rem;
+        font-weight: 800;
+    }
+
+    .status-row {
+        align-items: center;
+        border-bottom: 1px solid #edf2f7;
+        display: flex;
+        justify-content: space-between;
+        padding: 0.45rem 0;
+    }
+
+    .status-dot {
+        border-radius: 999px;
+        display: inline-flex;
+        height: 0.62rem;
+        margin-right: 0.42rem;
+        width: 0.62rem;
+    }
+
+    .module-grid {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        margin-top: 0.75rem;
+    }
+
+    .module-card {
+        background: #ffffff;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+        min-height: 9.75rem;
+        padding: 0.85rem;
+    }
+
+    .module-card h3 {
+        color: var(--module-color, #2563eb);
+        font-size: 0.78rem;
+        font-weight: 900;
+        margin: 0 0 0.7rem;
+        text-transform: uppercase;
+    }
+
+    .module-card__stat {
+        align-items: center;
+        border: 1px solid #edf2f7;
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.45rem;
+        padding: 0.42rem 0.5rem;
+    }
+
+    .module-card__stat strong {
+        color: #0f172a;
+        font-size: 1rem;
+    }
+
+    .module-card__bar {
+        background: #eaf1f8;
+        border-radius: 999px;
+        height: 0.42rem;
+        margin: 0.55rem 0;
+        overflow: hidden;
+    }
+
+    .module-card__bar span {
+        background: var(--module-color, #2563eb);
+        display: block;
+        height: 100%;
+    }
+
+    @media (max-width: 1180px) {
+        .dashboard-shell {
+            grid-template-columns: 1fr;
+        }
+
+        .metric-grid,
+        .module-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 760px) {
+        .metric-grid,
+        .module-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .app-bar {
+            display: block;
+        }
+
+        .block-container {
+            padding: 0.75rem 0.75rem 1.5rem;
         }
     }
     </style>
