@@ -112,29 +112,72 @@ def render_header():
 # MOBILE NAV
 # =========================
 def get_navigation_pages():
+    pages_dir = BASE_DIR / "pages"
+    label_overrides = {
+        "Access_Admin": "Access Admin",
+        "Audit_Surveillance": "Audit & Surveillance",
+        "Concrete_Tracker": "Concrete Tracker",
+        "CTQ_Dashboard": "CTQ Dashboard",
+        "Daily_Reports": "Daily Reports",
+        "Defect_Rework_Tracker": "Defect & Rework",
+        "Document_Status": "Document Status",
+        "Executive_Dashboard": "Executive Analytics",
+        "ITR_Tracker": "ITR Tracker",
+        "Learning_Academy": "Learning Academy",
+        "Lessons_Learned": "Lessons Learned",
+        "Management_Executive_Summary": "Management Summary",
+        "NCR_Tracker": "NCR Tracker",
+        "OBS_Tracker": "OBS Tracker",
+        "Quality_Tools": "Quality Tools",
+        "Standards_Library": "Standards Library",
+        "User_Profile": "User Profile",
+    }
+    preferred_order = [
+        "Executive Home",
+        "Executive Analytics",
+        "Quality Tools",
+        "Standards Library",
+        "Learning Academy",
+        "Concrete Tracker",
+        "NCR Tracker",
+        "OBS Tracker",
+        "Audit & Surveillance",
+        "CTQ Dashboard",
+        "Daily Reports",
+        "ITR Tracker",
+        "Document Status",
+        "Defect & Rework",
+        "Lessons Learned",
+        "Management Summary",
+        "User Profile",
+        "Access Admin",
+    ]
+
     pages = {
         "Executive Home": "app.py",
-        "Executive Analytics": "pages/Executive_Dashboard.py",
-        "Quality Tools": "pages/Quality_Tools.py",
-        "Standards Library": "pages/Standards_Library.py",
-        "Learning Academy": "pages/Learning_Academy.py",
-        "Concrete Tracker": "pages/Concrete_Tracker.py",
-        "NCR Tracker": "pages/NCR_Tracker.py",
-        "OBS Tracker": "pages/OBS_Tracker.py",
-        "Audit & Surveillance": "pages/Audit_Surveillance.py",
-        "CTQ Dashboard": "pages/CTQ_Dashboard.py",
-        "Daily Reports": "pages/Daily_Reports.py",
-        "ITR Tracker": "pages/ITR_Tracker.py",
-        "Document Status": "pages/Document_Status.py",
-        "Defect & Rework": "pages/Defect_Rework_Tracker.py",
-        "Lessons Learned": "pages/Lessons_Learned.py",
-        "Management Summary": "pages/Management_Executive_Summary.py",
-        "User Profile": "pages/User_Profile.py",
     }
+
+    if pages_dir.exists():
+        for page_file in sorted(pages_dir.glob("*.py")):
+            page_key = page_file.stem
+            if page_key.startswith("_"):
+                continue
+            label = label_overrides.get(page_key, page_key.replace("_", " ").title())
+            pages[label] = f"pages/{page_file.name}"
+
     role = st.session_state.get("auth", {}).get("role") or st.session_state.get("role")
-    if role == "admin":
-        pages["Access Admin"] = "pages/Access_Admin.py"
-    return pages
+    if role != "admin":
+        pages.pop("Access Admin", None)
+
+    ordered = {
+        label: pages[label]
+        for label in preferred_order
+        if label in pages
+    }
+    for label in sorted(pages):
+        if label not in ordered:
+            ordered[label] = pages[label]
+    return ordered
 
 
 def render_mobile_nav():
