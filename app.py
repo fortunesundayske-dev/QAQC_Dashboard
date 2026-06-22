@@ -11,6 +11,7 @@ st.set_page_config(
 )
 
 from pathlib import Path
+import html
 
 import pandas as pd
 import plotly.express as px
@@ -37,6 +38,13 @@ def status_count(df, status):
     if not isinstance(df, pd.DataFrame) or df.empty or "Status" not in df.columns:
         return 0
     return int(df["Status"].astype(str).str.lower().eq(status.lower()).sum())
+
+
+def status_count_any(df, statuses):
+    if not isinstance(df, pd.DataFrame) or df.empty or "Status" not in df.columns:
+        return 0
+    wanted = {status.lower() for status in statuses}
+    return int(df["Status"].astype(str).str.strip().str.lower().isin(wanted).sum())
 
 
 def open_count(df):
@@ -66,21 +74,17 @@ def metric_card(label, value, subtitle, accent, mark):
 
 def module_card(title, stats, color="#2563eb", progress=70):
     stat_html = "".join(
-        f"""
-<div class="module-card__stat">
-    <span>{label}</span>
-    <strong>{value}</strong>
-</div>
-"""
+        f'<div class="module-card__stat"><span>{html.escape(str(label))}</span><strong>{html.escape(str(value))}</strong></div>'
         for label, value in stats
     )
-    return f"""
-<div class="module-card" style="--module-color: {color};">
-    <h3>{title}</h3>
-    {stat_html}
-    <div class="module-card__bar"><span style="width: {max(0, min(progress, 100))}%;"></span></div>
-</div>
-"""
+    safe_progress = max(0, min(int(progress), 100))
+    return (
+        f'<div class="module-card" style="--module-color: {color};">'
+        f'<h3>{html.escape(str(title))}</h3>'
+        f'{stat_html}'
+        f'<div class="module-card__bar"><div style="width:{safe_progress}%;"></div></div>'
+        f'</div>'
+    )
 
 
 def trend_frame(df, label, date_candidates):
@@ -105,7 +109,9 @@ def project_performance(data):
         if not isinstance(df, pd.DataFrame) or df.empty or "Project" not in df.columns or "Status" not in df.columns:
             continue
         temp = df.copy()
-        temp["ClosedFlag"] = temp["Status"].astype(str).str.lower().isin(["closed", "completed", "accepted", "approved"])
+        temp["ClosedFlag"] = temp["Status"].astype(str).str.strip().str.lower().isin(
+            ["closed", "completed", "accepted", "approved", "passed", "pass", "compliant"]
+        )
         grouped = temp.groupby("Project").agg(Total=("Status", "size"), Closed=("ClosedFlag", "sum")).reset_index()
         grouped["Compliance %"] = grouped.apply(lambda row: pct(row["Closed"], row["Total"]), axis=1)
         rows.append(grouped[["Project", "Compliance %"]])
@@ -148,9 +154,15 @@ open_obs = open_count(obs)
 closed_obs = closed_count(obs)
 open_itr = open_count(itr)
 closed_itr = closed_count(itr)
-open_ctq = open_count(ctq)
-closed_ctq = closed_count(ctq)
-quality_score = pct(closed_ncr + closed_obs + closed_itr + closed_ctq, open_ncr + closed_ncr + open_obs + closed_obs + open_itr + closed_itr + open_ctq + closed_ctq)
+ctq_total = len(ctq) if isinstance(ctq, pd.DataFrame) else 0
+ctq_passed = status_count_any(ctq, ["Passed", "Pass", "Compliant", "Approved", "Accepted"])
+ctq_failed = status_count_any(ctq, ["Failed", "Fail", "Non-Compliant", "Nonconforming", "Rejected"])
+ctq_pending = max(ctq_total - ctq_passed - ctq_failed, 0)
+ctq_compliance = pct(ctq_passed, ctq_total)
+quality_score = pct(
+    closed_ncr + closed_obs + closed_itr + ctq_passed,
+    open_ncr + closed_ncr + open_obs + closed_obs + open_itr + closed_itr + ctq_total,
+)
 
 metric_html = [
     metric_card("Total Projects", len(projects), "Active projects", "#2563eb", "P"),
@@ -208,7 +220,18 @@ with left:
         module_card("OBS Dashboard", [("Open OBS", open_obs), ("Closed OBS", closed_obs)], "#f97316", pct(closed_obs, open_obs + closed_obs)),
         module_card("ITR Dashboard", [("Open ITR", open_itr), ("Closed ITR", closed_itr)], "#14b8a6", pct(closed_itr, open_itr + closed_itr)),
         module_card("Concrete Tracker", [("Total pours", len(concrete)), ("Volume m3", f"{concrete_volume:,.0f}")], "#1d8fe8", 74),
-        module_card("CTQ Register", [("Open CTQ", open_ctq), ("Closed CTQ", closed_ctq)], "#7c3aed", pct(closed_ctq, open_ctq + closed_ctq)),
+        module_card(
+            "CTQ Register",
+            [
+                ("Total CTQ", ctq_total),
+                ("Passed", ctq_passed),
+                ("Failed", ctq_failed),
+                ("Pending", ctq_pending),
+                ("Compliance", f"{ctq_compliance}%"),
+            ],
+            "#7c3aed",
+            ctq_compliance,
+        ),
         module_card("Learning", [("Lessons", len(lessons)), ("Library", "Active")], "#0f6eb8", 88),
         module_card("Standards", [("PDFs", "214"), ("Viewer", "Ready")], "#0891b2", 92),
     ]

@@ -10,6 +10,7 @@ from utils import (
     render_table,
     inject_global_ui,
     render_table_with_details,
+    render_navigation,
     render_top_nav
 )
 from auth import login
@@ -42,6 +43,7 @@ with col1:
 with col2:
     if NLNG_LOGO:
         st.image(NLNG_LOGO, width=140)
+render_navigation()
 render_top_nav()
 
 st.title("NCR Tracker")

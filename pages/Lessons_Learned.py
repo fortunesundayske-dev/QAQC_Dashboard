@@ -10,6 +10,7 @@ from utils import (
     render_table,
     inject_global_ui,
     render_table_with_details,
+    render_navigation,
     render_top_nav
 )
 from auth import login
@@ -21,6 +22,7 @@ st.set_page_config(page_title="Lessons Learned", layout="wide")
 inject_global_ui()
 if not login():
     st.stop()
+render_navigation()
 render_top_nav()
 ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"

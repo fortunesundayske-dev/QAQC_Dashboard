@@ -1,7 +1,7 @@
 import streamlit as st
 
 import auth
-from utils import inject_global_ui, render_top_nav
+from utils import inject_global_ui, render_navigation, render_top_nav
 
 
 st.set_page_config(page_title="User Profile", layout="wide")
@@ -10,6 +10,7 @@ inject_global_ui()
 if not auth.login():
     st.stop()
 
+render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 

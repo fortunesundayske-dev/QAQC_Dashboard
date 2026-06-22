@@ -5,7 +5,7 @@ import plotly.express as px
 import streamlit as st
 
 import auth
-from utils import global_filter_sidebar, inject_global_ui, load_master_data, render_top_nav
+from utils import global_filter_sidebar, inject_global_ui, load_master_data, render_navigation, render_top_nav
 
 
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
@@ -55,6 +55,7 @@ inject_global_ui()
 if not auth.login():
     st.stop()
 
+render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
@@ -67,8 +68,8 @@ def clean_volume(series):
     return (
         series.astype(str)
         .str.replace("m3", "", regex=False)
-        .str.replace("m³", "", regex=False)
         .str.replace("mÂ³", "", regex=False)
+        .str.replace("mÃ‚Â³", "", regex=False)
         .str.replace(",", "", regex=False)
         .str.strip()
         .replace({"nan": None, "None": None, "": None})

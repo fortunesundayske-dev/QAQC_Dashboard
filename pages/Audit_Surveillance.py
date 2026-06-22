@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from pathlib import Path
-from utils import load_master_data, global_filter_sidebar, apply_filters, render_table, inject_global_ui, render_table_with_details, render_top_nav
+from utils import load_master_data, global_filter_sidebar, apply_filters, render_table, inject_global_ui, render_table_with_details, render_navigation, render_top_nav
 from auth import login
 BASE_DIR = Path(__file__).resolve().parent.parent    
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
@@ -12,6 +12,7 @@ st.set_page_config(page_title="Audit & Surveillance", layout="wide")
 inject_global_ui()
 if not login():
     st.stop()
+render_navigation()
 render_top_nav()
 
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"

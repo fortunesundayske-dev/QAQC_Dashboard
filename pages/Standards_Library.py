@@ -6,7 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 import auth
-from utils import inject_global_ui, render_top_nav
+from utils import inject_global_ui, render_navigation, render_top_nav
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 STANDARDS_DIR = BASE_DIR / "assets" / "standards"
@@ -86,6 +86,7 @@ inject_global_ui()
 if not auth.login():
     st.stop()
 
+render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
