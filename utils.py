@@ -191,11 +191,19 @@ def get_navigation_pages():
     return ordered
 
 
+def _page_href(page):
+    if page == "app.py":
+        return "/"
+    return f"/{Path(page).stem}"
+
+
 def render_mobile_nav():
     pages = get_navigation_pages()
     selected = st.selectbox("Quick Navigation", list(pages.keys()))
-    if st.button("Open selected page", key="mobile_nav_open", use_container_width=True):
-        st.switch_page(pages[selected])
+    st.markdown(
+        f'<a class="nav-go-link" href="{_page_href(pages[selected])}" target="_self">Open selected page</a>',
+        unsafe_allow_html=True,
+    )
 
 # =========================
 # KPI CARDS
@@ -337,9 +345,10 @@ def render_navigation():
             list(pages.keys()),
             key="nav_dropdown"
         )
-
-        if st.button("Go", key="nav_go", use_container_width=True):
-            st.switch_page(pages[selected])
+        st.markdown(
+            f'<a class="nav-go-link" href="{_page_href(pages[selected])}" target="_self">Go to selected page</a>',
+            unsafe_allow_html=True,
+        )
     return
     st.markdown("### 🧭 Page Navigation", unsafe_allow_html=True)
 
@@ -383,8 +392,10 @@ def render_top_nav():
     st.sidebar.markdown('<div class="side-menu-title">Menu</div>', unsafe_allow_html=True)
 
     for label, page in pages.items():
-        if st.sidebar.button(label, key=f"side_nav_{label}", use_container_width=True):
-            st.switch_page(page)
+        st.sidebar.markdown(
+            f'<a class="side-nav-link" href="{_page_href(page)}" target="_self">{html.escape(label)}</a>',
+            unsafe_allow_html=True,
+        )
 
     st.sidebar.markdown(
         f'<div class="side-status">System Status: <strong>Online</strong><br>{len(pages)} modules available</div>',
@@ -1117,6 +1128,35 @@ def inject_global_ui():
         letter-spacing: 0.08em;
         margin: 0.35rem 0 0.45rem;
         text-transform: uppercase;
+    }
+
+    .side-nav-link {
+        border-radius: 8px;
+        color: #d7e7f7 !important;
+        display: block;
+        font-size: 0.88rem;
+        font-weight: 650;
+        margin: 0.08rem 0;
+        padding: 0.58rem 0.85rem;
+        text-decoration: none !important;
+        transition: background 0.18s ease, color 0.18s ease;
+    }
+
+    .side-nav-link:hover {
+        background: linear-gradient(135deg, #1d73e8, #1596d4);
+        color: #ffffff !important;
+    }
+
+    .nav-go-link {
+        background: linear-gradient(135deg, #0ea5e9, #2563eb);
+        border-radius: 8px;
+        color: #ffffff !important;
+        display: block;
+        font-weight: 760;
+        margin-top: 0.65rem;
+        padding: 0.68rem 0.85rem;
+        text-align: center;
+        text-decoration: none !important;
     }
 
     .side-status {
