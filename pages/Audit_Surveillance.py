@@ -4,9 +4,7 @@ import plotly.express as px
 from pathlib import Path
 from utils import load_master_data, global_filter_sidebar, apply_filters, render_table, inject_global_ui, render_table_with_details, render_top_nav
 from auth import login
-from utils import render_navigation
 render_top_nav()
-render_navigation()
  
 if not login():
     st.stop()

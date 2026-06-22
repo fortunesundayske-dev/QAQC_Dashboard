@@ -10,12 +10,12 @@ from utils import (
     render_table,
     inject_global_ui,
     render_table_with_details,
-    render_navigation
+    render_top_nav
 )
 from auth import login
-from utils import render_navigation
 
-render_navigation()
+
+render_top_nav()
 if not login():
     st.stop()
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
