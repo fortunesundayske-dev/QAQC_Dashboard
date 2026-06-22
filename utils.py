@@ -323,11 +323,17 @@ def extract_projects(data):
 # =========================
 
 def render_navigation():
-    st.markdown("### Page Navigation")
     pages = get_navigation_pages()
-    for label, page in pages.items():
-        if st.button(label, key=f"nav_{label}"):
-            st.switch_page(page)
+
+    with st.popover("📂 Page Navigation"):
+        selected = st.selectbox(
+            "Select Page",
+            list(pages.keys()),
+            key="nav_dropdown"
+        )
+
+        if st.button("Go", key="nav_go"):
+            st.switch_page(pages[selected])
     return
     st.markdown("### 🧭 Page Navigation", unsafe_allow_html=True)
 
