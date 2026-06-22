@@ -1,18 +1,18 @@
 import pandas as pd
 import streamlit as st
 
-from auth import login, render_user_sidebar
+import auth
 from utils import inject_global_ui, render_top_nav
 
 
 st.set_page_config(page_title="Learning Academy", layout="wide")
 inject_global_ui()
 
-if not login():
+if not auth.login():
     st.stop()
 
 render_top_nav()
-render_user_sidebar()
+getattr(auth, "render_user_sidebar", lambda: None)()
 
 st.markdown(
     """

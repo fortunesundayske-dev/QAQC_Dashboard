@@ -1,19 +1,19 @@
 import streamlit as st
 
-from auth import current_user, login, render_user_sidebar, update_profile
+import auth
 from utils import inject_global_ui, render_top_nav
 
 
 st.set_page_config(page_title="User Profile", layout="wide")
 inject_global_ui()
 
-if not login():
+if not auth.login():
     st.stop()
 
 render_top_nav()
-render_user_sidebar()
+getattr(auth, "render_user_sidebar", lambda: None)()
 
-user = current_user()
+user = getattr(auth, "current_user", lambda: None)()
 
 st.markdown(
     """
@@ -69,7 +69,8 @@ with c2:
         saved = st.form_submit_button("Save profile", use_container_width=True)
 
     if saved:
-        if update_profile(name, email, discipline, uploaded):
+        update_profile = getattr(auth, "update_profile", None)
+        if update_profile and update_profile(name, email, discipline, uploaded):
             st.success("Profile updated.")
             st.rerun()
         else:

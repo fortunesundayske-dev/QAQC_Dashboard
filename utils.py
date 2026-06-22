@@ -290,8 +290,10 @@ def render_top_nav():
         "Lessons Learned": "pages/Lessons_Learned.py",
         "Management Summary": "pages/Management_Executive_Summary.py",
         "User Profile": "pages/User_Profile.py",
-        "Access Admin": "pages/Access_Admin.py",
     }
+    role = st.session_state.get("auth", {}).get("role") or st.session_state.get("role")
+    if role == "admin":
+        pages["Access Admin"] = "pages/Access_Admin.py"
 
     nav_col, spacer = st.columns([1.25, 4])
 
@@ -735,6 +737,96 @@ def inject_global_ui():
     .standard-card,
     .learning-card {
         margin-bottom: 0.75rem;
+    }
+
+    .spotlight-grid {
+        display: grid;
+        gap: 0.95rem;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        margin: 0.95rem 0 1.1rem;
+    }
+
+    .spotlight-card {
+        background:
+            linear-gradient(135deg, rgba(56, 189, 248, 0.16), transparent 46%),
+            color-mix(in srgb, var(--panel) 94%, transparent);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 18px 46px rgba(2, 8, 23, 0.2);
+        min-height: 154px;
+        overflow: hidden;
+        padding: 1.05rem;
+        position: relative;
+        transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+    }
+
+    .spotlight-card::after {
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.16), transparent 64%);
+        content: "";
+        height: 140px;
+        position: absolute;
+        right: -48px;
+        top: -48px;
+        transition: transform 0.32s ease, opacity 0.32s ease;
+        width: 140px;
+    }
+
+    .spotlight-card:hover,
+    .tool-card:hover,
+    .standard-card:hover,
+    .learning-card:hover,
+    .security-card:hover {
+        border-color: rgba(56, 189, 248, 0.58);
+        box-shadow: 0 24px 60px rgba(2, 8, 23, 0.28);
+        transform: translateY(-5px);
+    }
+
+    .spotlight-card:hover::after {
+        opacity: 0.9;
+        transform: scale(1.16);
+    }
+
+    .spotlight-card h3 {
+        color: var(--text);
+        font-size: 1.06rem;
+        margin: 0.42rem 0 0.42rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .spotlight-card p {
+        color: var(--muted);
+        font-size: 0.88rem;
+        margin: 0;
+        position: relative;
+        z-index: 1;
+    }
+
+    .interactive-chip {
+        background: rgba(14, 165, 233, 0.12);
+        border: 1px solid rgba(56, 189, 248, 0.22);
+        border-radius: 999px;
+        color: var(--text);
+        display: inline-flex;
+        font-size: 0.78rem;
+        font-weight: 720;
+        margin: 0.24rem 0.24rem 0 0;
+        padding: 0.34rem 0.58rem;
+    }
+
+    .smooth-panel {
+        animation: panelFadeIn 0.42s ease both;
+    }
+
+    @keyframes panelFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     @media (prefers-color-scheme: light) {

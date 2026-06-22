@@ -22,7 +22,7 @@ from utils import (
     render_kpi_cards,
     build_kpis,
 )
-from auth import login, render_user_sidebar
+import auth
 import pandas as pd
 # =========================
 # PATHS
@@ -38,7 +38,7 @@ NLNG_LOGO = ASSETS / "nlng_logo.png"
 
 
 inject_enterprise_theme()
-if not login():
+if not auth.login():
     st.stop()
 
 # =========================
@@ -52,7 +52,7 @@ if not login():
 # =========================
 render_header()
 render_top_nav()
-render_user_sidebar()
+getattr(auth, "render_user_sidebar", lambda: None)()
 
 # =========================
 # DATA PREVIEW
@@ -111,31 +111,45 @@ render_kpi_cards(kpis)
 st.markdown('<div class="section-heading">Advanced QA/QC Workspace</div>', unsafe_allow_html=True)
 st.markdown(
     """
-<div class="tool-grid">
-    <div class="tool-card">
+<div class="spotlight-grid smooth-panel">
+    <div class="spotlight-card">
         <div class="card-eyebrow">Quality Tools</div>
-        <h3>Lean, RCA, calculators</h3>
-        <p>Use structured templates for DMAIC, 5 Whys, fishbone analysis, risk priority scoring, concrete volume, and inspection readiness.</p>
+        <h3>Lean, PDCA, RCA, calculators</h3>
+        <p>Run DMAIC, PDCA, 5 Whys, fishbone analysis, risk scoring, concrete volume, and inspection readiness tools.</p>
+        <span class="interactive-chip">PDCA</span><span class="interactive-chip">RCA</span><span class="interactive-chip">Concrete</span>
     </div>
-    <div class="tool-card">
+    <div class="spotlight-card">
         <div class="card-eyebrow">Standards</div>
         <h3>ASTM, DEP, BS summaries</h3>
-        <p>Browse discipline-based references for civil, concrete, welding, piping, coatings, NDT, electrical, and documentation control.</p>
+        <p>Browse discipline-based references with interactive filtering for civil, concrete, welding, piping, coatings, NDT, and quality systems.</p>
+        <span class="interactive-chip">ASTM</span><span class="interactive-chip">DEP</span><span class="interactive-chip">BS</span>
     </div>
-    <div class="tool-card">
+    <div class="spotlight-card">
         <div class="card-eyebrow">Learning</div>
         <h3>Inspection academy</h3>
         <p>Guided learning paths cover civil inspection, NDT, Barcol testing, piping, welding, CWI, SCWI, ITPs, NCRs, and audit practice.</p>
+        <span class="interactive-chip">CWI</span><span class="interactive-chip">NDT</span><span class="interactive-chip">SCWI</span>
     </div>
-    <div class="tool-card">
-        <div class="card-eyebrow">Security</div>
-        <h3>Approved access only</h3>
-        <p>Users request accounts, administrators approve access, passwords are hashed, and profile/role information is controlled.</p>
+    <div class="spotlight-card">
+        <div class="card-eyebrow">Concrete Intelligence</div>
+        <h3>Forecast and procurement</h3>
+        <p>Use smarter material forecasts with lead time, safety stock, service level, and mix-design assumptions.</p>
+        <span class="interactive-chip">Forecast</span><span class="interactive-chip">Stock</span><span class="interactive-chip">Procurement</span>
     </div>
 </div>
 """,
     unsafe_allow_html=True,
 )
+
+nav1, nav2, nav3, nav4 = st.columns(4)
+if nav1.button("Open Quality Tools", use_container_width=True):
+    st.switch_page("pages/Quality_Tools.py")
+if nav2.button("Open Standards Library", use_container_width=True):
+    st.switch_page("pages/Standards_Library.py")
+if nav3.button("Open Learning Academy", use_container_width=True):
+    st.switch_page("pages/Learning_Academy.py")
+if nav4.button("Open Concrete Tracker", use_container_width=True):
+    st.switch_page("pages/Concrete_Tracker.py")
 
 
 st.markdown('<div class="section-heading">Data Source Overview</div>', unsafe_allow_html=True)

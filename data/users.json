@@ -1,0 +1,36 @@
+{
+  "admin": {
+    "username": "admin",
+    "email": "admin@evomec.local",
+    "name": "System Administrator",
+    "role": "admin",
+    "status": "approved",
+    "password": "vNuaMHDg5Fm9gKLrqAicJRvkF9McyH3zKXcshimf6KQ=",
+    "salt": "1fc7f6aef30f607c26621b5897a27dbc",
+    "created_at": "2026-06-22T11:46:43+00:00",
+    "approved_at": "2026-06-22T11:46:43+00:00",
+    "approved_by": "system",
+    "profile_photo": null,
+    "discipline": "Quality Management",
+    "failed_attempts": 0,
+    "locked_until": null,
+    "last_login": "2026-06-22T11:54:50+00:00"
+  },
+  "dave": {
+    "username": "dave",
+    "email": "fortunesundayske@yahoo.com",
+    "name": "Dave Sunday",
+    "role": "viewer",
+    "status": "approved",
+    "password": "Q/wI4q98gHOJM1JjNd5m05jC0UM0+emhhU35XjeHqoE=",
+    "salt": "e6a0293dd96ea69418613b353fa30b35",
+    "created_at": "2026-06-22T11:54:12+00:00",
+    "approved_at": "2026-06-22T11:55:03+00:00",
+    "approved_by": "admin",
+    "profile_photo": null,
+    "discipline": "Civil",
+    "failed_attempts": 0,
+    "locked_until": null,
+    "last_login": "2026-06-22T12:08:40+00:00"
+  }
+}

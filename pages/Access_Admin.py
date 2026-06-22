@@ -1,27 +1,19 @@
 import pandas as pd
 import streamlit as st
 
-from auth import (
-    approve_user,
-    approved_users,
-    login,
-    pending_users,
-    reject_user,
-    render_user_sidebar,
-    require_role,
-)
+import auth
 from utils import inject_global_ui, render_top_nav
 
 
 st.set_page_config(page_title="Access Admin", layout="wide")
 inject_global_ui()
 
-if not login():
+if not auth.login():
     st.stop()
 
-require_role(["admin"])
+getattr(auth, "require_role", lambda roles: None)(["admin"])
 render_top_nav()
-render_user_sidebar()
+getattr(auth, "render_user_sidebar", lambda: None)()
 
 st.markdown(
     """
@@ -33,6 +25,15 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+pending_users = getattr(auth, "pending_users", lambda: {})
+approved_users = getattr(auth, "approved_users", lambda: {})
+approve_user = getattr(auth, "approve_user", None)
+reject_user = getattr(auth, "reject_user", None)
+
+if approve_user is None or reject_user is None:
+    st.error("Access administration needs the latest auth.py file. Please redeploy the latest repository version.")
+    st.stop()
 
 pending = pending_users()
 approved = approved_users()

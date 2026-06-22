@@ -128,6 +128,49 @@ def init_auth():
             "role": None,
             "email": None,
         }
+    elif "logged_in" not in st.session_state:
+        st.session_state.logged_in = st.session_state.auth.get("logged_in", False)
+
+    if st.session_state.get("logged_in") and not st.session_state.auth.get("logged_in"):
+        st.session_state.auth.update(
+            {
+                "logged_in": True,
+                "username": st.session_state.get("username"),
+                "name": st.session_state.get("name"),
+                "role": st.session_state.get("role"),
+                "email": st.session_state.get("email"),
+            }
+        )
+
+
+def _set_logged_in(username, user):
+    st.session_state.auth = {
+        "logged_in": True,
+        "username": username,
+        "name": user["name"],
+        "role": user["role"],
+        "email": user["email"],
+    }
+    st.session_state.logged_in = True
+    st.session_state.username = username
+    st.session_state.name = user["name"]
+    st.session_state.role = user["role"]
+    st.session_state.email = user["email"]
+
+
+def _set_logged_out():
+    st.session_state.auth = {
+        "logged_in": False,
+        "username": None,
+        "name": None,
+        "role": None,
+        "email": None,
+    }
+    st.session_state.logged_in = False
+    st.session_state.username = None
+    st.session_state.name = None
+    st.session_state.role = None
+    st.session_state.email = None
 
 
 def login():
@@ -179,13 +222,7 @@ def login():
             user["failed_attempts"] = 0
             user["last_login"] = _utc_now()
             _save_users(users)
-            st.session_state.auth = {
-                "logged_in": True,
-                "username": username,
-                "name": user["name"],
-                "role": user["role"],
-                "email": user["email"],
-            }
+            _set_logged_in(username, user)
             st.rerun()
 
         with st.expander("First local admin login"):
@@ -240,13 +277,7 @@ def login():
 
 def logout():
     if st.sidebar.button("Sign out", use_container_width=True):
-        st.session_state.auth = {
-            "logged_in": False,
-            "username": None,
-            "name": None,
-            "role": None,
-            "email": None,
-        }
+        _set_logged_out()
         st.rerun()
 
 

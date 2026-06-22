@@ -3,18 +3,18 @@ import math
 import pandas as pd
 import streamlit as st
 
-from auth import login, render_user_sidebar
+import auth
 from utils import inject_global_ui, render_top_nav
 
 
 st.set_page_config(page_title="Quality Tools", layout="wide")
 inject_global_ui()
 
-if not login():
+if not auth.login():
     st.stop()
 
 render_top_nav()
-render_user_sidebar()
+getattr(auth, "render_user_sidebar", lambda: None)()
 
 st.markdown(
     """
@@ -31,6 +31,7 @@ st.markdown(
     """
 <div class="tool-grid">
     <div class="tool-card"><div class="card-eyebrow">Lean Six Sigma</div><h3>DMAIC workflow</h3><p>Define, measure, analyse, improve, and control quality issues with accountable actions.</p></div>
+    <div class="tool-card"><div class="card-eyebrow">Continuous Improvement</div><h3>PDCA cycle</h3><p>Plan, do, check, and act on quality improvements with clear owners and evidence.</p></div>
     <div class="tool-card"><div class="card-eyebrow">Root Cause</div><h3>5 Whys and fishbone</h3><p>Move beyond symptoms and capture evidence-based causes before closing NCRs.</p></div>
     <div class="tool-card"><div class="card-eyebrow">Concrete</div><h3>Volume and materials</h3><p>Estimate volume, waste allowance, cement bags, aggregate demand, and pour readiness.</p></div>
     <div class="tool-card"><div class="card-eyebrow">Risk</div><h3>RPN scoring</h3><p>Prioritise failure modes using severity, occurrence, and detection ratings.</p></div>
@@ -39,8 +40,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_dmaic, tab_rca, tab_concrete, tab_risk, tab_checklist = st.tabs(
-    ["Lean Six Sigma", "Root Cause Analysis", "Concrete Calculator", "Risk Priority", "Inspection Readiness"]
+tab_dmaic, tab_pdca, tab_rca, tab_concrete, tab_risk, tab_checklist = st.tabs(
+    ["Lean Six Sigma", "PDCA", "Root Cause Analysis", "Concrete Calculator", "Risk Priority", "Inspection Readiness"]
 )
 
 with tab_dmaic:
@@ -73,6 +74,32 @@ with tab_dmaic:
         st.metric(f"Required {direction}", f"{change:.1f}%")
     if owner:
         st.info(f"Accountable owner: {owner}")
+
+with tab_pdca:
+    st.subheader("PDCA Continuous Improvement Builder")
+    p1, p2 = st.columns(2)
+    with p1:
+        improvement = st.text_area("Plan: improvement objective", placeholder="Example: Reduce concrete cube failure risk before next major pour.")
+        current_gap = st.text_input("Current gap / baseline")
+        planned_action = st.text_area("Do: trial action")
+    with p2:
+        check_method = st.text_area("Check: evidence and measurement method")
+        act_decision = st.selectbox("Act: decision", ["Standardise", "Adjust and repeat", "Escalate", "Close after verification"])
+        pdca_owner = st.text_input("Owner", key="pdca_owner")
+
+    pdca_df = pd.DataFrame(
+        [
+            {"Cycle": "Plan", "Output": improvement or "Define the target, process gap, risk, and expected benefit."},
+            {"Cycle": "Do", "Output": planned_action or "Run a controlled action or field trial with responsible persons."},
+            {"Cycle": "Check", "Output": check_method or "Compare evidence against baseline, acceptance criteria, and CTQ targets."},
+            {"Cycle": "Act", "Output": act_decision},
+        ]
+    )
+    st.dataframe(pdca_df, use_container_width=True, hide_index=True)
+    if current_gap:
+        st.info(f"Baseline/gap to verify: {current_gap}")
+    if pdca_owner:
+        st.success(f"PDCA owner assigned: {pdca_owner}")
 
 with tab_rca:
     st.subheader("Root Cause Analysis")
