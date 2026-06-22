@@ -27,7 +27,12 @@ def _utc_now():
 
 def _ensure_auth_store():
     DATA_DIR.mkdir(exist_ok=True)
-    PROFILE_DIR.mkdir(exist_ok=True)
+    try:
+        PROFILE_DIR.mkdir(exist_ok=True)
+    except OSError:
+        # Some hosted deployments mount the app directory read-only.
+        # Profile upload can fail gracefully later; sign-in should still work.
+        pass
     if USERS_FILE.exists():
         return
 
@@ -61,6 +66,14 @@ def _save_users(users):
     DATA_DIR.mkdir(exist_ok=True)
     with USERS_FILE.open("w", encoding="utf-8") as handle:
         json.dump(users, handle, indent=2)
+
+
+def _try_save_users(users):
+    try:
+        _save_users(users)
+        return True
+    except OSError:
+        return False
 
 
 def _hash_password(password, salt):
@@ -177,6 +190,9 @@ def login():
     init_auth()
 
     if st.session_state.auth["logged_in"]:
+        storage_warning = st.session_state.pop("auth_storage_warning", None)
+        if storage_warning:
+            st.warning(storage_warning)
         return True
 
     st.markdown(
@@ -217,7 +233,7 @@ def login():
             if not user or not _verify_password(password, user):
                 if user:
                     user["failed_attempts"] = int(user.get("failed_attempts", 0)) + 1
-                    _save_users(users)
+                    _try_save_users(users)
                 st.error("Invalid username or password.")
                 return False
 
@@ -227,7 +243,11 @@ def login():
 
             user["failed_attempts"] = 0
             user["last_login"] = _utc_now()
-            _save_users(users)
+            if not _try_save_users(users):
+                st.session_state.auth_storage_warning = (
+                    "Signed in, but this deployment could not update the local user audit file. "
+                    "Login access is active."
+                )
             _set_logged_in(username, user)
             st.rerun()
 
@@ -275,8 +295,13 @@ def login():
                     "failed_attempts": 0,
                     "locked_until": None,
                 }
-                _save_users(users)
-                st.success("Registration submitted. An administrator must approve access before sign in.")
+                if _try_save_users(users):
+                    st.success("Registration submitted. An administrator must approve access before sign in.")
+                else:
+                    st.error(
+                        "Registration could not be saved on this deployment. "
+                        "Configure persistent storage or redeploy with a writable user store."
+                    )
 
     return False
 
@@ -338,10 +363,17 @@ def update_profile(name, email, discipline, uploaded_photo=None):
         suffix = Path(uploaded_photo.name).suffix.lower() or ".png"
         filename = f"{record['username']}{suffix}"
         photo_path = PROFILE_DIR / filename
-        photo_path.write_bytes(uploaded_photo.getbuffer())
+        try:
+            PROFILE_DIR.mkdir(exist_ok=True)
+            photo_path.write_bytes(uploaded_photo.getbuffer())
+        except OSError:
+            st.error("Profile photo could not be saved on this deployment.")
+            return False
         record["profile_photo"] = str(photo_path)
 
-    _save_users(users)
+    if not _try_save_users(users):
+        st.error("Profile changes could not be saved on this deployment.")
+        return False
     st.session_state.auth["name"] = name
     st.session_state.auth["email"] = email
     return True
@@ -368,7 +400,8 @@ def approve_user(username, role="user"):
     user["role"] = role
     user["approved_at"] = _utc_now()
     user["approved_by"] = admin["username"] if admin else "admin"
-    _save_users(users)
+    if not _try_save_users(users):
+        return False, "Approval could not be saved on this deployment."
 
     try:
         email_sent = _send_approval_email(user)
@@ -386,5 +419,4 @@ def reject_user(username):
         return False
     users[username]["status"] = "rejected"
     users[username]["rejected_at"] = _utc_now()
-    _save_users(users)
-    return True
+    return _try_save_users(users)
