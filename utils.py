@@ -191,19 +191,10 @@ def get_navigation_pages():
     return ordered
 
 
-def _page_href(page):
-    if page == "app.py":
-        return "/"
-    return f"/{Path(page).stem}"
-
-
 def render_mobile_nav():
     pages = get_navigation_pages()
     selected = st.selectbox("Quick Navigation", list(pages.keys()))
-    st.markdown(
-        f'<a class="nav-go-link" href="{_page_href(pages[selected])}" target="_self">Open selected page</a>',
-        unsafe_allow_html=True,
-    )
+    st.page_link(pages[selected], label="Open selected page")
 
 # =========================
 # KPI CARDS
@@ -345,10 +336,7 @@ def render_navigation():
             list(pages.keys()),
             key="nav_dropdown"
         )
-        st.markdown(
-            f'<a class="nav-go-link" href="{_page_href(pages[selected])}" target="_self">Go to selected page</a>',
-            unsafe_allow_html=True,
-        )
+        st.page_link(pages[selected], label="Go to selected page")
     return
     st.markdown("### 🧭 Page Navigation", unsafe_allow_html=True)
 
@@ -392,10 +380,7 @@ def render_top_nav():
     st.sidebar.markdown('<div class="side-menu-title">Menu</div>', unsafe_allow_html=True)
 
     for label, page in pages.items():
-        st.sidebar.markdown(
-            f'<a class="side-nav-link" href="{_page_href(page)}" target="_self">{html.escape(label)}</a>',
-            unsafe_allow_html=True,
-        )
+        st.sidebar.page_link(page, label=label)
 
     st.sidebar.markdown(
         f'<div class="side-status">System Status: <strong>Online</strong><br>{len(pages)} modules available</div>',

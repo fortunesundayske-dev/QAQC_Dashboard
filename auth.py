@@ -249,7 +249,7 @@ def login():
                     "Login access is active."
                 )
             _set_logged_in(username, user)
-            return True
+            st.rerun()
 
         with st.expander("First local admin login"):
             st.info("Username: admin | Password: admin123. Change this password before production use.")
