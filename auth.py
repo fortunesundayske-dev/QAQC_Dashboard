@@ -72,7 +72,7 @@ def _try_save_users(users):
     try:
         _save_users(users)
         return True
-    except OSError:
+    except Exception:
         return False
 
 
@@ -249,7 +249,7 @@ def login():
                     "Login access is active."
                 )
             _set_logged_in(username, user)
-            st.rerun()
+            return True
 
         with st.expander("First local admin login"):
             st.info("Username: admin | Password: admin123. Change this password before production use.")
