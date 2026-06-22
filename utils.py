@@ -111,10 +111,37 @@ def render_header():
 # =========================
 # MOBILE NAV
 # =========================
+def get_navigation_pages():
+    pages = {
+        "Executive Home": "app.py",
+        "Executive Analytics": "pages/Executive_Dashboard.py",
+        "Quality Tools": "pages/Quality_Tools.py",
+        "Standards Library": "pages/Standards_Library.py",
+        "Learning Academy": "pages/Learning_Academy.py",
+        "Concrete Tracker": "pages/Concrete_Tracker.py",
+        "NCR Tracker": "pages/NCR_Tracker.py",
+        "OBS Tracker": "pages/OBS_Tracker.py",
+        "Audit & Surveillance": "pages/Audit_Surveillance.py",
+        "CTQ Dashboard": "pages/CTQ_Dashboard.py",
+        "Daily Reports": "pages/Daily_Reports.py",
+        "ITR Tracker": "pages/ITR_Tracker.py",
+        "Document Status": "pages/Document_Status.py",
+        "Defect & Rework": "pages/Defect_Rework_Tracker.py",
+        "Lessons Learned": "pages/Lessons_Learned.py",
+        "Management Summary": "pages/Management_Executive_Summary.py",
+        "User Profile": "pages/User_Profile.py",
+    }
+    role = st.session_state.get("auth", {}).get("role") or st.session_state.get("role")
+    if role == "admin":
+        pages["Access Admin"] = "pages/Access_Admin.py"
+    return pages
+
+
 def render_mobile_nav():
-    st.selectbox("Quick Navigation",
-        ["Dashboard","Audit","Concrete","CTQ","NCR","OBS","ITR","Reports"]
-    )
+    pages = get_navigation_pages()
+    selected = st.selectbox("Quick Navigation", list(pages.keys()))
+    if st.button("Open selected page", key="mobile_nav_open", use_container_width=True):
+        st.switch_page(pages[selected])
 
 # =========================
 # KPI CARDS
@@ -248,6 +275,12 @@ def extract_projects(data):
 # =========================
 
 def render_navigation():
+    st.markdown("### Page Navigation")
+    pages = get_navigation_pages()
+    for label, page in pages.items():
+        if st.button(label, key=f"nav_{label}"):
+            st.switch_page(page)
+    return
     st.markdown("### 🧭 Page Navigation", unsafe_allow_html=True)
 
     pages = {
@@ -273,27 +306,7 @@ def render_navigation():
  
 
 def render_top_nav():
-    pages = {
-        "Executive Dashboard": "app.py",
-        "Quality Tools": "pages/Quality_Tools.py",
-        "Standards Library": "pages/Standards_Library.py",
-        "Learning Academy": "pages/Learning_Academy.py",
-        "Concrete Tracker": "pages/Concrete_Tracker.py",
-        "NCR Tracker": "pages/NCR_Tracker.py",
-        "OBS Tracker": "pages/OBS_Tracker.py",
-        "Audit & Surveillance": "pages/Audit_Surveillance.py",
-        "CTQ Dashboard": "pages/CTQ_Dashboard.py",
-        "Daily Reports": "pages/Daily_Reports.py",
-        "ITR Tracker": "pages/ITR_Tracker.py",
-        "Document Status": "pages/Document_Status.py",
-        "Defect & Rework": "pages/Defect_Rework_Tracker.py",
-        "Lessons Learned": "pages/Lessons_Learned.py",
-        "Management Summary": "pages/Management_Executive_Summary.py",
-        "User Profile": "pages/User_Profile.py",
-    }
-    role = st.session_state.get("auth", {}).get("role") or st.session_state.get("role")
-    if role == "admin":
-        pages["Access Admin"] = "pages/Access_Admin.py"
+    pages = get_navigation_pages()
 
     nav_col, spacer = st.columns([1.25, 4])
 
