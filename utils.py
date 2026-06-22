@@ -351,29 +351,24 @@ def render_navigation():
 def render_top_nav():
     pages = get_navigation_pages()
 
-    nav_col, spacer = st.columns([1.25, 4])
+    nav_col, open_col, spacer = st.columns([2.4, 0.9, 2.7])
 
     with nav_col:
-        if hasattr(st, "popover"):
-            with st.popover("Navigate", use_container_width=True):
-                st.caption("QA/QC modules")
-                for label, page in pages.items():
-                    if st.button(label, key=f"top_nav_{label}", use_container_width=True):
-                        st.switch_page(page)
-        else:
-            selected = st.selectbox(
-                "Navigate",
-                list(pages.keys()),
-                index=0,
-                label_visibility="collapsed",
-                key="top_nav_select"
-            )
-            if st.button("Open module", key="top_nav_open", use_container_width=True):
-                st.switch_page(pages[selected])
+        selected = st.selectbox(
+            "Navigate",
+            list(pages.keys()),
+            index=0,
+            key="top_nav_select",
+        )
+
+    with open_col:
+        st.markdown('<div style="height: 1.78rem;"></div>', unsafe_allow_html=True)
+        if st.button("Open", key="top_nav_open", use_container_width=True):
+            st.switch_page(pages[selected])
 
     with spacer:
         st.markdown(
-            '<div class="nav-hint">Use the module menu to move between QA/QC registers, trackers, and summaries.</div>',
+            f'<div class="nav-hint">{len(pages)} modules available. Use the selector to move between every dashboard page.</div>',
             unsafe_allow_html=True
         )
     
@@ -693,6 +688,25 @@ def inject_global_ui():
 
         .dashboard-hero h1 {
             font-size: 1.65rem;
+        }
+
+        .auth-panel,
+        .auth-panel--hero {
+            padding: 1rem;
+        }
+
+        .auth-panel h1 {
+            font-size: 1.45rem;
+        }
+
+        div[data-testid="stTabs"] div[role="tablist"] {
+            gap: 0.35rem;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        div[data-testid="stTabs"] button[role="tab"] {
+            min-width: max-content;
         }
     }
 
