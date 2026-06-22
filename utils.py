@@ -94,7 +94,7 @@ def render_header():
         """
 <div class="app-bar">
     <div>
-        <div class="app-bar__eyebrow">EVOMEC GLOBAL SERVICES</div>
+        <div class="app-bar__eyebrow">EVOMEC GLOBAL SERVICES LIMITED</div>
         <div class="app-bar__title">QA/QC Executive Dashboard</div>
     </div>
     <div class="app-bar__status">Live Quality Console</div>
