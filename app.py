@@ -24,12 +24,13 @@ from utils import (
     render_header,
     render_table,
     render_top_nav,
+    get_navigation_pages
 )
 
 
 BASE_DIR = Path(__file__).resolve().parent
 EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
-
+get_navigation_pages()
 
 def status_count(df, status):
     if not isinstance(df, pd.DataFrame) or df.empty or "Status" not in df.columns:
