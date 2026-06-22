@@ -14,8 +14,8 @@ from utils import (
 )
 from auth import login
 
-
-render_top_nav()
+st.set_page_config(page_title="NCR Tracker", layout="wide")
+inject_global_ui()
 
 if not login():
     st.stop()
@@ -42,9 +42,7 @@ with col1:
 with col2:
     if NLNG_LOGO:
         st.image(NLNG_LOGO, width=140)
-
-st.set_page_config(page_title="NCR Tracker", layout="wide")
-inject_global_ui()
+render_top_nav()
 
 st.title("NCR Tracker")
 st.markdown("Monitor non-conformance records, aging, and closeout performance across projects.")
@@ -63,7 +61,8 @@ c1, c2, c3, c4 = st.columns(4)
 c1.metric("Total NCRs", len(ncr))
 c2.metric("Open NCRs", int((ncr["Status"].str.lower() == "open").sum()))
 c3.metric("Closed NCRs", int((ncr["Status"].str.lower() == "closed").sum()))
-c4.metric("Closeout %", f"{int((ncr["Status"].str.lower() == "closed").sum() / max(1, len(ncr)) * 100)}%")
+closed_pct = int((ncr["Status"].str.lower() == "closed").sum() / max(1, len(ncr)) * 100)
+c4.metric("Closeout %", f"{closed_pct}%")
 
 st.markdown("""
 <style>

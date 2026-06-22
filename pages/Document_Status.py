@@ -14,12 +14,13 @@ from utils import (
 )
 from auth import login
 
-
-render_top_nav()
-if not login():
-    st.stop()
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
 BASE_DIR = Path(__file__).resolve().parent.parent
+st.set_page_config(page_title="Document Status", layout="wide")
+inject_global_ui()
+if not login():
+    st.stop()
+render_top_nav()
 ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
@@ -40,8 +41,6 @@ with col1:
 with col2:
     if NLNG_LOGO:
         st.image(NLNG_LOGO, width=140)
-st.set_page_config(page_title="Document Status", layout="wide")
-inject_global_ui()
 
 st.title("Document Status")
 st.markdown("Monitor AFC, IFR, IFA, IFC and superseded document compliance.")

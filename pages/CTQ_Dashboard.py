@@ -14,8 +14,8 @@ from utils import (
 )
 from auth import login
 
-
-render_top_nav()
+st.set_page_config(page_title="CTQ Dashboard", layout="wide")
+inject_global_ui()
 
 st.markdown("""
 <style>
@@ -53,8 +53,7 @@ with col1:
 with col2:
     if NLNG_LOGO:
         st.image(NLNG_LOGO, width=140)
-st.set_page_config(page_title="CTQ Dashboard", layout="wide")
-inject_global_ui()
+render_top_nav()
 
 st.title("CTQ Management")
 st.markdown("Track CTQ compliance and identify failure categories across projects.")

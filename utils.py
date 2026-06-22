@@ -275,6 +275,9 @@ def render_navigation():
 def render_top_nav():
     pages = {
         "Executive Dashboard": "app.py",
+        "Quality Tools": "pages/Quality_Tools.py",
+        "Standards Library": "pages/Standards_Library.py",
+        "Learning Academy": "pages/Learning_Academy.py",
         "Concrete Tracker": "pages/Concrete_Tracker.py",
         "NCR Tracker": "pages/NCR_Tracker.py",
         "OBS Tracker": "pages/OBS_Tracker.py",
@@ -286,6 +289,8 @@ def render_top_nav():
         "Defect & Rework": "pages/Defect_Rework_Tracker.py",
         "Lessons Learned": "pages/Lessons_Learned.py",
         "Management Summary": "pages/Management_Executive_Summary.py",
+        "User Profile": "pages/User_Profile.py",
+        "Access Admin": "pages/Access_Admin.py",
     }
 
     nav_col, spacer = st.columns([1.25, 4])
@@ -630,6 +635,174 @@ def inject_global_ui():
 
         .dashboard-hero h1 {
             font-size: 1.65rem;
+        }
+    }
+
+    .auth-shell {
+        margin: 0.25rem 0 1rem;
+    }
+
+    .auth-panel,
+    .tool-card,
+    .standard-card,
+    .learning-card,
+    .security-card {
+        background: color-mix(in srgb, var(--panel) 92%, transparent);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 16px 38px rgba(2, 8, 23, 0.18);
+        padding: 1rem;
+    }
+
+    .auth-panel--hero {
+        padding: 1.35rem 1.4rem;
+    }
+
+    .auth-panel h1 {
+        color: var(--text);
+        font-size: 2rem;
+        line-height: 1.1;
+        margin: 0.35rem 0 0.55rem;
+    }
+
+    .auth-eyebrow,
+    .card-eyebrow {
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 780;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .security-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .security-list span,
+    .standard-tag {
+        background: rgba(56, 189, 248, 0.1);
+        border: 1px solid rgba(56, 189, 248, 0.24);
+        border-radius: 999px;
+        color: var(--text);
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 0.34rem 0.58rem;
+    }
+
+    .profile-avatar {
+        align-items: center;
+        background: linear-gradient(135deg, #0ea5e9, #22c55e);
+        border: 2px solid rgba(255, 255, 255, 0.44);
+        border-radius: 999px;
+        color: white;
+        display: flex;
+        font-size: 1.3rem;
+        font-weight: 800;
+        height: 86px;
+        justify-content: center;
+        margin-bottom: 0.7rem;
+        width: 86px;
+    }
+
+    .tool-grid {
+        display: grid;
+        gap: 0.85rem;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        margin: 0.8rem 0 1rem;
+    }
+
+    .tool-card h3,
+    .standard-card h3,
+    .learning-card h3,
+    .security-card h3 {
+        color: var(--text);
+        font-size: 1rem;
+        margin: 0.35rem 0 0.35rem;
+    }
+
+    .tool-card p,
+    .standard-card p,
+    .learning-card p,
+    .security-card p {
+        color: var(--muted);
+        font-size: 0.88rem;
+        margin: 0;
+    }
+
+    .standard-card,
+    .learning-card {
+        margin-bottom: 0.75rem;
+    }
+
+    @media (prefers-color-scheme: light) {
+        :root {
+            --bg: #f6f8fb;
+            --panel: #ffffff;
+            --panel-soft: #edf3f8;
+            --line: rgba(15, 23, 42, 0.12);
+            --text: #0f172a;
+            --muted: #475569;
+            --accent: #0369a1;
+            --success: #15803d;
+            --warning: #b45309;
+            --danger: #b91c1c;
+        }
+
+        .stApp {
+            background:
+                radial-gradient(circle at top left, rgba(14, 165, 233, 0.14), transparent 30rem),
+                linear-gradient(135deg, #f8fafc 0%, #edf3f8 52%, #ffffff 100%);
+            color: var(--text);
+        }
+
+        h1, h2, h3,
+        .app-bar__title,
+        .dashboard-hero h1,
+        .kpi-value,
+        .tool-card h3,
+        .standard-card h3,
+        .learning-card h3 {
+            color: var(--text);
+        }
+
+        .app-bar,
+        .dashboard-hero,
+        .kpi-card,
+        div[data-testid="stMetric"],
+        .auth-panel,
+        .tool-card,
+        .standard-card,
+        .learning-card,
+        .security-card {
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+        }
+
+        .dashboard-hero p,
+        .section-caption,
+        .kpi-title,
+        .nav-hint,
+        .tool-card p,
+        .standard-card p,
+        .learning-card p,
+        .security-card p {
+            color: var(--muted);
+        }
+
+        section[data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #ffffff, #eef5fb);
+        }
+
+        section[data-testid="stSidebar"] h1,
+        section[data-testid="stSidebar"] h2,
+        section[data-testid="stSidebar"] h3,
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] p,
+        section[data-testid="stSidebar"] span {
+            color: var(--text);
         }
     }
     </style>

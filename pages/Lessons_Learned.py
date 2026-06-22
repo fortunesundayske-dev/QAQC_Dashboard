@@ -15,13 +15,13 @@ from utils import (
 from auth import login
 
 
-render_top_nav()
-if not login():
-    st.stop()
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
 BASE_DIR = Path(__file__).resolve().parent.parent
 st.set_page_config(page_title="Lessons Learned", layout="wide")
 inject_global_ui()
+if not login():
+    st.stop()
+render_top_nav()
 ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"

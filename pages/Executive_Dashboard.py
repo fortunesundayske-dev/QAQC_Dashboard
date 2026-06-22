@@ -14,17 +14,14 @@ from utils import (
 )
 from auth import login
 
-
-render_top_nav()
-
-if not login():
-    st.stop()
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
 LOGO_PATH = Path(__file__).parents[1] / "assets" / "company_logo.png"
 BASE_DIR = Path(__file__).resolve().parent.parent
 st.set_page_config(page_title="Executive Dashboard", layout="wide")
 inject_global_ui()
-st.subheader("ITR Debug")
+if not login():
+    st.stop()
+render_top_nav()
 
 st.title("Executive Dashboard")
 st.markdown("A management-level summary of quality performance across all construction projects.")
@@ -35,9 +32,6 @@ data = load_master_data(DATA_FILE)
 ncr = apply_filters(data.get("NCR Log", pd.DataFrame()), filters, date_column="Date Raised")
 obs = apply_filters(data.get("OBS Log", pd.DataFrame()), filters, date_column="Date Raised")
 itr = apply_filters(data.get("ITR Log", pd.DataFrame()), filters, date_column="Date")
-st.write("ITR Rows:", len(itr))
-st.write("ITR Columns:", itr.columns.tolist())
-st.write(itr.head())
 concrete = apply_filters(data.get("Concrete Tracker", pd.DataFrame()), filters, date_column="Date")
 audit = apply_filters(data.get("Audit Register", pd.DataFrame()), filters, date_column="Planned Date")
 surveillance = apply_filters(data.get("Surveillance Register", pd.DataFrame()), filters, date_column="Planned Date")

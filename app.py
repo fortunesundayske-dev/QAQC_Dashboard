@@ -22,7 +22,7 @@ from utils import (
     render_kpi_cards,
     build_kpis,
 )
-from auth import login
+from auth import login, render_user_sidebar
 import pandas as pd
 # =========================
 # PATHS
@@ -37,6 +37,7 @@ NLNG_LOGO = ASSETS / "nlng_logo.png"
 
 
 
+inject_enterprise_theme()
 if not login():
     st.stop()
 
@@ -49,9 +50,9 @@ if not login():
 # =========================
 # THEME
 # =========================
-inject_enterprise_theme()
 render_header()
 render_top_nav()
+render_user_sidebar()
 
 # =========================
 # DATA PREVIEW
@@ -81,7 +82,7 @@ st.markdown(
 <div class="dashboard-hero">
     <div class="hero-eyebrow">Executive quality oversight</div>
     <h1>Evomec QA/QC Executive Dashboard</h1>
-    <p>A consolidated quality management console for construction projects, live registers, performance indicators, and executive review.</p>
+    <p>A consolidated quality management command centre for project quality records, inspection learning, international standards references, Lean Six Sigma tools, and controlled user access.</p>
 </div>
 """,
     unsafe_allow_html=True
@@ -106,6 +107,35 @@ st.markdown(
     unsafe_allow_html=True
 )
 render_kpi_cards(kpis)
+
+st.markdown('<div class="section-heading">Advanced QA/QC Workspace</div>', unsafe_allow_html=True)
+st.markdown(
+    """
+<div class="tool-grid">
+    <div class="tool-card">
+        <div class="card-eyebrow">Quality Tools</div>
+        <h3>Lean, RCA, calculators</h3>
+        <p>Use structured templates for DMAIC, 5 Whys, fishbone analysis, risk priority scoring, concrete volume, and inspection readiness.</p>
+    </div>
+    <div class="tool-card">
+        <div class="card-eyebrow">Standards</div>
+        <h3>ASTM, DEP, BS summaries</h3>
+        <p>Browse discipline-based references for civil, concrete, welding, piping, coatings, NDT, electrical, and documentation control.</p>
+    </div>
+    <div class="tool-card">
+        <div class="card-eyebrow">Learning</div>
+        <h3>Inspection academy</h3>
+        <p>Guided learning paths cover civil inspection, NDT, Barcol testing, piping, welding, CWI, SCWI, ITPs, NCRs, and audit practice.</p>
+    </div>
+    <div class="tool-card">
+        <div class="card-eyebrow">Security</div>
+        <h3>Approved access only</h3>
+        <p>Users request accounts, administrators approve access, passwords are hashed, and profile/role information is controlled.</p>
+    </div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
 
 st.markdown('<div class="section-heading">Data Source Overview</div>', unsafe_allow_html=True)

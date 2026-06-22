@@ -1,112 +1,353 @@
-import streamlit as st
+import base64
 import hashlib
 import hmac
+import json
+import os
+import re
+import secrets
+import smtplib
+from datetime import datetime, timezone
+from email.message import EmailMessage
+from pathlib import Path
 
-PASSWORD_SALT = "qaqc_dashboard_v1"
+import streamlit as st
 
 
-def hash_password(password):
-    return hashlib.sha256(f"{PASSWORD_SALT}:{password}".encode()).hexdigest()
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+USERS_FILE = DATA_DIR / "users.json"
+PROFILE_DIR = DATA_DIR / "profile_photos"
+PBKDF2_ITERATIONS = 260_000
+DEFAULT_ADMIN_PASSWORD = "admin123"
 
-# =========================
-# USERS DATABASE (replace later with DB)
-# =========================
-USERS = {
-    "admin": {
-        "name": "Admin User",
-        "password": "aa5b6568e7d12f34320f4c23dab3b29b598f2960277a314c8e22e29a291ffb28",
-        "role": "admin"
-    },
-    "user": {
-        "name": "Normal User",
-        "password": "82522beaaedd08c9cc7073af6e8d26d59ff83d94ad74a6eb127cefabdf7ceea7",
-        "role": "user"
-    },
-    "viewer": {
-        "name": "Viewer",
-        "password": "cc04baa01651396ea98efe44422d6074bddaf3fec7c9ce2c3c8ecbd28bee09d4",
-        "role": "viewer"
+
+def _utc_now():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _ensure_auth_store():
+    DATA_DIR.mkdir(exist_ok=True)
+    PROFILE_DIR.mkdir(exist_ok=True)
+    if USERS_FILE.exists():
+        return
+
+    salt = secrets.token_hex(16)
+    admin = {
+        "username": "admin",
+        "email": "admin@evomec.local",
+        "name": "System Administrator",
+        "role": "admin",
+        "status": "approved",
+        "password": _hash_password(DEFAULT_ADMIN_PASSWORD, salt),
+        "salt": salt,
+        "created_at": _utc_now(),
+        "approved_at": _utc_now(),
+        "approved_by": "system",
+        "profile_photo": None,
+        "discipline": "Quality Management",
+        "failed_attempts": 0,
+        "locked_until": None,
     }
-}
+    _save_users({"admin": admin})
 
-# =========================
-# INIT SESSION STATE
-# =========================
+
+def _load_users():
+    _ensure_auth_store()
+    with USERS_FILE.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _save_users(users):
+    DATA_DIR.mkdir(exist_ok=True)
+    with USERS_FILE.open("w", encoding="utf-8") as handle:
+        json.dump(users, handle, indent=2)
+
+
+def _hash_password(password, salt):
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        PBKDF2_ITERATIONS,
+    )
+    return base64.b64encode(digest).decode("utf-8")
+
+
+def _verify_password(password, user):
+    expected = user.get("password", "")
+    salt = user.get("salt", "")
+    if not expected or not salt:
+        return False
+    candidate = _hash_password(password, salt)
+    return hmac.compare_digest(candidate, expected)
+
+
+def _valid_password(password):
+    checks = [
+        len(password) >= 10,
+        bool(re.search(r"[A-Z]", password)),
+        bool(re.search(r"[a-z]", password)),
+        bool(re.search(r"\d", password)),
+        bool(re.search(r"[^A-Za-z0-9]", password)),
+    ]
+    return all(checks)
+
+
+def _send_approval_email(user):
+    smtp_host = os.getenv("QAQC_SMTP_HOST")
+    smtp_user = os.getenv("QAQC_SMTP_USER")
+    smtp_password = os.getenv("QAQC_SMTP_PASSWORD")
+    sender = os.getenv("QAQC_SMTP_FROM", smtp_user or "no-reply@qaqc.local")
+
+    if not smtp_host or not smtp_user or not smtp_password:
+        return False
+
+    msg = EmailMessage()
+    msg["Subject"] = "QA/QC Dashboard access approved"
+    msg["From"] = sender
+    msg["To"] = user["email"]
+    msg.set_content(
+        f"Hello {user['name']},\n\n"
+        "Your QA/QC Dashboard account has been approved. "
+        "You can now sign in with your registered username.\n\n"
+        "Regards,\nQA/QC Dashboard Security"
+    )
+
+    with smtplib.SMTP_SSL(smtp_host, int(os.getenv("QAQC_SMTP_PORT", "465"))) as smtp:
+        smtp.login(smtp_user, smtp_password)
+        smtp.send_message(msg)
+    return True
+
+
 def init_auth():
     if "auth" not in st.session_state:
         st.session_state.auth = {
             "logged_in": False,
             "username": None,
             "name": None,
-            "role": None
+            "role": None,
+            "email": None,
         }
 
 
-# =========================
-# LOGIN UI
-# =========================
 def login():
     init_auth()
 
     if st.session_state.auth["logged_in"]:
         return True
 
-    # ===== LOGIN PAGE UI =====
-    col1, col2 = st.columns(2)
+    st.markdown(
+        """
+<div class="auth-shell">
+    <div class="auth-panel auth-panel--hero">
+        <div class="auth-eyebrow">Secure QA/QC Access</div>
+        <h1>Evomec QA/QC Command Centre</h1>
+        <p>Approved access only. Registration requests are reviewed by an administrator before users can enter project records, standards, tools, and learning modules.</p>
+        <div class="security-list">
+            <span>PBKDF2 password hashing</span>
+            <span>Admin approval gate</span>
+            <span>Role-based access</span>
+            <span>Audit-ready user records</span>
+        </div>
+    </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
 
-    with col1:
-        st.image("assets/nlng_logo.png", width=120)
+    tab_login, tab_register = st.tabs(["Sign in", "Request access"])
 
-    with col2:
-        st.image("assets/evomec_logo.png", width=120)
+    with tab_login:
+        username = st.text_input("Username", key="login_username").strip().lower()
+        password = st.text_input("Password", type="password", key="login_password")
 
-    st.title("🔐 QAQC Dashboard Login")
-    st.caption("NLNG | Evomec Global Services Secure Access")
+        if st.button("Sign in", type="primary", use_container_width=True):
+            users = _load_users()
+            user = users.get(username)
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+            if not user or not _verify_password(password, user):
+                if user:
+                    user["failed_attempts"] = int(user.get("failed_attempts", 0)) + 1
+                    _save_users(users)
+                st.error("Invalid username or password.")
+                return False
 
-    if st.button("Login"):
-        user = USERS.get(username)
+            if user.get("status") != "approved":
+                st.warning("Your account is waiting for administrator approval.")
+                return False
 
-        if user and hmac.compare_digest(hash_password(password), user["password"]):
-            st.session_state.auth["logged_in"] = True
-            st.session_state.auth["username"] = username
-            st.session_state.auth["name"] = user["name"]
-            st.session_state.auth["role"] = user["role"]
+            user["failed_attempts"] = 0
+            user["last_login"] = _utc_now()
+            _save_users(users)
+            st.session_state.auth = {
+                "logged_in": True,
+                "username": username,
+                "name": user["name"],
+                "role": user["role"],
+                "email": user["email"],
+            }
             st.rerun()
-        else:
-            st.error("Invalid username or password")
+
+        with st.expander("First local admin login"):
+            st.info("Username: admin | Password: admin123. Change this password before production use.")
+
+    with tab_register:
+        with st.form("registration_form"):
+            name = st.text_input("Full name")
+            username = st.text_input("Preferred username").strip().lower()
+            email = st.text_input("Work email")
+            discipline = st.selectbox(
+                "Primary discipline",
+                ["Civil", "Mechanical", "Piping", "Welding", "Electrical", "Instrumentation", "NDT", "Quality Management"],
+            )
+            password = st.text_input("Password", type="password")
+            confirm = st.text_input("Confirm password", type="password")
+            submitted = st.form_submit_button("Submit for approval", use_container_width=True)
+
+        if submitted:
+            users = _load_users()
+            if not name or not username or not email:
+                st.error("Full name, username, and email are required.")
+            elif username in users:
+                st.error("That username already exists.")
+            elif password != confirm:
+                st.error("Passwords do not match.")
+            elif not _valid_password(password):
+                st.error("Use at least 10 characters with uppercase, lowercase, number, and symbol.")
+            else:
+                salt = secrets.token_hex(16)
+                users[username] = {
+                    "username": username,
+                    "email": email,
+                    "name": name,
+                    "role": "user",
+                    "status": "pending",
+                    "password": _hash_password(password, salt),
+                    "salt": salt,
+                    "created_at": _utc_now(),
+                    "approved_at": None,
+                    "approved_by": None,
+                    "profile_photo": None,
+                    "discipline": discipline,
+                    "failed_attempts": 0,
+                    "locked_until": None,
+                }
+                _save_users(users)
+                st.success("Registration submitted. An administrator must approve access before sign in.")
 
     return False
 
 
-# =========================
-# LOGOUT
-# =========================
 def logout():
-    if st.sidebar.button("Logout"):
+    if st.sidebar.button("Sign out", use_container_width=True):
         st.session_state.auth = {
             "logged_in": False,
             "username": None,
             "name": None,
-            "role": None
+            "role": None,
+            "email": None,
         }
         st.rerun()
 
 
-# =========================
-# GET ROLE
-# =========================
 def get_role():
+    init_auth()
     return st.session_state.auth.get("role")
 
 
-# =========================
-# PROTECT PAGE
-# =========================
+def current_user():
+    init_auth()
+    users = _load_users()
+    username = st.session_state.auth.get("username")
+    return users.get(username) if username else None
+
+
 def require_role(roles):
     role = get_role()
     if role not in roles:
-        st.error("🚫 You do not have access to this module.")
+        st.error("You do not have access to this module.")
         st.stop()
+
+
+def render_user_sidebar():
+    user = current_user()
+    if not user:
+        return
+
+    photo = user.get("profile_photo")
+    if photo and Path(photo).exists():
+        st.sidebar.image(photo, width=86)
+    else:
+        initials = "".join(part[:1] for part in user["name"].split()[:2]).upper() or "U"
+        st.sidebar.markdown(f'<div class="profile-avatar">{initials}</div>', unsafe_allow_html=True)
+
+    st.sidebar.markdown(f"**{user['name']}**")
+    st.sidebar.caption(f"{user['role'].title()} | {user.get('discipline', 'QA/QC')}")
+    logout()
+
+
+def update_profile(name, email, discipline, uploaded_photo=None):
+    user = current_user()
+    if not user:
+        return False
+
+    users = _load_users()
+    record = users[user["username"]]
+    record["name"] = name
+    record["email"] = email
+    record["discipline"] = discipline
+
+    if uploaded_photo is not None:
+        suffix = Path(uploaded_photo.name).suffix.lower() or ".png"
+        filename = f"{record['username']}{suffix}"
+        photo_path = PROFILE_DIR / filename
+        photo_path.write_bytes(uploaded_photo.getbuffer())
+        record["profile_photo"] = str(photo_path)
+
+    _save_users(users)
+    st.session_state.auth["name"] = name
+    st.session_state.auth["email"] = email
+    return True
+
+
+def pending_users():
+    users = _load_users()
+    return {key: value for key, value in users.items() if value.get("status") == "pending"}
+
+
+def approved_users():
+    users = _load_users()
+    return {key: value for key, value in users.items() if value.get("status") == "approved"}
+
+
+def approve_user(username, role="user"):
+    users = _load_users()
+    user = users.get(username)
+    admin = current_user()
+    if not user:
+        return False, "User not found."
+
+    user["status"] = "approved"
+    user["role"] = role
+    user["approved_at"] = _utc_now()
+    user["approved_by"] = admin["username"] if admin else "admin"
+    _save_users(users)
+
+    try:
+        email_sent = _send_approval_email(user)
+    except Exception as exc:
+        return True, f"Approved, but email failed: {exc}"
+
+    if email_sent:
+        return True, "Approved and email sent."
+    return True, "Approved. Configure SMTP environment variables to send approval email."
+
+
+def reject_user(username):
+    users = _load_users()
+    if username not in users:
+        return False
+    users[username]["status"] = "rejected"
+    users[username]["rejected_at"] = _utc_now()
+    _save_users(users)
+    return True
