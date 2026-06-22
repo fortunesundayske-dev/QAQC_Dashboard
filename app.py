@@ -24,7 +24,8 @@ from utils import (
     render_header,
     render_table,
     render_top_nav,
-    get_navigation_pages
+    get_navigation_pages,
+    render_navigation
 )
 
 
@@ -119,6 +120,7 @@ if not auth.login():
     st.stop()
 
 render_header()
+render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
