@@ -23,26 +23,6 @@ if not login():
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-ASSETS = BASE_DIR / "assets"
-EVOMEC_LOGO = ASSETS / "evomec_logo.png"
-NLNG_LOGO = ASSETS / "nlng_logo.png"
-
-
-def safe_path(path):
-    return str(path) if path.exists() else None
-
-EVOMEC_LOGO = safe_path(EVOMEC_LOGO)
-NLNG_LOGO = safe_path(NLNG_LOGO)
-
-col1, col2 = st.columns(2)
-
-with col1:
-    if EVOMEC_LOGO:
-        st.image(EVOMEC_LOGO, width=150)
-
-with col2:
-    if NLNG_LOGO:
-        st.image(NLNG_LOGO, width=140)
 render_navigation()
 render_top_nav()
 

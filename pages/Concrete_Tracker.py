@@ -10,10 +10,6 @@ from utils import global_filter_sidebar, inject_global_ui, load_master_data, ren
 
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
 BASE_DIR = Path(__file__).resolve().parent.parent
-ASSETS = BASE_DIR / "assets"
-EVOMEC_LOGO = ASSETS / "evomec_logo.png"
-NLNG_LOGO = ASSETS / "nlng_logo.png"
-
 MATERIAL_COLUMNS = {
     "Cement": "Cement (t)",
     "River Sand 0-4mm": "River Sand 0-4mm (t)",
@@ -59,9 +55,6 @@ render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
-
-def safe_path(path):
-    return str(path) if path.exists() else None
 
 
 def clean_volume(series):
@@ -164,13 +157,6 @@ def material_requirement_from_volume(volume, mix):
     }
 
 
-logo_col1, logo_col2 = st.columns(2)
-with logo_col1:
-    if safe_path(EVOMEC_LOGO):
-        st.image(safe_path(EVOMEC_LOGO), width=150)
-with logo_col2:
-    if safe_path(NLNG_LOGO):
-        st.image(safe_path(NLNG_LOGO), width=140)
 
 st.markdown(
     """

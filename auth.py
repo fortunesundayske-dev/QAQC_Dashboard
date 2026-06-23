@@ -140,6 +140,8 @@ def init_auth():
             "name": None,
             "role": None,
             "email": None,
+            "discipline": "QA/QC",
+            "profile_photo": None,
         }
     elif "logged_in" not in st.session_state:
         st.session_state.logged_in = st.session_state.auth.get("logged_in", False)
@@ -152,6 +154,8 @@ def init_auth():
                 "name": st.session_state.get("name"),
                 "role": st.session_state.get("role"),
                 "email": st.session_state.get("email"),
+                "discipline": st.session_state.get("discipline", "QA/QC"),
+                "profile_photo": st.session_state.get("profile_photo"),
             }
         )
 
@@ -163,12 +167,16 @@ def _set_logged_in(username, user):
         "name": user["name"],
         "role": user["role"],
         "email": user["email"],
+        "discipline": user.get("discipline", "QA/QC"),
+        "profile_photo": user.get("profile_photo"),
     }
     st.session_state.logged_in = True
     st.session_state.username = username
     st.session_state.name = user["name"]
     st.session_state.role = user["role"]
     st.session_state.email = user["email"]
+    st.session_state.discipline = user.get("discipline", "QA/QC")
+    st.session_state.profile_photo = user.get("profile_photo")
 
 
 def _set_logged_out():
@@ -251,9 +259,6 @@ def login():
             _set_logged_in(username, user)
             st.rerun()
 
-        with st.expander("First local admin login"):
-            st.info("Username: admin | Password: admin123. Change this password before production use.")
-
     else:
         with st.form("registration_form"):
             name = st.text_input("Full name")
@@ -332,20 +337,7 @@ def require_role(roles):
 
 
 def render_user_sidebar():
-    user = current_user()
-    if not user:
-        return
-
-    photo = user.get("profile_photo")
-    if photo and Path(photo).exists():
-        st.sidebar.image(photo, width=86)
-    else:
-        initials = "".join(part[:1] for part in user["name"].split()[:2]).upper() or "U"
-        st.sidebar.markdown(f'<div class="profile-avatar">{initials}</div>', unsafe_allow_html=True)
-
-    st.sidebar.markdown(f"**{user['name']}**")
-    st.sidebar.caption(f"{user['role'].title()} | {user.get('discipline', 'QA/QC')}")
-    logout()
+    return
 
 
 def update_profile(name, email, discipline, uploaded_photo=None):
@@ -376,6 +368,8 @@ def update_profile(name, email, discipline, uploaded_photo=None):
         return False
     st.session_state.auth["name"] = name
     st.session_state.auth["email"] = email
+    st.session_state.auth["discipline"] = discipline
+    st.session_state.auth["profile_photo"] = record.get("profile_photo")
     return True
 
 

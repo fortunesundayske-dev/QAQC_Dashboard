@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import time
+import base64
 from click import style
 from pathlib import Path
 import uuid
@@ -14,6 +15,15 @@ EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
+
+
+def _image_data_uri(path):
+    p = Path(path)
+    if not p.exists():
+        return ""
+    suffix = p.suffix.lower().lstrip(".")
+    mime = "jpeg" if suffix in {"jpg", "jpeg"} else suffix
+    return f"data:image/{mime};base64,{base64.b64encode(p.read_bytes()).decode('ascii')}"
 # =========================
 # DATA LOADING (DICT SYSTEM)
 # =========================
@@ -102,17 +112,45 @@ def inject_enterprise_theme():
 # HEADER
 # =========================
 def render_header():
-    st.markdown(
-        """
-<div class="app-bar">
+    nlng_src = _image_data_uri(NLNG_LOGO)
+    evomec_src = _image_data_uri(EVOMEC_LOGO)
+    nlng_logo = f'<img src="{nlng_src}" alt="NLNG">' if nlng_src else '<span>NLNG</span>'
+    evomec_logo = f'<img src="{evomec_src}" alt="EVOMEC">' if evomec_src else '<span>EVOMEC</span>'
+    user = st.session_state.get("auth") or {}
+    profile_html = ""
+    if user.get("logged_in"):
+        photo = user.get("profile_photo")
+        if photo and Path(photo).exists():
+            avatar = f'<img class="header-profile__photo" src="{_image_data_uri(photo)}" alt="Profile photo">'
+        else:
+            initials = "".join(part[:1] for part in str(user.get("name", "User")).split()[:2]).upper() or "U"
+            avatar = f'<div class="header-profile__initials">{html.escape(initials)}</div>'
+        profile_html = f"""
+<div class="header-profile">
+    {avatar}
     <div>
-        <div class="app-bar__eyebrow">EVOMEC GLOBAL SERVICES</div>
-        <div class="app-bar__title">QA/QC Executive Dashboard</div>
+        <div class="header-profile__name">{html.escape(str(user.get("name", "User")))}</div>
+        <div class="header-profile__meta">{html.escape(str(user.get("role", "user")).title())}</div>
     </div>
-    <div class="app-bar__status">Quality Control Management System</div>
 </div>
-""",
-        unsafe_allow_html=True
+"""
+    st.html(
+        f"""
+<div class="app-bar">
+    <div class="app-brand-lockup">
+        <div class="app-logo-img app-logo-img--nlng">{nlng_logo}</div>
+        <div>
+        <div class="app-bar__eyebrow">NLNG Project</div>
+        <div class="app-bar__title">QA/QC Executive Dashboard</div>
+            <div class="app-bar__project">Quality Control Management System</div>
+        </div>
+    </div>
+    <div class="app-bar__right">
+        {profile_html}
+        <div class="app-logo-img app-logo-img--evomec">{evomec_logo}</div>
+    </div>
+</div>
+"""
     )
 
             
@@ -364,20 +402,60 @@ def render_navigation():
  
 
 def render_top_nav():
+    render_header()
+
     pages = get_navigation_pages()
+    user = st.session_state.get("auth")
+    nlng_src = _image_data_uri(NLNG_LOGO)
+    nlng_brand = f'<img class="side-brand__logo" src="{nlng_src}" alt="NLNG">' if nlng_src else '<div class="side-brand__name">NLNG</div>'
 
     st.sidebar.markdown(
-        """
+        f"""
 <div class="side-brand">
-    <div class="side-brand__mark">E</div>
+    {nlng_brand}
     <div>
-        <div class="side-brand__name">EVOMEC</div>
+        <div class="side-brand__name">NLNG</div>
         <div class="side-brand__sub">QA/QC Command Centre</div>
     </div>
 </div>
 """,
         unsafe_allow_html=True,
     )
+
+    if user:
+        photo = user.get("profile_photo")
+        photo_html = ""
+        if photo and Path(photo).exists():
+            photo_html = f'<img class="sidebar-profile__photo" src="{_image_data_uri(photo)}" alt="Profile photo">'
+        else:
+            initials = "".join(part[:1] for part in str(user.get("name", "User")).split()[:2]).upper() or "U"
+            photo_html = f'<div class="profile-avatar sidebar-profile__initials">{html.escape(initials)}</div>'
+        st.sidebar.markdown(
+            f"""
+<div class="sidebar-profile">
+    {photo_html}
+    <div>
+        <div class="sidebar-profile__name">{html.escape(str(user.get("name", "User")))}</div>
+        <div class="sidebar-profile__meta">{html.escape(str(user.get("role", "user")).title())} | {html.escape(str(user.get("discipline", "QA/QC")))}</div>
+    </div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+        if st.sidebar.button("Sign out", key="global_sidebar_sign_out", use_container_width=True):
+            st.session_state.auth = {
+                "logged_in": False,
+                "username": None,
+                "name": None,
+                "role": None,
+                "email": None,
+                "discipline": "QA/QC",
+                "profile_photo": None,
+            }
+            for key in ["logged_in", "username", "name", "role", "email", "discipline", "profile_photo"]:
+                st.session_state.pop(key, None)
+            st.rerun()
+
     st.sidebar.markdown('<div class="side-menu-title">Menu</div>', unsafe_allow_html=True)
 
     for label, page in pages.items():
@@ -1594,6 +1672,74 @@ def inject_global_ui():
         color: #ffffff !important;
     }
 
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #f3f4f6 0%, #e5e7eb 100%) !important;
+        border-right: 1px solid rgba(148, 163, 184, 0.42) !important;
+    }
+
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] a,
+    section[data-testid="stSidebar"] a:visited,
+    section[data-testid="stSidebar"] a *,
+    section[data-testid="stSidebar"] [role="link"],
+    section[data-testid="stSidebar"] [role="link"] * {
+        color: #111827 !important;
+        opacity: 1 !important;
+        text-shadow: none !important;
+    }
+
+    .side-brand {
+        border-bottom-color: rgba(148, 163, 184, 0.5) !important;
+    }
+
+    .side-brand__name {
+        color: #0f172a !important;
+    }
+
+    .side-brand__sub {
+        color: #334155 !important;
+    }
+
+    .side-menu-title {
+        color: #0369a1 !important;
+    }
+
+    .side-nav-link {
+        color: #111827 !important;
+    }
+
+    .side-nav-link[href="/"] {
+        background: rgba(148, 163, 184, 0.28) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+    }
+
+    .side-nav-link:hover,
+    .side-nav-link:focus-visible,
+    section[data-testid="stSidebar"] a:hover,
+    section[data-testid="stSidebar"] a:focus-visible {
+        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
+        color: #ffffff !important;
+        text-shadow: none !important;
+    }
+
+    .side-nav-link:hover *,
+    .side-nav-link:focus-visible *,
+    section[data-testid="stSidebar"] a:hover *,
+    section[data-testid="stSidebar"] a:focus-visible * {
+        color: #ffffff !important;
+    }
+
+    .side-status {
+        background: rgba(255, 255, 255, 0.62) !important;
+        border-color: rgba(148, 163, 184, 0.5) !important;
+        color: #0f172a !important;
+    }
+
     @media (prefers-color-scheme: light) {
         .exec-metric,
         .exec-panel,
@@ -1644,6 +1790,679 @@ def inject_global_ui():
         .module-card__stat {
             border-color: rgba(148, 163, 184, 0.24) !important;
         }
+    }
+
+    /* NLNG-inspired command dashboard skin */
+    .stApp {
+        background:
+            radial-gradient(circle at 18% 0%, rgba(59, 130, 246, 0.14), transparent 26rem),
+            radial-gradient(circle at 82% 8%, rgba(34, 197, 94, 0.07), transparent 24rem),
+            linear-gradient(135deg, #111827 0%, #1f2937 52%, #0f172a 100%) !important;
+        color: #e5edf8 !important;
+    }
+
+    .block-container {
+        max-width: 1580px !important;
+        padding: 0.75rem 1rem 1.4rem !important;
+    }
+
+    h1, h2, h3, h4, p, label, span {
+        letter-spacing: 0 !important;
+    }
+
+    .app-bar {
+        align-items: center !important;
+        background: rgba(17, 24, 39, 0.88) !important;
+        border: 1px solid rgba(148, 163, 184, 0.18) !important;
+        border-radius: 0 !important;
+        box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34) !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        margin: -0.25rem -0.15rem 0.55rem !important;
+        min-height: 4.3rem;
+        padding: 0.8rem 1rem !important;
+    }
+
+    .app-brand-lockup {
+        align-items: center;
+        display: flex;
+        gap: 0.85rem;
+    }
+
+    .app-logo-mark {
+        background: linear-gradient(135deg, #2563eb, #0ea5e9);
+        border-radius: 8px;
+        box-shadow: 0 12px 28px rgba(37, 99, 235, 0.34);
+        height: 2.5rem;
+        position: relative;
+        width: 2.5rem;
+    }
+
+    .app-logo-mark::after {
+        background: rgba(2, 6, 23, 0.9);
+        border-radius: 6px;
+        content: "";
+        height: 1rem;
+        left: 0.72rem;
+        position: absolute;
+        top: 0.72rem;
+        transform: rotate(-35deg);
+        width: 1.6rem;
+    }
+
+    .app-logo-img {
+        align-items: center;
+        display: flex;
+        justify-content: center;
+    }
+
+    .app-logo-img img {
+        display: block;
+        max-height: 2.85rem;
+        object-fit: contain;
+        width: auto;
+    }
+
+    .app-logo-img--nlng img {
+        max-height: 3rem;
+        max-width: 8rem;
+    }
+
+    .app-logo-img--evomec img {
+        max-height: 2.75rem;
+        max-width: 10rem;
+    }
+
+    .app-bar__right {
+        align-items: center;
+        display: flex;
+        gap: 0.9rem;
+    }
+
+    .header-profile {
+        align-items: center;
+        background: rgba(15, 23, 42, 0.78);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 999px;
+        display: flex;
+        gap: 0.55rem;
+        padding: 0.38rem 0.68rem 0.38rem 0.42rem;
+    }
+
+    .header-profile__photo,
+    .header-profile__initials {
+        align-items: center;
+        background: linear-gradient(135deg, #2563eb, #22c55e);
+        border: 2px solid rgba(96, 165, 250, 0.46);
+        border-radius: 999px;
+        color: #ffffff;
+        display: flex;
+        font-size: 0.76rem;
+        font-weight: 900;
+        height: 2.05rem;
+        justify-content: center;
+        object-fit: cover;
+        width: 2.05rem;
+    }
+
+    .header-profile__name {
+        color: #ffffff;
+        font-size: 0.78rem;
+        font-weight: 900;
+        line-height: 1.05;
+        max-width: 9rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .header-profile__meta {
+        color: #93c5fd;
+        font-size: 0.62rem;
+        font-weight: 760;
+        margin-top: 0.1rem;
+    }
+
+    .app-bar__eyebrow {
+        color: #ffffff !important;
+        font-size: 1.05rem !important;
+        font-weight: 900 !important;
+    }
+
+    .app-bar__title {
+        color: #ffffff !important;
+        font-size: 1rem !important;
+        font-weight: 900 !important;
+        line-height: 1.1;
+        text-transform: uppercase;
+    }
+
+    .app-bar__project {
+        color: #38bdf8;
+        font-size: 0.72rem;
+        font-weight: 780;
+        margin-top: 0.12rem;
+        text-transform: uppercase;
+    }
+
+    .app-bar__partner {
+        color: #ffffff;
+        font-size: 1.42rem;
+        font-weight: 950;
+        letter-spacing: 0.02em;
+    }
+
+    .top-module-nav {
+        align-items: center;
+        background: rgba(8, 17, 31, 0.78);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 0;
+        display: flex;
+        gap: 0.35rem;
+        margin: 0 0 0.75rem;
+        overflow-x: auto;
+        padding: 0.42rem 0.55rem;
+        scrollbar-width: thin;
+    }
+
+    .top-module-nav a {
+        border-bottom: 2px solid transparent;
+        color: #cbd5e1 !important;
+        flex: 0 0 auto;
+        font-size: 0.72rem;
+        font-weight: 740;
+        padding: 0.48rem 0.62rem;
+        text-decoration: none !important;
+        transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    }
+
+    .top-module-nav a:first-child,
+    .top-module-nav a:hover {
+        background: rgba(37, 99, 235, 0.12);
+        border-color: #2563eb;
+        color: #ffffff !important;
+    }
+
+    section[data-testid="stSidebar"] {
+        background:
+            radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 15rem),
+            linear-gradient(180deg, #1f2937 0%, #111827 100%) !important;
+        border-right: 1px solid rgba(148, 163, 184, 0.16) !important;
+    }
+
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] a,
+    section[data-testid="stSidebar"] a:visited,
+    section[data-testid="stSidebar"] a *,
+    section[data-testid="stSidebar"] [role="link"],
+    section[data-testid="stSidebar"] [role="link"] * {
+        color: #dbeafe !important;
+        text-shadow: none !important;
+    }
+
+    .side-brand {
+        border-bottom-color: rgba(148, 163, 184, 0.2) !important;
+        padding-top: 0.7rem !important;
+    }
+
+    .side-brand__name {
+        color: #ffffff !important;
+        font-size: 1.05rem !important;
+        font-weight: 950 !important;
+    }
+
+    .side-brand__logo {
+        display: block;
+        max-height: 2.4rem;
+        object-fit: contain;
+        width: 3rem;
+    }
+
+    .side-brand__sub {
+        color: #93c5fd !important;
+    }
+
+    .side-menu-title {
+        color: #38bdf8 !important;
+    }
+
+    .sidebar-profile {
+        align-items: center;
+        background: rgba(15, 23, 42, 0.68);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 8px;
+        display: flex;
+        gap: 0.72rem;
+        margin: 0.75rem 0 0.8rem;
+        padding: 0.72rem;
+    }
+
+    .sidebar-profile__photo,
+    .sidebar-profile__initials {
+        border: 2px solid rgba(96, 165, 250, 0.45);
+        border-radius: 999px;
+        flex: 0 0 auto;
+        height: 3rem !important;
+        margin: 0 !important;
+        object-fit: cover;
+        width: 3rem !important;
+    }
+
+    .sidebar-profile__initials {
+        font-size: 1rem !important;
+    }
+
+    .sidebar-profile__name {
+        color: #ffffff;
+        font-size: 0.88rem;
+        font-weight: 900;
+        line-height: 1.15;
+    }
+
+    .sidebar-profile__meta {
+        color: #93c5fd;
+        font-size: 0.68rem;
+        font-weight: 720;
+        margin-top: 0.18rem;
+    }
+
+    .side-nav-link {
+        border-radius: 7px !important;
+        color: #dbeafe !important;
+        display: block !important;
+        margin: 0.18rem 0 !important;
+        padding: 0.58rem 0.75rem !important;
+    }
+
+    .side-nav-link[href="/"],
+    .side-nav-link:hover,
+    .side-nav-link:focus-visible {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+        box-shadow: 0 12px 26px rgba(37, 99, 235, 0.28) !important;
+        color: #ffffff !important;
+        transform: translateX(3px) !important;
+    }
+
+    .side-status {
+        background: rgba(15, 23, 42, 0.76) !important;
+        border-color: rgba(148, 163, 184, 0.22) !important;
+        color: #cbd5e1 !important;
+    }
+
+    .dashboard-command {
+        padding-bottom: 0.6rem;
+    }
+
+    .metric-grid--six {
+        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+        gap: 0.7rem !important;
+        margin-bottom: 0.7rem !important;
+    }
+
+    .exec-metric,
+    .exec-panel,
+    .module-card,
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: linear-gradient(145deg, rgba(31, 41, 55, 0.96), rgba(17, 24, 39, 0.9)) !important;
+        border: 1px solid rgba(96, 165, 250, 0.16) !important;
+        border-radius: 8px !important;
+        box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.08) inset,
+            0 14px 34px rgba(0, 0, 0, 0.28) !important;
+        color: #e5edf8 !important;
+    }
+
+    .exec-metric {
+        min-height: 6.55rem !important;
+        padding: 0.85rem !important;
+    }
+
+    .exec-metric::after {
+        display: none !important;
+    }
+
+    .exec-metric:hover,
+    .exec-panel:hover,
+    .module-card:hover,
+    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+        border-color: color-mix(in srgb, var(--metric-color, #2563eb) 46%, rgba(96, 165, 250, 0.18)) !important;
+        box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.1) inset,
+            0 22px 46px rgba(0, 0, 0, 0.42),
+            0 0 24px color-mix(in srgb, var(--metric-color, #2563eb) 18%, transparent) !important;
+        transform: translateY(-4px) !important;
+    }
+
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        margin-bottom: 0.75rem !important;
+        min-height: 19.4rem !important;
+        overflow: hidden !important;
+        padding: 0.15rem !important;
+        transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease !important;
+    }
+
+    .native-panel-title {
+        align-items: center;
+        color: #f8fafc !important;
+        display: flex;
+        font-size: 0.82rem;
+        font-weight: 900;
+        justify-content: space-between;
+        margin: 0 0 0.35rem;
+    }
+
+    .native-panel-title span {
+        color: #94a3b8 !important;
+        font-weight: 900;
+    }
+
+    .exec-metric__icon {
+        border-radius: 8px !important;
+        height: 3rem !important;
+        width: 3rem !important;
+    }
+
+    .exec-metric__label {
+        color: #f8fafc !important;
+        font-size: 0.72rem !important;
+        font-weight: 880 !important;
+    }
+
+    .exec-metric__value {
+        color: #ffffff !important;
+        font-size: 1.65rem !important;
+        margin-top: 0.3rem !important;
+    }
+
+    .exec-metric__sub,
+    .exec-metric__delta {
+        color: #cbd5e1 !important;
+        font-size: 0.66rem !important;
+    }
+
+    .exec-metric__delta {
+        color: #22c55e !important;
+        font-weight: 800;
+        margin-top: 0.18rem;
+    }
+
+    .exec-panel {
+        min-height: 19.4rem;
+        padding: 0.85rem !important;
+    }
+
+    .exec-panel--html {
+        overflow: hidden;
+    }
+
+    .exec-chart-grid {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin-bottom: 0.75rem;
+    }
+
+    .exec-bottom-grid {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.8fr);
+        margin-bottom: 0.75rem;
+    }
+
+    .inline-chart {
+        display: block;
+        height: 15.4rem;
+        margin-top: 0.2rem;
+        overflow: visible;
+        width: 100%;
+    }
+
+    .inline-chart text {
+        fill: #dbeafe;
+        font-size: 0.72rem;
+        font-weight: 760;
+    }
+
+    .inline-chart .axis-label {
+        fill: #94a3b8;
+        font-size: 0.68rem;
+        font-weight: 700;
+    }
+
+    .inline-chart .legend text {
+        fill: #cbd5e1;
+        font-size: 0.68rem;
+    }
+
+    .category-bars {
+        display: grid;
+        gap: 0.74rem;
+        padding-top: 0.65rem;
+    }
+
+    .category-row {
+        align-items: center;
+        display: grid;
+        gap: 0.65rem;
+        grid-template-columns: 8rem minmax(0, 1fr) 2rem;
+    }
+
+    .category-label {
+        align-items: center;
+        color: #dbeafe;
+        display: flex;
+        font-size: 0.76rem;
+        font-weight: 780;
+        gap: 0.42rem;
+        min-width: 0;
+    }
+
+    .category-label span {
+        border-radius: 999px;
+        flex: 0 0 auto;
+        height: 0.62rem;
+        width: 0.62rem;
+    }
+
+    .category-track {
+        background: rgba(148, 163, 184, 0.14);
+        border-radius: 999px;
+        height: 0.56rem;
+        overflow: hidden;
+    }
+
+    .category-track i {
+        border-radius: 999px;
+        display: block;
+        height: 100%;
+    }
+
+    .category-row strong {
+        color: #ffffff;
+        font-size: 0.82rem;
+        text-align: right;
+    }
+
+    .panel-title {
+        align-items: center;
+        color: #f8fafc;
+        display: flex;
+        font-size: 0.86rem;
+        font-weight: 900;
+        justify-content: space-between;
+        margin-bottom: 0.35rem;
+    }
+
+    .panel-title span {
+        color: #94a3b8 !important;
+        letter-spacing: 0.12em !important;
+    }
+
+    .panel-total {
+        background: rgba(15, 23, 42, 0.76);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 8px;
+        color: #dbeafe;
+        font-weight: 800;
+        margin-top: 0.35rem;
+        padding: 0.55rem;
+        text-align: center;
+    }
+
+    .exec-empty {
+        align-items: center;
+        color: #94a3b8;
+        display: flex;
+        min-height: 14rem;
+        justify-content: center;
+    }
+
+    .exec-table {
+        border-collapse: collapse;
+        color: #cbd5e1;
+        font-size: 0.72rem;
+        width: 100%;
+    }
+
+    .exec-table th,
+    .exec-table td {
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        padding: 0.62rem 0.55rem;
+        text-align: left;
+    }
+
+    .exec-table th {
+        color: #bfdbfe;
+        font-size: 0.66rem;
+        font-weight: 850;
+        text-transform: uppercase;
+    }
+
+    .status-badge {
+        border-radius: 5px;
+        display: inline-flex;
+        font-size: 0.68rem;
+        font-weight: 820;
+        padding: 0.2rem 0.4rem;
+    }
+
+    .status-badge--open {
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.42);
+        color: #fca5a5;
+    }
+
+    .status-badge--closed {
+        background: rgba(34, 197, 94, 0.12);
+        border: 1px solid rgba(34, 197, 94, 0.42);
+        color: #86efac;
+    }
+
+    .module-grid--compact {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+        margin-top: 0.75rem !important;
+    }
+
+    .module-card {
+        min-height: 7.3rem !important;
+    }
+
+    .module-card__stat {
+        background: rgba(15, 23, 42, 0.6);
+        border-color: rgba(148, 163, 184, 0.16) !important;
+        color: #cbd5e1 !important;
+    }
+
+    .module-card__stat strong {
+        color: #ffffff !important;
+    }
+
+    @media (max-width: 1320px) {
+        .metric-grid--six {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+
+        .exec-chart-grid,
+        .exec-bottom-grid {
+            grid-template-columns: 1fr !important;
+        }
+    }
+
+    @media (max-width: 760px) {
+        .metric-grid--six,
+        .module-grid--compact {
+            grid-template-columns: 1fr !important;
+        }
+
+        .top-module-nav {
+            margin-left: -0.25rem;
+            margin-right: -0.25rem;
+        }
+    }
+
+    /* Final global shell override for Streamlit's visible containers */
+    html,
+    body,
+    #root,
+    .stApp,
+    [data-testid="stApp"],
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    [data-testid="stMainBlockContainer"] {
+        background:
+            radial-gradient(circle at 18% 0%, rgba(59, 130, 246, 0.13), transparent 28rem),
+            linear-gradient(135deg, #111827 0%, #1f2937 55%, #111827 100%) !important;
+        color: #e5edf8 !important;
+    }
+
+    [data-testid="stHeader"],
+    header[data-testid="stHeader"] {
+        background: rgba(17, 24, 39, 0.82) !important;
+    }
+
+    [data-testid="stSidebarContent"] {
+        background:
+            radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 16rem),
+            linear-gradient(180deg, #1f2937 0%, #111827 100%) !important;
+    }
+
+    .stButton button,
+    section[data-testid="stSidebar"] .stButton button {
+        border-radius: 8px !important;
+        font-weight: 800 !important;
+    }
+
+    section[data-testid="stSidebar"] .stButton button {
+        background: rgba(15, 23, 42, 0.78) !important;
+        border: 1px solid rgba(148, 163, 184, 0.22) !important;
+        color: #dbeafe !important;
+    }
+
+    section[data-testid="stSidebar"] .stButton button:hover {
+        background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+        border-color: rgba(248, 113, 113, 0.42) !important;
+        color: #ffffff !important;
+    }
+
+    .auth-panel,
+    div[data-testid="stForm"],
+    div[data-testid="stExpander"] {
+        background: rgba(31, 41, 55, 0.92) !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+        color: #e5edf8 !important;
+    }
+
+    .auth-panel h1,
+    .auth-panel h2,
+    .auth-panel h3,
+    div[data-testid="stForm"] label,
+    div[data-testid="stForm"] p {
+        color: #f8fafc !important;
     }
     </style>
     """, unsafe_allow_html=True)
