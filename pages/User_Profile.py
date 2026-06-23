@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import streamlit as st
 
 import auth
@@ -16,6 +18,21 @@ getattr(auth, "render_user_sidebar", lambda: None)()
 
 user = getattr(auth, "current_user", lambda: None)()
 
+
+def render_profile_avatar(user_record):
+    photo = user_record.get("profile_photo")
+    if photo and Path(str(photo)).exists():
+        st.image(str(photo), width=180)
+        return
+
+    initials = "".join(part[:1] for part in user_record.get("name", "User").split()[:2]).upper() or "U"
+    st.markdown(
+        '<div class="profile-avatar" style="height: 150px; width: 150px; font-size: 2rem;">'
+        + initials
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
 st.markdown(
     """
 <div class="dashboard-hero">
@@ -33,16 +50,7 @@ if not user:
 
 c1, c2 = st.columns([1, 2])
 with c1:
-    photo = user.get("profile_photo")
-    if photo:
-        st.image(photo, width=180)
-    else:
-        st.markdown(
-            '<div class="profile-avatar" style="height: 150px; width: 150px; font-size: 2rem;">'
-            + "".join(part[:1] for part in user["name"].split()[:2]).upper()
-            + "</div>",
-            unsafe_allow_html=True,
-        )
+    render_profile_avatar(user)
     st.caption(f"Role: {user['role'].title()} | Status: {user['status'].title()}")
 
 with c2:
