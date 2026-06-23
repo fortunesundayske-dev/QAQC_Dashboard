@@ -6,6 +6,7 @@ from click import style
 from pathlib import Path
 import uuid
 import html
+from urllib.parse import quote
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -380,7 +381,14 @@ def render_top_nav():
     st.sidebar.markdown('<div class="side-menu-title">Menu</div>', unsafe_allow_html=True)
 
     for label, page in pages.items():
-        st.sidebar.page_link(page, label=label)
+        if page == "app.py":
+            href = "/"
+        else:
+            href = "/" + quote(Path(page).stem)
+        st.sidebar.markdown(
+            f'<a class="side-nav-link" href="{href}" target="_self">{html.escape(label)}</a>',
+            unsafe_allow_html=True,
+        )
 
     st.sidebar.markdown(
         f'<div class="side-status">System Status: <strong>Online</strong><br>{len(pages)} modules available</div>',
@@ -1214,23 +1222,29 @@ def inject_global_ui():
         border: 1px solid rgba(15, 23, 42, 0.09);
         border-radius: 8px;
         box-shadow:
-            0 16px 28px rgba(15, 23, 42, 0.09),
+            0 2px 0 rgba(255, 255, 255, 0.98) inset,
+            0 7px 0 rgba(15, 23, 42, 0.08),
+            0 22px 34px rgba(15, 23, 42, 0.16),
             inset 0 1px 0 rgba(255, 255, 255, 0.95);
         display: flex;
         gap: 0.8rem;
         min-height: 5.6rem;
         padding: 0.85rem;
+        position: relative;
         transform: translateY(0);
+        transform-style: preserve-3d;
         transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
     }
 
     .exec-metric:hover {
         border-color: color-mix(in srgb, var(--metric-color, #2563eb) 34%, rgba(15, 23, 42, 0.08));
         box-shadow:
-            0 24px 38px rgba(15, 23, 42, 0.15),
-            0 12px 24px color-mix(in srgb, var(--metric-color, #2563eb) 18%, transparent),
+            0 2px 0 rgba(255, 255, 255, 0.98) inset,
+            0 11px 0 color-mix(in srgb, var(--metric-color, #2563eb) 22%, rgba(15, 23, 42, 0.12)),
+            0 34px 48px rgba(15, 23, 42, 0.24),
+            0 18px 32px color-mix(in srgb, var(--metric-color, #2563eb) 22%, transparent),
             inset 0 1px 0 rgba(255, 255, 255, 0.98);
-        transform: translateY(-4px);
+        transform: perspective(900px) translateY(-8px) rotateX(2deg);
     }
 
     .exec-metric__icon {
@@ -1272,20 +1286,26 @@ def inject_global_ui():
         border: 1px solid rgba(15, 23, 42, 0.09);
         border-radius: 8px;
         box-shadow:
-            0 18px 32px rgba(15, 23, 42, 0.1),
+            0 2px 0 rgba(255, 255, 255, 0.98) inset,
+            0 7px 0 rgba(15, 23, 42, 0.08),
+            0 24px 38px rgba(15, 23, 42, 0.16),
             inset 0 1px 0 rgba(255, 255, 255, 0.95);
         padding: 0.95rem;
+        position: relative;
         transform: translateY(0);
+        transform-style: preserve-3d;
         transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
     }
 
     .exec-panel:hover {
         border-color: rgba(14, 165, 233, 0.3);
         box-shadow:
-            0 26px 42px rgba(15, 23, 42, 0.16),
-            0 12px 28px rgba(14, 165, 233, 0.12),
+            0 2px 0 rgba(255, 255, 255, 0.98) inset,
+            0 11px 0 rgba(14, 165, 233, 0.16),
+            0 36px 54px rgba(15, 23, 42, 0.24),
+            0 18px 34px rgba(14, 165, 233, 0.16),
             inset 0 1px 0 rgba(255, 255, 255, 0.98);
-        transform: translateY(-3px);
+        transform: perspective(900px) translateY(-7px) rotateX(2deg);
     }
 
     .exec-panel h3 {
@@ -1355,21 +1375,27 @@ def inject_global_ui():
         border: 1px solid rgba(15, 23, 42, 0.09);
         border-radius: 8px;
         box-shadow:
-            0 16px 28px rgba(15, 23, 42, 0.09),
+            0 2px 0 rgba(255, 255, 255, 0.98) inset,
+            0 7px 0 rgba(15, 23, 42, 0.08),
+            0 22px 34px rgba(15, 23, 42, 0.16),
             inset 0 1px 0 rgba(255, 255, 255, 0.95);
         min-height: 9.75rem;
         padding: 0.85rem;
+        position: relative;
         transform: translateY(0);
+        transform-style: preserve-3d;
         transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
     }
 
     .module-card:hover {
         border-color: color-mix(in srgb, var(--module-color, #2563eb) 34%, rgba(15, 23, 42, 0.08));
         box-shadow:
-            0 24px 38px rgba(15, 23, 42, 0.15),
-            0 12px 24px color-mix(in srgb, var(--module-color, #2563eb) 16%, transparent),
+            0 2px 0 rgba(255, 255, 255, 0.98) inset,
+            0 11px 0 color-mix(in srgb, var(--module-color, #2563eb) 22%, rgba(15, 23, 42, 0.12)),
+            0 34px 48px rgba(15, 23, 42, 0.24),
+            0 18px 32px color-mix(in srgb, var(--module-color, #2563eb) 22%, transparent),
             inset 0 1px 0 rgba(255, 255, 255, 0.98);
-        transform: translateY(-4px);
+        transform: perspective(900px) translateY(-8px) rotateX(2deg);
     }
 
     .module-card h3 {
@@ -1482,6 +1508,109 @@ def inject_global_ui():
 
         .block-container {
             padding: 0.75rem 0.75rem 1.5rem;
+        }
+    }
+
+    section[data-testid="stSidebar"] a,
+    section[data-testid="stSidebar"] a:visited,
+    section[data-testid="stSidebar"] a *,
+    section[data-testid="stSidebar"] [role="link"],
+    section[data-testid="stSidebar"] [role="link"] *,
+    section[data-testid="stSidebar"] [data-testid*="stPageLink"],
+    section[data-testid="stSidebar"] [data-testid*="stPageLink"] *,
+    section[data-testid="stSidebar"] [data-testid*="stSidebarNavLink"],
+    section[data-testid="stSidebar"] [data-testid*="stSidebarNavLink"] * {
+        color: #eaf6ff !important;
+        opacity: 1 !important;
+        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+    }
+
+    section[data-testid="stSidebar"] a,
+    section[data-testid="stSidebar"] [role="link"],
+    section[data-testid="stSidebar"] [data-testid*="stPageLink"] a {
+        border-radius: 8px !important;
+        color: #eaf6ff !important;
+        transition: background 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, transform 0.18s ease !important;
+    }
+
+    section[data-testid="stSidebar"] a[href="/"],
+    section[data-testid="stSidebar"] a[href$="localhost:8501/"],
+    section[data-testid="stSidebar"] a[href$="/QAQC_Dashboard/"] {
+        background: rgba(148, 163, 184, 0.14) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    }
+
+    section[data-testid="stSidebar"] a:hover,
+    section[data-testid="stSidebar"] a:focus-visible,
+    section[data-testid="stSidebar"] [role="link"]:hover,
+    section[data-testid="stSidebar"] [data-testid*="stPageLink"]:hover,
+    section[data-testid="stSidebar"] a[aria-current="page"] {
+        background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%) !important;
+        box-shadow:
+            0 2px 0 rgba(255, 255, 255, 0.16) inset,
+            0 6px 0 rgba(4, 21, 44, 0.34),
+            0 18px 28px rgba(2, 132, 199, 0.28) !important;
+        color: #ffffff !important;
+        transform: perspective(600px) translateX(5px) translateY(-2px) rotateY(-3deg) !important;
+    }
+
+    section[data-testid="stSidebar"] a:hover *,
+    section[data-testid="stSidebar"] a:focus-visible *,
+    section[data-testid="stSidebar"] [role="link"]:hover *,
+    section[data-testid="stSidebar"] [data-testid*="stPageLink"]:hover *,
+    section[data-testid="stSidebar"] a[aria-current="page"] * {
+        color: #ffffff !important;
+    }
+
+    @media (prefers-color-scheme: light) {
+        .exec-metric,
+        .exec-panel,
+        .module-card {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
+            color: #102033;
+        }
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .exec-metric,
+        .exec-panel,
+        .module-card {
+            background: linear-gradient(145deg, #102033 0%, #0b1727 100%) !important;
+            border-color: rgba(148, 163, 184, 0.26) !important;
+            box-shadow:
+                0 2px 0 rgba(255, 255, 255, 0.08) inset,
+                0 7px 0 rgba(0, 0, 0, 0.34),
+                0 24px 38px rgba(0, 0, 0, 0.42) !important;
+        }
+
+        .exec-metric__label,
+        .exec-panel h3,
+        .status-row,
+        .module-card__stat,
+        .module-card__stat strong,
+        .status-row strong,
+        .score-ring {
+            color: #f8fafc !important;
+        }
+
+        .exec-metric__value {
+            color: #ffffff !important;
+        }
+
+        .exec-metric__sub,
+        .score-ring span {
+            color: #cbd5e1 !important;
+        }
+
+        .score-ring {
+            background:
+                radial-gradient(circle at center, #102033 55%, transparent 57%),
+                conic-gradient(#27ae60 0 83%, #334155 83% 100%) !important;
+        }
+
+        .status-row,
+        .module-card__stat {
+            border-color: rgba(148, 163, 184, 0.24) !important;
         }
     }
     </style>
