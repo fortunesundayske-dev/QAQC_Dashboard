@@ -1211,21 +1211,22 @@ def inject_global_ui():
 
     .metric-grid {
         display: grid;
-        gap: 0.75rem;
+        gap: 1rem;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        margin-bottom: 0.75rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.35rem;
     }
 
     .exec-metric {
         align-items: center;
         background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
-        border: 1px solid rgba(15, 23, 42, 0.09);
+        border: 1px solid rgba(15, 23, 42, 0.12);
         border-radius: 8px;
         box-shadow:
-            0 2px 0 rgba(255, 255, 255, 0.98) inset,
-            0 7px 0 rgba(15, 23, 42, 0.08),
-            0 22px 34px rgba(15, 23, 42, 0.16),
-            inset 0 1px 0 rgba(255, 255, 255, 0.95);
+            0 1px 0 rgba(255, 255, 255, 0.98) inset,
+            0 4px 0 rgba(148, 163, 184, 0.36),
+            0 14px 24px rgba(15, 23, 42, 0.18),
+            0 24px 44px rgba(15, 23, 42, 0.09);
         display: flex;
         gap: 0.8rem;
         min-height: 5.6rem;
@@ -1234,31 +1235,62 @@ def inject_global_ui():
         transform: translateY(0);
         transform-style: preserve-3d;
         transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+        z-index: 0;
+    }
+
+    .exec-metric::after {
+        background: linear-gradient(180deg, rgba(148, 163, 184, 0.28), rgba(15, 23, 42, 0.16));
+        border-radius: 8px;
+        bottom: -0.45rem;
+        box-shadow: 0 14px 24px rgba(15, 23, 42, 0.16);
+        content: "";
+        height: 0.9rem;
+        left: 0.5rem;
+        position: absolute;
+        right: 0.5rem;
+        transform: skewX(-8deg);
+        transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+        z-index: -1;
     }
 
     .exec-metric:hover {
         border-color: color-mix(in srgb, var(--metric-color, #2563eb) 34%, rgba(15, 23, 42, 0.08));
         box-shadow:
-            0 2px 0 rgba(255, 255, 255, 0.98) inset,
-            0 11px 0 color-mix(in srgb, var(--metric-color, #2563eb) 22%, rgba(15, 23, 42, 0.12)),
-            0 34px 48px rgba(15, 23, 42, 0.24),
-            0 18px 32px color-mix(in srgb, var(--metric-color, #2563eb) 22%, transparent),
-            inset 0 1px 0 rgba(255, 255, 255, 0.98);
-        transform: perspective(900px) translateY(-8px) rotateX(2deg);
+            0 1px 0 rgba(255, 255, 255, 0.98) inset,
+            0 8px 0 color-mix(in srgb, var(--metric-color, #2563eb) 36%, rgba(15, 23, 42, 0.18)),
+            0 26px 40px rgba(15, 23, 42, 0.24),
+            0 18px 32px color-mix(in srgb, var(--metric-color, #2563eb) 26%, transparent);
+        transform: perspective(850px) translateY(-7px) rotateX(3deg);
+    }
+
+    .exec-metric:hover::after {
+        background: linear-gradient(180deg, color-mix(in srgb, var(--metric-color, #2563eb) 26%, rgba(148, 163, 184, 0.2)), rgba(15, 23, 42, 0.2));
+        box-shadow: 0 22px 32px color-mix(in srgb, var(--metric-color, #2563eb) 18%, rgba(15, 23, 42, 0.18));
+        transform: translateY(0.18rem) skewX(-8deg);
     }
 
     .exec-metric__icon {
         align-items: center;
         background: var(--metric-color, #2563eb);
         border-radius: 8px;
-        box-shadow: 0 10px 22px color-mix(in srgb, var(--metric-color, #2563eb) 28%, transparent);
+        box-shadow:
+            0 4px 0 color-mix(in srgb, var(--metric-color, #2563eb) 62%, #0f172a),
+            0 12px 22px color-mix(in srgb, var(--metric-color, #2563eb) 32%, transparent);
         color: #ffffff;
         display: flex;
         font-size: 1.15rem;
         font-weight: 900;
         height: 2.7rem;
         justify-content: center;
+        transition: box-shadow 0.18s ease, transform 0.18s ease;
         width: 2.7rem;
+    }
+
+    .exec-metric:hover .exec-metric__icon {
+        box-shadow:
+            0 6px 0 color-mix(in srgb, var(--metric-color, #2563eb) 62%, #0f172a),
+            0 18px 28px color-mix(in srgb, var(--metric-color, #2563eb) 38%, transparent);
+        transform: translateY(-2px) scale(1.04);
     }
 
     .exec-metric__label {
