@@ -382,15 +382,20 @@ def extract_projects(data):
 def render_navigation():
     pages = get_navigation_pages()
 
-    st.markdown(
-        """
-<div class="command-topbar">
-    <div class="command-crumb">› <span>Page Navigation</span></div>
-    <div class="command-tools"><span>⌕</span><span>•</span><span>● Online</span></div>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
+    nav_col, tool_col = st.columns([0.78, 0.22], gap="small")
+    with nav_col:
+        with st.popover("›  Page Navigation", use_container_width=True):
+            suffix = _auth_query_suffix()
+            links = []
+            for label, page in pages.items():
+                href = "/" + suffix if page == "app.py" else "/" + quote(Path(page).stem) + suffix
+                links.append(f'<a class="nav-popover-link" href="{href}" target="_self">{html.escape(label)}</a>')
+            st.markdown('<div class="nav-popover-menu">' + "".join(links) + "</div>", unsafe_allow_html=True)
+    with tool_col:
+        st.markdown(
+            '<div class="command-tools command-tools--compact"><span>⌕</span><span>•</span><span>● Online</span></div>',
+            unsafe_allow_html=True,
+        )
     return
     st.markdown("### 🧭 Page Navigation", unsafe_allow_html=True)
 
@@ -2163,6 +2168,58 @@ def inject_global_ui():
 
     .command-tools span:last-child {
         color: #22c55e !important;
+    }
+
+    div[data-testid="stPopover"] button {
+        background: rgba(8, 17, 31, 0.82) !important;
+        border: 1px solid rgba(96, 165, 250, 0.16) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22) !important;
+        color: #e5edf8 !important;
+        justify-content: flex-start !important;
+        min-height: 2.4rem !important;
+        padding: 0 0.8rem !important;
+    }
+
+    div[data-testid="stPopover"] button:hover {
+        border-color: rgba(56, 189, 248, 0.38) !important;
+        color: #ffffff !important;
+    }
+
+    .command-tools--compact {
+        align-items: center;
+        background: rgba(8, 17, 31, 0.82);
+        border: 1px solid rgba(96, 165, 250, 0.16);
+        border-radius: 8px;
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+        display: flex;
+        justify-content: flex-end;
+        min-height: 2.4rem;
+        padding: 0 0.8rem;
+    }
+
+    .nav-popover-menu {
+        display: grid;
+        gap: 0.35rem;
+        min-width: 16rem;
+        padding: 0.2rem;
+    }
+
+    .nav-popover-link {
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 7px;
+        color: #e5edf8 !important;
+        display: block;
+        font-size: 0.82rem;
+        font-weight: 800;
+        padding: 0.55rem 0.7rem;
+        text-decoration: none !important;
+    }
+
+    .nav-popover-link:hover {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: #ffffff !important;
     }
 
     .app-bar {
