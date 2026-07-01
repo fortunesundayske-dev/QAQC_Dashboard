@@ -3280,9 +3280,9 @@ def inject_global_ui():
             radial-gradient(circle at 15% 8%, rgba(37, 99, 235, 0.2), transparent 25rem),
             radial-gradient(circle at 88% 10%, rgba(37, 99, 235, 0.3), transparent 30rem),
             linear-gradient(135deg, #061329 0%, #071d3d 50%, #082c5f 100%) !important;
-        margin: -0.75rem -1rem -1.4rem !important;
-        min-height: calc(100vh - 0.5rem) !important;
-        padding: 1.45rem 2.15rem 0 !important;
+        margin: -0.75rem -1rem 0 !important;
+        min-height: auto !important;
+        padding: 0.9rem 2.15rem 0.75rem !important;
     }
 
     .auth-page .stHorizontalBlock {
@@ -3378,8 +3378,8 @@ def inject_global_ui():
         border-radius: 12px !important;
         box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34) !important;
         max-width: 38.8rem;
-        min-height: 43.4rem !important;
-        padding: 2.25rem 2.9rem 2rem !important;
+        min-height: auto !important;
+        padding: 1.55rem 2.55rem 1.35rem !important;
     }
 
     .auth-shield {
@@ -3432,8 +3432,8 @@ def inject_global_ui():
 
     .auth-footer {
         background: rgba(7, 20, 40, 0.3);
-        margin: 1.65rem -2.15rem 0 !important;
-        padding: 1.25rem 2.15rem 1rem !important;
+        margin: 0.95rem -2.15rem 0 !important;
+        padding: 0.85rem 2.15rem 0.75rem !important;
     }
 
     @media (max-width: 900px) {
