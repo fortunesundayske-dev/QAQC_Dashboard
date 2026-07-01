@@ -12,6 +12,7 @@ st.set_page_config(
 
 from pathlib import Path
 import html
+from urllib.parse import quote
 
 import pandas as pd
 import plotly.express as px
@@ -602,6 +603,28 @@ with chart_col3:
         panel_title("Material Receipt Trend")
         st.plotly_chart(material_receipt_fig(material_trend), use_container_width=True, key="home_material_receipt_trend")
 
+bottom_col1, bottom_col2 = st.columns([1, 2])
+with bottom_col1:
+    with st.container(border=True):
+        panel_title("OBS by Category")
+        st.plotly_chart(obs_category_fig(obs_categories), use_container_width=True, key="home_obs_category")
+with bottom_col2:
+    with st.container(border=True):
+        panel_title("Recent NCRs")
+        recent_ncr = recent_ncr_frame(ncr)
+        if recent_ncr.empty:
+            st.info("No recent NCR records available.")
+        else:
+            st.dataframe(recent_ncr, use_container_width=True, hide_index=True, height=314)
+
+module_cards = [
+    module_card("Audit", [("Planned", len(filtered_data.get("Audit Register", pd.DataFrame()))), ("Documents", len(docs))], "#2563eb", 83),
+    module_card("ITR", [("Open", open_itr), ("Closed", closed_itr)], "#14b8a6", pct(closed_itr, open_itr + closed_itr)),
+    module_card("CTQ", [("Total", ctq_total), ("Compliance", f"{ctq_compliance}%")], "#7c3aed", ctq_compliance),
+    module_card("Rework", [("Records", len(filtered_data.get("Defect-Rework Log", pd.DataFrame()))), ("Lessons", len(lessons))], "#f97316", 72),
+]
+st.markdown('<div class="module-grid module-grid--compact">' + "".join(module_cards) + "</div>", unsafe_allow_html=True)
+
 quick_links = [
     ("NCR Register", "pages/NCR_Tracker.py", "#ef4444", "!"),
     ("OBS Register", "pages/OBS_Tracker.py", "#f97316", "O"),
@@ -610,8 +633,10 @@ quick_links = [
     ("Audit Schedule", "pages/Audit_Surveillance.py", "#22c55e", "A"),
     ("Document Library", "pages/Document_Status.py", "#2563eb", "D"),
 ]
+auth_token = st.session_state.get("auth", {}).get("auth_token") or st.session_state.get("auth_token")
+auth_suffix = f"?auth_token={quote(str(auth_token))}" if auth_token else ""
 quick_html = "".join(
-    f'<a class="quick-link" href="/{Path(path).stem}" target="_self" style="--quick-color:{color};"><span>{mark}</span>{html.escape(label)}</a>'
+    f'<a class="quick-link" href="/{Path(path).stem}{auth_suffix}" target="_self" style="--quick-color:{color};"><span>{mark}</span>{html.escape(label)}</a>'
     for label, path, color, mark in quick_links
 )
 st.markdown(
@@ -620,7 +645,7 @@ st.markdown(
     <div class="quick-access-title">Quick Access</div>
     <div class="quick-access-grid">
         {quick_html}
-        <a class="quick-link quick-link--all" href="/" target="_self">View All Tools -&gt;</a>
+        <a class="quick-link quick-link--all" href="/{auth_suffix}" target="_self">View All Tools -&gt;</a>
     </div>
 </div>
 <div class="dashboard-security-strip"><span>Secure</span><span>Compliant</span><span>Reliable</span></div>

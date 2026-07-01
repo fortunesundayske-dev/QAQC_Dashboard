@@ -236,6 +236,18 @@ def render_mobile_nav():
     selected = st.selectbox("Quick Navigation", list(pages.keys()))
     st.page_link(pages[selected], label="Open selected page")
 
+
+def _auth_query_suffix():
+    token = st.session_state.get("auth", {}).get("auth_token") or st.session_state.get("auth_token")
+    if not token:
+        try:
+            token = st.query_params.get("auth_token")
+        except Exception:
+            token = None
+    if isinstance(token, list):
+        token = token[0] if token else None
+    return f"?auth_token={quote(str(token))}" if token else ""
+
 # =========================
 # KPI CARDS
 # =========================
@@ -454,18 +466,25 @@ def render_top_nav():
                 "email": None,
                 "discipline": "QA/QC",
                 "profile_photo": None,
+                "auth_token": None,
             }
-            for key in ["logged_in", "username", "name", "role", "email", "discipline", "profile_photo"]:
+            for key in ["logged_in", "username", "name", "role", "email", "discipline", "profile_photo", "auth_token"]:
                 st.session_state.pop(key, None)
+            try:
+                if "auth_token" in st.query_params:
+                    del st.query_params["auth_token"]
+            except Exception:
+                pass
             st.rerun()
 
     st.sidebar.markdown('<div class="side-menu-title">Menu</div>', unsafe_allow_html=True)
 
     for label, page in pages.items():
+        suffix = _auth_query_suffix()
         if page == "app.py":
-            href = "/"
+            href = "/" + suffix
         else:
-            href = "/" + quote(Path(page).stem)
+            href = "/" + quote(Path(page).stem) + suffix
         st.sidebar.markdown(
             f'<a class="side-nav-link" href="{href}" target="_self">{html.escape(label)}</a>',
             unsafe_allow_html=True,
@@ -3195,6 +3214,184 @@ def inject_global_ui():
             margin-right: -1rem;
             padding-left: 1rem;
             padding-right: 1rem;
+        }
+    }
+
+    /* Login reference screen override */
+    .auth-page {
+        background:
+            radial-gradient(circle at 15% 8%, rgba(37, 99, 235, 0.2), transparent 25rem),
+            radial-gradient(circle at 88% 10%, rgba(37, 99, 235, 0.3), transparent 30rem),
+            linear-gradient(135deg, #061329 0%, #071d3d 50%, #082c5f 100%) !important;
+        margin: -0.75rem -1rem -1.4rem !important;
+        min-height: calc(100vh - 0.5rem) !important;
+        padding: 1.45rem 2.15rem 0 !important;
+    }
+
+    .auth-page .stHorizontalBlock {
+        align-items: center;
+        gap: 4.7rem !important;
+        max-width: 1380px;
+        margin: 0 auto;
+    }
+
+    .auth-logo {
+        height: 4rem !important;
+        margin-bottom: 2.45rem !important;
+    }
+
+    .auth-eyebrow--pill {
+        background: rgba(37, 99, 235, 0.26) !important;
+        border-color: rgba(59, 130, 246, 0.28) !important;
+        color: #38bdf8 !important;
+        margin-bottom: 1.05rem !important;
+    }
+
+    .auth-hero-panel h1 {
+        color: #ffffff !important;
+        font-size: clamp(2.65rem, 4.2vw, 3.9rem) !important;
+        font-weight: 900 !important;
+        line-height: 1.06 !important;
+        margin-bottom: 1.05rem !important;
+    }
+
+    .auth-hero-panel h1 span {
+        color: #2f86ff !important;
+    }
+
+    .auth-hero-panel p {
+        color: #c9d5e5 !important;
+        font-size: 1rem !important;
+        line-height: 1.7 !important;
+        max-width: 34.5rem !important;
+    }
+
+    .auth-feature-grid {
+        gap: 1.55rem 2.05rem !important;
+        margin: 1.95rem 0 1.75rem !important;
+        max-width: 40rem !important;
+    }
+
+    .auth-feature {
+        min-height: 4.3rem !important;
+        padding-left: 3.8rem !important;
+    }
+
+    .auth-feature::before,
+    .auth-access-note::before {
+        content: "▣" !important;
+        font-size: 1rem;
+        height: 2.7rem !important;
+        width: 2.7rem !important;
+    }
+
+    .auth-feature b {
+        font-size: 0.86rem !important;
+    }
+
+    .auth-feature small {
+        color: #c0ccdc !important;
+        font-size: 0.77rem !important;
+    }
+
+    .auth-access-note {
+        background: rgba(16, 43, 79, 0.76) !important;
+        border-color: rgba(96, 165, 250, 0.32) !important;
+        max-width: 40rem !important;
+        min-height: 5.9rem !important;
+        padding: 1rem 1.35rem 1rem 4.95rem !important;
+    }
+
+    .auth-access-note::before {
+        content: "✓" !important;
+        left: 1rem !important;
+        top: 1.45rem !important;
+    }
+
+    .auth-access-note b {
+        color: #7dd3fc !important;
+        font-size: 0.9rem !important;
+    }
+
+    div[data-testid="column"]:has(.auth-card-head) {
+        background:
+            radial-gradient(circle at 50% 6%, rgba(37, 99, 235, 0.16), transparent 14rem),
+            linear-gradient(145deg, rgba(15, 32, 56, 0.92), rgba(9, 21, 39, 0.96)) !important;
+        border: 1px solid rgba(148, 163, 184, 0.3) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34) !important;
+        max-width: 38.8rem;
+        min-height: 43.4rem !important;
+        padding: 2.25rem 2.9rem 2rem !important;
+    }
+
+    .auth-shield {
+        background:
+            radial-gradient(circle, rgba(37, 99, 235, 0.3), rgba(15, 23, 42, 0.92)) !important;
+        border-color: rgba(59, 130, 246, 0.48) !important;
+        color: #2f86ff !important;
+        font-size: 2.2rem !important;
+        height: 5rem !important;
+        margin-bottom: 1.25rem !important;
+        width: 5rem !important;
+    }
+
+    .auth-card-head h2 {
+        font-size: 1.75rem !important;
+        margin-bottom: 0.45rem !important;
+    }
+
+    .auth-card-head p {
+        color: #b8c5d7 !important;
+        margin-bottom: 1.45rem !important;
+    }
+
+    div[data-testid="column"]:has(.auth-card-head) div[role="radiogroup"] {
+        margin-bottom: 1.25rem !important;
+    }
+
+    div[data-testid="column"]:has(.auth-card-head) div[role="radiogroup"] label {
+        min-height: 3rem !important;
+    }
+
+    div[data-testid="column"]:has(.auth-card-head) div[data-baseweb="input"] > div {
+        min-height: 3rem !important;
+    }
+
+    div[data-testid="column"]:has(.auth-card-head) .stButton button {
+        min-height: 3.25rem !important;
+        margin-top: 0.55rem !important;
+    }
+
+    .auth-forgot {
+        color: #38bdf8 !important;
+        margin-bottom: 1.35rem !important;
+    }
+
+    .auth-card-foot {
+        color: #9aaac0 !important;
+        margin-top: 1.95rem !important;
+    }
+
+    .auth-footer {
+        background: rgba(7, 20, 40, 0.3);
+        margin: 1.65rem -2.15rem 0 !important;
+        padding: 1.25rem 2.15rem 1rem !important;
+    }
+
+    @media (max-width: 900px) {
+        .auth-page {
+            padding: 1rem !important;
+        }
+
+        .auth-page .stHorizontalBlock {
+            gap: 1rem !important;
+        }
+
+        div[data-testid="column"]:has(.auth-card-head) {
+            max-width: none;
+            min-height: auto !important;
+            padding: 1.4rem 1rem !important;
         }
     }
     </style>

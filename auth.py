@@ -20,6 +20,7 @@ PROFILE_DIR = DATA_DIR / "profile_photos"
 PBKDF2_ITERATIONS = 260_000
 DEFAULT_ADMIN_PASSWORD = "admin123"
 LOGO_FILE = BASE_DIR / "assets" / "evomec_logo.png"
+SESSION_TOKEN_PARAM = "auth_token"
 
 
 def _utc_now():
@@ -93,6 +94,30 @@ def _hash_password(password, salt):
         PBKDF2_ITERATIONS,
     )
     return base64.b64encode(digest).decode("utf-8")
+
+
+def _hash_session_token(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _query_param(name):
+    value = st.query_params.get(name)
+    if isinstance(value, list):
+        return value[0] if value else None
+    return value
+
+
+def _set_query_token(token):
+    if token:
+        st.query_params[SESSION_TOKEN_PARAM] = token
+
+
+def _clear_query_token():
+    try:
+        if SESSION_TOKEN_PARAM in st.query_params:
+            del st.query_params[SESSION_TOKEN_PARAM]
+    except Exception:
+        pass
 
 
 def _verify_password(password, user):
@@ -169,7 +194,7 @@ def init_auth():
         )
 
 
-def _set_logged_in(username, user):
+def _set_logged_in(username, user, session_token=None):
     st.session_state.auth = {
         "logged_in": True,
         "username": username,
@@ -178,6 +203,7 @@ def _set_logged_in(username, user):
         "email": user["email"],
         "discipline": user.get("discipline", "QA/QC"),
         "profile_photo": user.get("profile_photo"),
+        "auth_token": session_token or st.session_state.get("auth", {}).get("auth_token"),
     }
     st.session_state.logged_in = True
     st.session_state.username = username
@@ -186,21 +212,47 @@ def _set_logged_in(username, user):
     st.session_state.email = user["email"]
     st.session_state.discipline = user.get("discipline", "QA/QC")
     st.session_state.profile_photo = user.get("profile_photo")
+    st.session_state.auth_token = session_token or st.session_state.auth.get("auth_token")
+    _set_query_token(st.session_state.auth_token)
+
+
+def _restore_from_query_token():
+    token = _query_param(SESSION_TOKEN_PARAM)
+    if not token:
+        return False
+    token_hash = _hash_session_token(token)
+    users = _load_users()
+    for username, user in users.items():
+        saved_hash = user.get("session_token_hash")
+        if saved_hash and hmac.compare_digest(saved_hash, token_hash) and user.get("status") == "approved":
+            _set_logged_in(username, user, session_token=token)
+            return True
+    _clear_query_token()
+    return False
 
 
 def _set_logged_out():
+    username = st.session_state.get("auth", {}).get("username")
+    if username:
+        users = _load_users()
+        if username in users and users[username].get("session_token_hash"):
+            users[username].pop("session_token_hash", None)
+            _try_save_users(users)
     st.session_state.auth = {
         "logged_in": False,
         "username": None,
         "name": None,
         "role": None,
         "email": None,
+        "auth_token": None,
     }
     st.session_state.logged_in = False
     st.session_state.username = None
     st.session_state.name = None
     st.session_state.role = None
     st.session_state.email = None
+    st.session_state.auth_token = None
+    _clear_query_token()
 
 
 def login():
@@ -210,6 +262,9 @@ def login():
         storage_warning = st.session_state.pop("auth_storage_warning", None)
         if storage_warning:
             st.warning(storage_warning)
+        return True
+
+    if _restore_from_query_token():
         return True
 
     logo_src = _image_data_uri(LOGO_FILE)
@@ -278,6 +333,8 @@ def login():
                     st.warning("Your account is waiting for administrator approval.")
                     return False
 
+                session_token = secrets.token_urlsafe(32)
+                user["session_token_hash"] = _hash_session_token(session_token)
                 user["failed_attempts"] = 0
                 user["last_login"] = _utc_now()
                 if not _try_save_users(users):
@@ -285,7 +342,7 @@ def login():
                         "Signed in, but this deployment could not update the local user audit file. "
                         "Login access is active."
                     )
-                _set_logged_in(username, user)
+                _set_logged_in(username, user, session_token=session_token)
                 st.rerun()
 
             if remember:
