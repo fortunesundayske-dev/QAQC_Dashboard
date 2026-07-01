@@ -19,10 +19,19 @@ USERS_FILE = DATA_DIR / "users.json"
 PROFILE_DIR = DATA_DIR / "profile_photos"
 PBKDF2_ITERATIONS = 260_000
 DEFAULT_ADMIN_PASSWORD = "admin123"
+LOGO_FILE = BASE_DIR / "assets" / "evomec_logo.png"
 
 
 def _utc_now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _image_data_uri(path):
+    try:
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    except OSError:
+        return ""
+    return f"data:image/png;base64,{encoded}"
 
 
 def _ensure_auth_store():
@@ -203,110 +212,146 @@ def login():
             st.warning(storage_warning)
         return True
 
+    logo_src = _image_data_uri(LOGO_FILE)
+    st.markdown('<div class="auth-page">', unsafe_allow_html=True)
+    hero_col, form_col = st.columns([1.05, 1], gap="large")
+
+    with hero_col:
+        logo_html = f'<img class="auth-logo" src="{logo_src}" alt="Evomec logo">' if logo_src else '<div class="auth-logo-text">EVOMEC</div>'
+        st.markdown(
+            f"""
+<div class="auth-hero-panel">
+    {logo_html}
+    <div class="auth-eyebrow auth-eyebrow--pill">Secure QA/QC Access</div>
+    <h1>Evomec QA/QC<br><span>Command Centre</span></h1>
+    <p>A secure, centralized platform for managing project quality, standards, tools, and learning resources - accessible only to authorized personnel.</p>
+    <div class="auth-feature-grid">
+        <div class="auth-feature"><b>PBKDF2 Password Hashing</b><small>Industry-standard encryption for maximum security</small></div>
+        <div class="auth-feature"><b>Admin Approval Gate</b><small>All access requests are reviewed by an administrator</small></div>
+        <div class="auth-feature"><b>Role-Based Access</b><small>Granular permissions ensure users see only what they need</small></div>
+        <div class="auth-feature"><b>Audit-Ready Records</b><small>Complete traceability and audit-ready user activity</small></div>
+    </div>
+    <div class="auth-access-note"><b>Authorized Access Only</b><span>Registration requests are carefully reviewed before access is granted to project records, standards, tools, and learning modules.</span></div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+    with form_col:
+        st.markdown(
+            """
+<div class="auth-card-head">
+    <div class="auth-shield">✓</div>
+    <h2>Welcome Back</h2>
+    <p>Sign in to access the Evomec QA/QC Command Centre</p>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+        access_mode = st.radio(
+            "Access mode",
+            ["Sign in", "Request access"],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="auth_access_mode",
+        )
+
+        if access_mode == "Sign in":
+            username = st.text_input("Username", key="login_username", placeholder="Enter your username").strip().lower()
+            password = st.text_input("Password", type="password", key="login_password", placeholder="Enter your password")
+            remember = st.checkbox("Remember me", key="login_remember")
+            st.markdown('<div class="auth-forgot">Forgot password?</div>', unsafe_allow_html=True)
+
+            if st.button("Sign in", type="primary", use_container_width=True):
+                users = _load_users()
+                user = users.get(username)
+
+                if not user or not _verify_password(password, user):
+                    if user:
+                        user["failed_attempts"] = int(user.get("failed_attempts", 0)) + 1
+                        _try_save_users(users)
+                    st.error("Invalid username or password.")
+                    return False
+
+                if user.get("status") != "approved":
+                    st.warning("Your account is waiting for administrator approval.")
+                    return False
+
+                user["failed_attempts"] = 0
+                user["last_login"] = _utc_now()
+                if not _try_save_users(users):
+                    st.session_state.auth_storage_warning = (
+                        "Signed in, but this deployment could not update the local user audit file. "
+                        "Login access is active."
+                    )
+                _set_logged_in(username, user)
+                st.rerun()
+
+            if remember:
+                pass
+
+            st.markdown('<div class="auth-card-foot">Secure &nbsp;•&nbsp; Private &nbsp;•&nbsp; Protected</div>', unsafe_allow_html=True)
+
+        else:
+            with st.form("registration_form"):
+                name = st.text_input("Full name")
+                username = st.text_input("Preferred username").strip().lower()
+                email = st.text_input("Work email")
+                discipline = st.selectbox(
+                    "Primary discipline",
+                    ["Civil", "Mechanical", "Piping", "Welding", "Electrical", "Instrumentation", "NDT", "Quality Management"],
+                )
+                password = st.text_input("Password", type="password")
+                confirm = st.text_input("Confirm password", type="password")
+                submitted = st.form_submit_button("Submit for approval", use_container_width=True)
+
+            if submitted:
+                users = _load_users()
+                if not name or not username or not email:
+                    st.error("Full name, username, and email are required.")
+                elif username in users:
+                    st.error("That username already exists.")
+                elif password != confirm:
+                    st.error("Passwords do not match.")
+                elif not _valid_password(password):
+                    st.error("Use at least 10 characters with uppercase, lowercase, number, and symbol.")
+                else:
+                    salt = secrets.token_hex(16)
+                    users[username] = {
+                        "username": username,
+                        "email": email,
+                        "name": name,
+                        "role": "user",
+                        "status": "pending",
+                        "password": _hash_password(password, salt),
+                        "salt": salt,
+                        "created_at": _utc_now(),
+                        "approved_at": None,
+                        "approved_by": None,
+                        "profile_photo": None,
+                        "discipline": discipline,
+                        "failed_attempts": 0,
+                        "locked_until": None,
+                    }
+                    if _try_save_users(users):
+                        st.success("Registration submitted. An administrator must approve access before sign in.")
+                    else:
+                        st.error(
+                            "Registration could not be saved on this deployment. "
+                            "Configure persistent storage or redeploy with a writable user store."
+                        )
+
     st.markdown(
         """
-<div class="auth-shell">
-    <div class="auth-panel auth-panel--hero">
-        <div class="auth-eyebrow">Secure QA/QC Access</div>
-        <h1>Evomec QA/QC Command Centre</h1>
-        <p>Approved access only. Registration requests are reviewed by an administrator before users can enter project records, standards, tools, and learning modules.</p>
-        <div class="security-list">
-            <span>PBKDF2 password hashing</span>
-            <span>Admin approval gate</span>
-            <span>Role-based access</span>
-            <span>Audit-ready user records</span>
-        </div>
-    </div>
+<div class="auth-footer">
+    <div><b>Your security is our priority.</b><span>All data is encrypted and access is monitored for compliance.</span></div>
+    <div>© 2026 Evomec. All rights reserved.</div>
+</div>
 </div>
 """,
         unsafe_allow_html=True,
     )
-
-    access_mode = st.radio(
-        "Access mode",
-        ["Sign in", "Request access"],
-        horizontal=True,
-        label_visibility="collapsed",
-        key="auth_access_mode",
-    )
-
-    if access_mode == "Sign in":
-        username = st.text_input("Username", key="login_username").strip().lower()
-        password = st.text_input("Password", type="password", key="login_password")
-
-        if st.button("Sign in", type="primary", use_container_width=True):
-            users = _load_users()
-            user = users.get(username)
-
-            if not user or not _verify_password(password, user):
-                if user:
-                    user["failed_attempts"] = int(user.get("failed_attempts", 0)) + 1
-                    _try_save_users(users)
-                st.error("Invalid username or password.")
-                return False
-
-            if user.get("status") != "approved":
-                st.warning("Your account is waiting for administrator approval.")
-                return False
-
-            user["failed_attempts"] = 0
-            user["last_login"] = _utc_now()
-            if not _try_save_users(users):
-                st.session_state.auth_storage_warning = (
-                    "Signed in, but this deployment could not update the local user audit file. "
-                    "Login access is active."
-                )
-            _set_logged_in(username, user)
-            st.rerun()
-
-    else:
-        with st.form("registration_form"):
-            name = st.text_input("Full name")
-            username = st.text_input("Preferred username").strip().lower()
-            email = st.text_input("Work email")
-            discipline = st.selectbox(
-                "Primary discipline",
-                ["Civil", "Mechanical", "Piping", "Welding", "Electrical", "Instrumentation", "NDT", "Quality Management"],
-            )
-            password = st.text_input("Password", type="password")
-            confirm = st.text_input("Confirm password", type="password")
-            submitted = st.form_submit_button("Submit for approval", use_container_width=True)
-
-        if submitted:
-            users = _load_users()
-            if not name or not username or not email:
-                st.error("Full name, username, and email are required.")
-            elif username in users:
-                st.error("That username already exists.")
-            elif password != confirm:
-                st.error("Passwords do not match.")
-            elif not _valid_password(password):
-                st.error("Use at least 10 characters with uppercase, lowercase, number, and symbol.")
-            else:
-                salt = secrets.token_hex(16)
-                users[username] = {
-                    "username": username,
-                    "email": email,
-                    "name": name,
-                    "role": "user",
-                    "status": "pending",
-                    "password": _hash_password(password, salt),
-                    "salt": salt,
-                    "created_at": _utc_now(),
-                    "approved_at": None,
-                    "approved_by": None,
-                    "profile_photo": None,
-                    "discipline": discipline,
-                    "failed_attempts": 0,
-                    "locked_until": None,
-                }
-                if _try_save_users(users):
-                    st.success("Registration submitted. An administrator must approve access before sign in.")
-                else:
-                    st.error(
-                        "Registration could not be saved on this deployment. "
-                        "Configure persistent storage or redeploy with a writable user store."
-                    )
 
     return False
 
