@@ -210,12 +210,17 @@ with tab_email:
         test_clicked = test_col.form_submit_button("Save and send trial email", use_container_width=True)
 
     if save_clicked or test_clicked:
+        port_value = str(smtp_port).strip()
         if not smtp_host or not smtp_port or not smtp_user or not smtp_password:
             st.error("SMTP host, port, sender mailbox, and password are required.")
+        elif ssl and port_value != "465":
+            st.error("SSL is only for port 465. For Microsoft 365 port 587, uncheck SSL and keep STARTTLS checked.")
+        elif starttls and ssl:
+            st.error("Choose either STARTTLS or SSL, not both. For Microsoft 365, use STARTTLS only.")
         else:
             config = {
                 "SMTP_HOST": smtp_host.strip(),
-                "SMTP_PORT": str(smtp_port).strip(),
+                "SMTP_PORT": port_value,
                 "SMTP_USER": smtp_user.strip(),
                 "SMTP_PASSWORD": smtp_password,
                 "SMTP_FROM": (smtp_from or smtp_user).strip(),

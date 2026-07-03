@@ -64,6 +64,7 @@ def smtp_setting(name, fallback=None):
         "SMTP_PASSWORD": "QAQC_SMTP_PASSWORD",
         "SMTP_FROM": "QAQC_SMTP_FROM",
         "SMTP_SSL": "QAQC_SMTP_SSL",
+        "SMTP_STARTTLS": "QAQC_SMTP_STARTTLS",
     }
     alias = aliases.get(name)
     if alias and os.getenv(alias):
@@ -208,9 +209,11 @@ def send_email(message):
 
     port = int(smtp_setting("SMTP_PORT", "587"))
     use_ssl = smtp_setting("SMTP_SSL", "0") == "1" or port == 465
+    if use_ssl and port != 465:
+        raise RuntimeError("SSL is only for port 465. For Microsoft 365 port 587, uncheck SSL and check STARTTLS.")
     smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
     with smtp_class(host, port, timeout=20) as smtp:
-        if not use_ssl and os.getenv("SMTP_STARTTLS", "1") == "1":
+        if not use_ssl and smtp_setting("SMTP_STARTTLS", "1") == "1":
             smtp.starttls()
         if smtp_user and smtp_password:
             try:
