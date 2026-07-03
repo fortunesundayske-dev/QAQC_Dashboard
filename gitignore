@@ -9,6 +9,9 @@ venv/
 # Streamlit
 .streamlit/
 
+# Local SMTP settings
+data/smtp_config.json
+
 # Excel temp files
 ~$*
 

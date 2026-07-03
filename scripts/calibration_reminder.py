@@ -14,6 +14,7 @@ import pandas as pd
 BASE_DIR = Path(__file__).resolve().parents[1]
 EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 ACK_FILE = BASE_DIR / "data" / "calibration_acknowledgements.json"
+SMTP_CONFIG_FILE = BASE_DIR / "data" / "smtp_config.json"
 USERS_FILE = BASE_DIR / "data" / "users.json"
 COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
 MANDATORY_RECIPIENTS = [
@@ -36,6 +37,39 @@ def read_acknowledgements():
 def write_acknowledgements(payload):
     ACK_FILE.parent.mkdir(parents=True, exist_ok=True)
     ACK_FILE.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def read_smtp_config():
+    if not SMTP_CONFIG_FILE.exists():
+        return {}
+    try:
+        config = json.loads(SMTP_CONFIG_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return config if isinstance(config, dict) else {}
+
+
+def write_smtp_config(config):
+    SMTP_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    SMTP_CONFIG_FILE.write_text(json.dumps(config, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def smtp_setting(name, fallback=None):
+    if os.getenv(name):
+        return os.getenv(name)
+    aliases = {
+        "SMTP_HOST": "QAQC_SMTP_HOST",
+        "SMTP_PORT": "QAQC_SMTP_PORT",
+        "SMTP_USER": "QAQC_SMTP_USER",
+        "SMTP_PASSWORD": "QAQC_SMTP_PASSWORD",
+        "SMTP_FROM": "QAQC_SMTP_FROM",
+        "SMTP_SSL": "QAQC_SMTP_SSL",
+    }
+    alias = aliases.get(name)
+    if alias and os.getenv(alias):
+        return os.getenv(alias)
+    config = read_smtp_config()
+    return config.get(name, fallback)
 
 
 def is_completed(value):
@@ -149,26 +183,31 @@ def registered_email_recipients():
 
 
 def send_email(message):
-    configured = os.getenv("CALIBRATION_EMAIL_TO", "")
+    configured = smtp_setting("CALIBRATION_EMAIL_TO", "")
     recipients = [item.strip() for item in configured.split(",") if item.strip()]
     if not recipients:
         recipients = registered_email_recipients()
-    host = os.getenv("SMTP_HOST") or os.getenv("QAQC_SMTP_HOST")
+    host = smtp_setting("SMTP_HOST")
     if not recipients or not host:
-        return
+        missing = []
+        if not recipients:
+            missing.append("email recipients")
+        if not host:
+            missing.append("SMTP host")
+        raise RuntimeError("Cannot send calibration email. Missing " + " and ".join(missing) + ".")
 
     email = EmailMessage()
     email["Subject"] = "Calibration reminder - equipment due for calibration"
-    smtp_user = os.getenv("SMTP_USER") or os.getenv("QAQC_SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD") or os.getenv("QAQC_SMTP_PASSWORD")
-    sender_address = os.getenv("SMTP_FROM") or os.getenv("QAQC_SMTP_FROM") or smtp_user or "calibration-reminder@localhost"
-    sender_name = os.getenv("CALIBRATION_EMAIL_FROM_NAME", "KPKAUE Fortune QA")
+    smtp_user = smtp_setting("SMTP_USER")
+    smtp_password = smtp_setting("SMTP_PASSWORD")
+    sender_address = smtp_setting("SMTP_FROM") or smtp_user or "calibration-reminder@localhost"
+    sender_name = smtp_setting("CALIBRATION_EMAIL_FROM_NAME", "KPKAUE Fortune QA")
     email["From"] = formataddr((sender_name, sender_address))
     email["To"] = ", ".join(recipients)
     email.set_content(message)
 
-    port = int(os.getenv("SMTP_PORT") or os.getenv("QAQC_SMTP_PORT") or "587")
-    use_ssl = os.getenv("SMTP_SSL") == "1" or os.getenv("QAQC_SMTP_SSL") == "1" or port == 465
+    port = int(smtp_setting("SMTP_PORT", "587"))
+    use_ssl = smtp_setting("SMTP_SSL", "0") == "1" or port == 465
     smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
     with smtp_class(host, port, timeout=20) as smtp:
         if not use_ssl and os.getenv("SMTP_STARTTLS", "1") == "1":

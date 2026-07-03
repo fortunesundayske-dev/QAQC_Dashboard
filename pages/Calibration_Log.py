@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import os
+import sys
 
 import pandas as pd
 import streamlit as st
@@ -19,6 +20,12 @@ from utils import (
 )
 
 
+BASE_DIR = Path(__file__).parents[1]
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+from scripts import calibration_reminder
+
+
 st.set_page_config(page_title="Calibration Log", layout="wide")
 inject_global_ui()
 
@@ -29,8 +36,8 @@ render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
-DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
-USERS_FILE = Path(__file__).parents[1] / "data" / "users.json"
+DATA_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
+USERS_FILE = BASE_DIR / "data" / "users.json"
 MANDATORY_CALIBRATION_EMAILS = [
     "allison.okosun@evomeclimited.com",
     "lawrence.esievo@evomeclimited.com",
@@ -55,6 +62,10 @@ def approved_notification_emails():
     )
     return sorted(recipients)
 
+
+def smtp_configured():
+    return bool(calibration_reminder.smtp_setting("SMTP_HOST"))
+
 st.title("Calibration Log")
 st.markdown("Monitor equipment calibration status, overdue items, and reminder actions.")
 
@@ -70,7 +81,7 @@ metric_4.metric("Due in 21 days", summary["due_in_21_days"])
 metric_5.metric("Snoozed", summary["snoozed"])
 
 email_recipients = approved_notification_emails()
-smtp_ready = bool(os.getenv("SMTP_HOST") or os.getenv("QAQC_SMTP_HOST"))
+smtp_ready = smtp_configured()
 if email_recipients and smtp_ready:
     st.success("Email reminders will be sent to: " + ", ".join(email_recipients))
 elif email_recipients:
@@ -99,7 +110,7 @@ display_cols = [
     "Snoozed_Until",
 ]
 
-tab_alerts, tab_overdue, tab_all = st.tabs(["Reminder Actions", "Overdue Equipment", "All Calibration Records"])
+tab_alerts, tab_overdue, tab_all, tab_email = st.tabs(["Reminder Actions", "Overdue Equipment", "All Calibration Records", "Email Setup"])
 
 with tab_alerts:
     if reminders.empty:
@@ -171,3 +182,55 @@ with tab_all:
         visible = visible[mask]
 
     st.dataframe(visible[display_cols], use_container_width=True, hide_index=True, height=520)
+
+with tab_email:
+    st.markdown("#### Calibration email setup")
+    st.caption("Settings are saved on this PC for the scheduled reminder and trial email.")
+    existing = calibration_reminder.read_smtp_config()
+
+    with st.form("smtp_setup_form"):
+        col_a, col_b = st.columns(2)
+        with col_a:
+            smtp_host = st.text_input("SMTP host", value=existing.get("SMTP_HOST", "smtp.office365.com"))
+            smtp_port = st.text_input("SMTP port", value=str(existing.get("SMTP_PORT", "587")))
+            smtp_user = st.text_input("Sender mailbox / username", value=existing.get("SMTP_USER", ""))
+            smtp_from = st.text_input("Sender email address", value=existing.get("SMTP_FROM", existing.get("SMTP_USER", "")))
+        with col_b:
+            from_name = st.text_input("Sender display name", value=existing.get("CALIBRATION_EMAIL_FROM_NAME", "KPKAUE Fortune QA"))
+            smtp_password = st.text_input("SMTP password or app password", type="password", value=existing.get("SMTP_PASSWORD", ""))
+            starttls = st.checkbox("Use STARTTLS", value=existing.get("SMTP_STARTTLS", "1") == "1")
+            ssl = st.checkbox("Use SSL", value=existing.get("SMTP_SSL", "0") == "1")
+
+        save_col, test_col = st.columns(2)
+        save_clicked = save_col.form_submit_button("Save SMTP settings", use_container_width=True)
+        test_clicked = test_col.form_submit_button("Save and send trial email", use_container_width=True)
+
+    if save_clicked or test_clicked:
+        if not smtp_host or not smtp_port or not smtp_user or not smtp_password:
+            st.error("SMTP host, port, sender mailbox, and password are required.")
+        else:
+            config = {
+                "SMTP_HOST": smtp_host.strip(),
+                "SMTP_PORT": str(smtp_port).strip(),
+                "SMTP_USER": smtp_user.strip(),
+                "SMTP_PASSWORD": smtp_password,
+                "SMTP_FROM": (smtp_from or smtp_user).strip(),
+                "SMTP_STARTTLS": "1" if starttls else "0",
+                "SMTP_SSL": "1" if ssl else "0",
+                "CALIBRATION_EMAIL_FROM_NAME": from_name.strip() or "KPKAUE Fortune QA",
+            }
+            calibration_reminder.write_smtp_config(config)
+            st.success("SMTP settings saved.")
+
+            if test_clicked:
+                try:
+                    records = calibration_reminder.load_due_records()
+                    sample = records.head(10) if not records.empty else records
+                    message = calibration_reminder.message_from_records(sample, limit=None)
+                    calibration_reminder.send_email(message)
+                    st.success(f"Trial email sent to: {', '.join(calibration_reminder.registered_email_recipients())}")
+                except Exception as exc:
+                    st.error(f"Trial email failed: {exc}")
+
+    st.markdown("#### Email loop")
+    st.write(", ".join(approved_notification_emails()))
