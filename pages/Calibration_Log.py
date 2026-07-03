@@ -31,23 +31,29 @@ getattr(auth, "render_user_sidebar", lambda: None)()
 
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
 USERS_FILE = Path(__file__).parents[1] / "data" / "users.json"
+MANDATORY_CALIBRATION_EMAILS = [
+    "allison.okosun@evomeclimited.com",
+    "lawrence.esievo@evomeclimited.com",
+    "PMC.QAQC@evomeclimited.com",
+    "theophilus.o@evomeclimited.com",
+]
 data = load_master_data(DATA_FILE)
 log = get_calibration_log(data)
 summary = get_calibration_summary(data)
 
 
 def approved_notification_emails():
+    recipients = set(MANDATORY_CALIBRATION_EMAILS)
     try:
         users = json.loads(USERS_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return []
-    return sorted(
-        {
-            str(user.get("email", "")).strip()
-            for user in users.values()
-            if user.get("status") == "approved" and str(user.get("email", "")).strip()
-        }
+        return sorted(recipients)
+    recipients.update(
+        str(user.get("email", "")).strip()
+        for user in users.values()
+        if user.get("status") == "approved" and str(user.get("email", "")).strip()
     )
+    return sorted(recipients)
 
 st.title("Calibration Log")
 st.markdown("Monitor equipment calibration status, overdue items, and reminder actions.")

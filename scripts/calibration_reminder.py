@@ -4,6 +4,7 @@ import smtplib
 import subprocess
 from datetime import date, timedelta
 from email.message import EmailMessage
+from email.utils import formataddr
 from pathlib import Path
 from urllib import request
 
@@ -15,6 +16,12 @@ EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 ACK_FILE = BASE_DIR / "data" / "calibration_acknowledgements.json"
 USERS_FILE = BASE_DIR / "data" / "users.json"
 COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
+MANDATORY_RECIPIENTS = [
+    "allison.okosun@evomeclimited.com",
+    "lawrence.esievo@evomeclimited.com",
+    "PMC.QAQC@evomeclimited.com",
+    "theophilus.o@evomeclimited.com",
+]
 
 
 def read_acknowledgements():
@@ -34,6 +41,12 @@ def write_acknowledgements(payload):
 def is_completed(value):
     status = str(value or "").lower()
     return any(term in status for term in COMPLETE_TERMS)
+
+
+def clean_text(value):
+    if pd.isna(value):
+        return ""
+    return str(value).strip()
 
 
 def load_due_records():
@@ -65,7 +78,7 @@ def load_due_records():
     return pd.DataFrame(active_rows)
 
 
-def message_from_records(records):
+def message_from_records(records, limit=8):
     overdue = int((records["Days_Until_Due"] < 0).sum())
     due_21 = int((records["Days_Until_Due"] == 21).sum())
     due_soon = int(((records["Days_Until_Due"] >= 0) & (records["Days_Until_Due"] < 21)).sum())
@@ -76,13 +89,34 @@ def message_from_records(records):
         f"Due within 21 days: {due_soon}",
         "",
     ]
-    for _, row in records.head(8).iterrows():
+    visible_records = records if limit is None else records.head(limit)
+    for _, row in visible_records.iterrows():
         due_date = pd.Timestamp(row["Next_Due_Date"]).strftime("%Y-%m-%d")
-        equipment = str(row.get("Equipment_Type", "Equipment")).strip()
-        serial = str(row.get("Serial_No", "")).strip()
-        lines.append(f"- {equipment} {serial} due {due_date}")
-    if len(records) > 8:
-        lines.append(f"- plus {len(records) - 8} more")
+        project = clean_text(row.get("Project", ""))
+        category = clean_text(row.get("Equipment_Category", ""))
+        equipment = clean_text(row.get("Equipment_Type", "Equipment")) or "Equipment"
+        model = clean_text(row.get("Make_Model", ""))
+        serial = clean_text(row.get("Serial_No", ""))
+        cert = clean_text(row.get("Certificate_No", ""))
+        days = int(row.get("Days_Until_Due", 0))
+        status = "Overdue" if days < 0 else f"Due in {days} day(s)"
+        details = [
+            f"Equipment: {equipment}",
+            f"Serial: {serial or 'N/A'}",
+            f"Due: {due_date}",
+            f"Status: {status}",
+        ]
+        if project:
+            details.append(f"Project: {project}")
+        if category:
+            details.append(f"Category: {category}")
+        if model:
+            details.append(f"Model: {model}")
+        if cert:
+            details.append(f"Certificate: {cert}")
+        lines.append("- " + " | ".join(details))
+    if limit is not None and len(records) > limit:
+        lines.append(f"- plus {len(records) - limit} more")
     return "\n".join(lines)
 
 
@@ -100,13 +134,13 @@ def show_desktop_prompt(message):
 
 
 def registered_email_recipients():
+    recipients = list(MANDATORY_RECIPIENTS)
     if not USERS_FILE.exists():
-        return []
+        return sorted(set(recipients))
     try:
         users = json.loads(USERS_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return []
-    recipients = []
+        return sorted(set(recipients))
     for user in users.values():
         email = str(user.get("email", "")).strip()
         if email and user.get("status") == "approved":
@@ -124,10 +158,12 @@ def send_email(message):
         return
 
     email = EmailMessage()
-    email["Subject"] = "Calibration reminder"
+    email["Subject"] = "Calibration reminder - equipment due for calibration"
     smtp_user = os.getenv("SMTP_USER") or os.getenv("QAQC_SMTP_USER")
     smtp_password = os.getenv("SMTP_PASSWORD") or os.getenv("QAQC_SMTP_PASSWORD")
-    email["From"] = os.getenv("SMTP_FROM") or os.getenv("QAQC_SMTP_FROM") or smtp_user or "calibration-reminder@localhost"
+    sender_address = os.getenv("SMTP_FROM") or os.getenv("QAQC_SMTP_FROM") or smtp_user or "calibration-reminder@localhost"
+    sender_name = os.getenv("CALIBRATION_EMAIL_FROM_NAME", "KPKAUE Fortune QA")
+    email["From"] = formataddr((sender_name, sender_address))
     email["To"] = ", ".join(recipients)
     email.set_content(message)
 
@@ -164,10 +200,11 @@ def main():
     records = load_due_records()
     if records.empty:
         return
-    message = message_from_records(records)
-    show_desktop_prompt(message)
-    send_email(message)
-    send_teams(message)
+    popup_message = message_from_records(records, limit=8)
+    email_message = message_from_records(records, limit=None)
+    show_desktop_prompt(popup_message)
+    send_email(email_message)
+    send_teams(popup_message)
     mark_notified(records)
 
 
