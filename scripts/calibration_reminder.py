@@ -119,22 +119,26 @@ def send_email(message):
     recipients = [item.strip() for item in configured.split(",") if item.strip()]
     if not recipients:
         recipients = registered_email_recipients()
-    host = os.getenv("SMTP_HOST")
+    host = os.getenv("SMTP_HOST") or os.getenv("QAQC_SMTP_HOST")
     if not recipients or not host:
         return
 
     email = EmailMessage()
     email["Subject"] = "Calibration reminder"
-    email["From"] = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "calibration-reminder@localhost"))
+    smtp_user = os.getenv("SMTP_USER") or os.getenv("QAQC_SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD") or os.getenv("QAQC_SMTP_PASSWORD")
+    email["From"] = os.getenv("SMTP_FROM") or os.getenv("QAQC_SMTP_FROM") or smtp_user or "calibration-reminder@localhost"
     email["To"] = ", ".join(recipients)
     email.set_content(message)
 
-    port = int(os.getenv("SMTP_PORT", "587"))
-    with smtplib.SMTP(host, port, timeout=20) as smtp:
-        if os.getenv("SMTP_STARTTLS", "1") == "1":
+    port = int(os.getenv("SMTP_PORT") or os.getenv("QAQC_SMTP_PORT") or "587")
+    use_ssl = os.getenv("SMTP_SSL") == "1" or os.getenv("QAQC_SMTP_SSL") == "1" or port == 465
+    smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+    with smtp_class(host, port, timeout=20) as smtp:
+        if not use_ssl and os.getenv("SMTP_STARTTLS", "1") == "1":
             smtp.starttls()
-        if os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD"):
-            smtp.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASSWORD"))
+        if smtp_user and smtp_password:
+            smtp.login(smtp_user, smtp_password)
         smtp.send_message(email)
 
 

@@ -132,6 +132,8 @@ def get_calibration_log(data):
         if saved.get("note"):
             log.at[index, "Notification_Notes"] = saved.get("note")
 
+    missing_reminders = log["Reminder_Date"].isna() & log["Next_Due_Date"].notna()
+    log.loc[missing_reminders, "Reminder_Date"] = log.loc[missing_reminders, "Next_Due_Date"] - pd.Timedelta(days=21)
     log["Days_Until_Due"] = (log["Next_Due_Date"].dt.normalize() - _today()).dt.days
     log["Alert_Status"] = log.apply(_calibration_alert_status, axis=1)
     log["Is_Completed"] = log["Status"].apply(calibration_record_completed)

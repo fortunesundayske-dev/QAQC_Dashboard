@@ -1,4 +1,6 @@
 from pathlib import Path
+import json
+import os
 
 import pandas as pd
 import streamlit as st
@@ -28,9 +30,24 @@ render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
+USERS_FILE = Path(__file__).parents[1] / "data" / "users.json"
 data = load_master_data(DATA_FILE)
 log = get_calibration_log(data)
 summary = get_calibration_summary(data)
+
+
+def approved_notification_emails():
+    try:
+        users = json.loads(USERS_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return sorted(
+        {
+            str(user.get("email", "")).strip()
+            for user in users.values()
+            if user.get("status") == "approved" and str(user.get("email", "")).strip()
+        }
+    )
 
 st.title("Calibration Log")
 st.markdown("Monitor equipment calibration status, overdue items, and reminder actions.")
@@ -45,6 +62,15 @@ metric_2.metric("Active records", summary["active"])
 metric_3.metric("Overdue", summary["overdue"])
 metric_4.metric("Due in 21 days", summary["due_in_21_days"])
 metric_5.metric("Snoozed", summary["snoozed"])
+
+email_recipients = approved_notification_emails()
+smtp_ready = bool(os.getenv("SMTP_HOST") or os.getenv("QAQC_SMTP_HOST"))
+if email_recipients and smtp_ready:
+    st.success("Email reminders will be sent to: " + ", ".join(email_recipients))
+elif email_recipients:
+    st.info("Email reminder recipients: " + ", ".join(email_recipients) + ". Configure SMTP to send emails automatically.")
+else:
+    st.warning("No approved user email is available for calibration reminders.")
 
 reminders = get_calibration_reminders(data)
 overdue = reminders[reminders["Days_Until_Due"] < 0]
