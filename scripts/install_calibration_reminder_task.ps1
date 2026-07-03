@@ -4,6 +4,10 @@ $ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Pa
 $Python = "C:\Users\evome\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
 $ReminderScript = Join-Path $ProjectRoot "scripts\calibration_reminder.py"
 $TaskName = "QAQC Calibration Reminder"
+$CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+if ([string]::IsNullOrWhiteSpace($CurrentUser)) {
+    $CurrentUser = "$env:USERDOMAIN\$env:USERNAME"
+}
 
 if (-not (Test-Path -LiteralPath $Python)) {
     throw "Python runtime not found: $Python"
@@ -15,8 +19,8 @@ if (-not (Test-Path -LiteralPath $ReminderScript)) {
 
 $Action = New-ScheduledTaskAction -Execute $Python -Argument "`"$ReminderScript`"" -WorkingDirectory $ProjectRoot
 $Trigger = New-ScheduledTaskTrigger -Daily -At 9:00AM
-$Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+$Principal = New-ScheduledTaskPrincipal -UserId $CurrentUser -LogonType Interactive -RunLevel Limited
 $Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew
 
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Force | Out-Null
-Write-Host "Installed '$TaskName'. It will check calibration reminders every day at 9:00 AM."
+Write-Host "Installed '$TaskName' for $CurrentUser. It will check calibration reminders every day at 9:00 AM."
