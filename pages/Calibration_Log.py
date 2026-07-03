@@ -41,6 +41,7 @@ USERS_FILE = BASE_DIR / "data" / "users.json"
 MANDATORY_CALIBRATION_EMAILS = [
     "allison.okosun@evomeclimited.com",
     "fortune.kpakue@evomeclimited.com",
+    "fortunesundayske@outlook.com",
     "lawrence.esievo@evomeclimited.com",
     "PMC.QAQC@evomeclimited.com",
     "theophilus.o@evomeclimited.com",

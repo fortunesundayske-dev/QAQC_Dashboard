@@ -20,6 +20,7 @@ COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
 MANDATORY_RECIPIENTS = [
     "allison.okosun@evomeclimited.com",
     "fortune.kpakue@evomeclimited.com",
+    "fortunesundayske@outlook.com",
     "lawrence.esievo@evomeclimited.com",
     "PMC.QAQC@evomeclimited.com",
     "theophilus.o@evomeclimited.com",
