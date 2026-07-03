@@ -19,6 +19,7 @@ USERS_FILE = BASE_DIR / "data" / "users.json"
 COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
 MANDATORY_RECIPIENTS = [
     "allison.okosun@evomeclimited.com",
+    "fortune.kpakue@evomeclimited.com",
     "lawrence.esievo@evomeclimited.com",
     "PMC.QAQC@evomeclimited.com",
     "theophilus.o@evomeclimited.com",
@@ -210,7 +211,7 @@ def send_email(message):
     port = int(smtp_setting("SMTP_PORT", "587"))
     use_ssl = smtp_setting("SMTP_SSL", "0") == "1" or port == 465
     if use_ssl and port != 465:
-        raise RuntimeError("SSL is only for port 465. For Microsoft 365 port 587, uncheck SSL and check STARTTLS.")
+        raise RuntimeError("SSL is only for port 465. For Outlook port 587, uncheck SSL and check STARTTLS.")
     smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
     with smtp_class(host, port, timeout=20) as smtp:
         if not use_ssl and smtp_setting("SMTP_STARTTLS", "1") == "1":
@@ -220,8 +221,8 @@ def send_email(message):
                 smtp.login(smtp_user, smtp_password)
             except smtplib.SMTPAuthenticationError as exc:
                 raise RuntimeError(
-                    "Microsoft 365 rejected the SMTP login. Check the sender mailbox, password/app password, "
-                    "and confirm Authenticated SMTP is enabled for that mailbox."
+                    "Outlook rejected the SMTP login. Check the full sender email address, password/app password, "
+                    "and confirm SMTP sending is enabled for that mailbox."
                 ) from exc
         smtp.send_message(email)
 

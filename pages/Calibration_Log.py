@@ -40,6 +40,7 @@ DATA_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 USERS_FILE = BASE_DIR / "data" / "users.json"
 MANDATORY_CALIBRATION_EMAILS = [
     "allison.okosun@evomeclimited.com",
+    "fortune.kpakue@evomeclimited.com",
     "lawrence.esievo@evomeclimited.com",
     "PMC.QAQC@evomeclimited.com",
     "theophilus.o@evomeclimited.com",
@@ -187,15 +188,16 @@ with tab_email:
     st.markdown("#### Calibration email setup")
     st.caption("Settings are saved on this PC for the scheduled reminder and trial email.")
     st.info(
-        "For Microsoft 365, use `smtp.office365.com`, port `587`, STARTTLS enabled, and the sender mailbox password or app password. "
-        "If login fails with `535 5.7.3`, enable Authenticated SMTP for the sender mailbox or use an app password."
+        "For Outlook.com/Hotmail, use `smtp-mail.outlook.com`, port `587`, STARTTLS enabled. "
+        "For Microsoft 365 work mail, use `smtp.office365.com`, port `587`, STARTTLS enabled. "
+        "Use the full sender email address as the username. If MFA is on, use an app password."
     )
     existing = calibration_reminder.read_smtp_config()
 
     with st.form("smtp_setup_form"):
         col_a, col_b = st.columns(2)
         with col_a:
-            smtp_host = st.text_input("SMTP host", value=existing.get("SMTP_HOST", "smtp.office365.com"))
+            smtp_host = st.text_input("SMTP host", value=existing.get("SMTP_HOST", "smtp-mail.outlook.com"))
             smtp_port = st.text_input("SMTP port", value=str(existing.get("SMTP_PORT", "587")))
             smtp_user = st.text_input("Sender mailbox / username", value=existing.get("SMTP_USER", ""))
             smtp_from = st.text_input("Sender email address", value=existing.get("SMTP_FROM", existing.get("SMTP_USER", "")))
@@ -214,9 +216,9 @@ with tab_email:
         if not smtp_host or not smtp_port or not smtp_user or not smtp_password:
             st.error("SMTP host, port, sender mailbox, and password are required.")
         elif ssl and port_value != "465":
-            st.error("SSL is only for port 465. For Microsoft 365 port 587, uncheck SSL and keep STARTTLS checked.")
+            st.error("SSL is only for port 465. For Outlook port 587, uncheck SSL and keep STARTTLS checked.")
         elif starttls and ssl:
-            st.error("Choose either STARTTLS or SSL, not both. For Microsoft 365, use STARTTLS only.")
+            st.error("Choose either STARTTLS or SSL, not both. For Outlook port 587, use STARTTLS only.")
         else:
             config = {
                 "SMTP_HOST": smtp_host.strip(),

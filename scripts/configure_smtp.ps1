@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$DefaultHost = "smtp.office365.com"
+$DefaultHost = "smtp-mail.outlook.com"
 $DefaultPort = "587"
 $DefaultSenderName = "KPKAUE Fortune QA"
 
@@ -23,7 +23,8 @@ function Set-UserEnv($Name, $Value) {
 }
 
 Write-Host "SMTP setup for QA/QC calibration reminder emails" -ForegroundColor Cyan
-Write-Host "For Microsoft 365, use smtp.office365.com, port 587, STARTTLS enabled." -ForegroundColor DarkGray
+Write-Host "For Outlook.com/Hotmail, use smtp-mail.outlook.com, port 587, STARTTLS enabled." -ForegroundColor DarkGray
+Write-Host "For Microsoft 365 work mail, use smtp.office365.com, port 587, STARTTLS enabled." -ForegroundColor DarkGray
 Write-Host ""
 
 $HostName = Read-WithDefault "SMTP host" $DefaultHost
