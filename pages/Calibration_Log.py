@@ -186,6 +186,10 @@ with tab_all:
 with tab_email:
     st.markdown("#### Calibration email setup")
     st.caption("Settings are saved on this PC for the scheduled reminder and trial email.")
+    st.info(
+        "For Microsoft 365, use `smtp.office365.com`, port `587`, STARTTLS enabled, and the sender mailbox password or app password. "
+        "If login fails with `535 5.7.3`, enable Authenticated SMTP for the sender mailbox or use an app password."
+    )
     existing = calibration_reminder.read_smtp_config()
 
     with st.form("smtp_setup_form"):

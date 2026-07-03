@@ -213,7 +213,13 @@ def send_email(message):
         if not use_ssl and os.getenv("SMTP_STARTTLS", "1") == "1":
             smtp.starttls()
         if smtp_user and smtp_password:
-            smtp.login(smtp_user, smtp_password)
+            try:
+                smtp.login(smtp_user, smtp_password)
+            except smtplib.SMTPAuthenticationError as exc:
+                raise RuntimeError(
+                    "Microsoft 365 rejected the SMTP login. Check the sender mailbox, password/app password, "
+                    "and confirm Authenticated SMTP is enabled for that mailbox."
+                ) from exc
         smtp.send_message(email)
 
 
