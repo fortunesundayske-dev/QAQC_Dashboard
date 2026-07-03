@@ -129,6 +129,16 @@ def _verify_password(password, user):
     return hmac.compare_digest(candidate, expected)
 
 
+def _find_user_by_login(users, identifier):
+    login_id = str(identifier or "").strip().lower()
+    if login_id in users:
+        return login_id, users[login_id]
+    for username, user in users.items():
+        if str(user.get("email", "")).strip().lower() == login_id:
+            return username, user
+    return None, None
+
+
 def _valid_password(password):
     checks = [
         len(password) >= 10,
@@ -156,7 +166,7 @@ def _send_approval_email(user):
     msg.set_content(
         f"Hello {user['name']},\n\n"
         "Your QA/QC Dashboard account has been approved. "
-        "You can now sign in with your registered username.\n\n"
+        "You can now sign in with your registered username or work email.\n\n"
         "Regards,\nQA/QC Dashboard Security"
     )
 
@@ -313,14 +323,14 @@ def login():
         )
 
         if access_mode == "Sign in":
-            username = st.text_input("Username", key="login_username", placeholder="Enter your username").strip().lower()
+            username = st.text_input("Username or work email", key="login_username", placeholder="Enter your username or work email").strip().lower()
             password = st.text_input("Password", type="password", key="login_password", placeholder="Enter your password")
             remember = st.checkbox("Remember me", key="login_remember")
             st.markdown('<div class="auth-forgot">Forgot password?</div>', unsafe_allow_html=True)
 
             if st.button("Sign in", type="primary", use_container_width=True):
                 users = _load_users()
-                user = users.get(username)
+                username, user = _find_user_by_login(users, username)
 
                 if not user or not _verify_password(password, user):
                     if user:

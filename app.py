@@ -27,7 +27,8 @@ from utils import (
     render_table,
     render_top_nav,
     get_navigation_pages,
-    render_navigation
+    render_navigation,
+    get_calibration_summary,
 )
 
 
@@ -543,6 +544,13 @@ except FileNotFoundError as err:
 
 filtered_data = global_filter_sidebar(data)
 projects = extract_projects(filtered_data)
+calibration_summary = get_calibration_summary(data)
+
+if calibration_summary.get("reminders", 0):
+    st.warning(
+        f"Calibration reminder: {calibration_summary['reminders']} equipment item(s) need attention. "
+        f"{calibration_summary['overdue']} overdue, {calibration_summary['due_in_21_days']} due exactly 21 days from today."
+    )
 
 ncr = filtered_data.get("NCR Log", pd.DataFrame())
 obs = filtered_data.get("OBS Log", pd.DataFrame())
@@ -578,6 +586,7 @@ metric_html = [
     metric_card("Open OBS", open_obs, "Field observations", "#f97316", "O", metric_delta(open_obs, open_obs + closed_obs)),
     metric_card("Daily Reports", len(daily), "Records loaded", "#7c3aed", "R", "28% vs last month"),
     metric_card("Concrete Volume (m3)", compact_number(concrete_volume_total), "Actual tracker total", "#0ea5e9", "C", "Concrete page"),
+    metric_card("Calibration Alerts", calibration_summary.get("reminders", 0), "Due within 21 days", "#dc2626", "!", f"{calibration_summary.get('overdue', 0)} overdue"),
 ]
 
 concrete_monthly = monthly_sum(concrete, ["Date", "Pour_Date", "Report_Date"], "Volume")
@@ -630,6 +639,7 @@ quick_links = [
     ("OBS Register", "pages/OBS_Tracker.py", "#f97316", "O"),
     ("Daily Reports", "pages/Daily_Reports.py", "#7c3aed", "R"),
     ("Concrete Tracker", "pages/Concrete_Tracker.py", "#0ea5e9", "C"),
+    ("Calibration Log", "pages/Calibration_Log.py", "#dc2626", "!"),
     ("Audit Schedule", "pages/Audit_Surveillance.py", "#22c55e", "A"),
     ("Document Library", "pages/Document_Status.py", "#2563eb", "D"),
 ]

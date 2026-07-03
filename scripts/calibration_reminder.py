@@ -1,0 +1,171 @@
+import json
+import os
+import smtplib
+import subprocess
+from datetime import date, timedelta
+from email.message import EmailMessage
+from pathlib import Path
+from urllib import request
+
+import pandas as pd
+
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
+ACK_FILE = BASE_DIR / "data" / "calibration_acknowledgements.json"
+USERS_FILE = BASE_DIR / "data" / "users.json"
+COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
+
+
+def read_acknowledgements():
+    if not ACK_FILE.exists():
+        return {}
+    try:
+        return json.loads(ACK_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def write_acknowledgements(payload):
+    ACK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ACK_FILE.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def is_completed(value):
+    status = str(value or "").lower()
+    return any(term in status for term in COMPLETE_TERMS)
+
+
+def load_due_records():
+    if not EXCEL_FILE.exists():
+        return pd.DataFrame()
+
+    df = pd.read_excel(EXCEL_FILE, sheet_name="Calibration Log")
+    if df.empty or "Next_Due_Date" not in df.columns:
+        return pd.DataFrame()
+
+    today = pd.Timestamp(date.today())
+    df["Next_Due_Date"] = pd.to_datetime(df["Next_Due_Date"], errors="coerce")
+    df["Days_Until_Due"] = (df["Next_Due_Date"].dt.normalize() - today).dt.days
+    df["Status"] = df.get("Status", "")
+    df = df[df["Next_Due_Date"].notna() & (~df["Status"].apply(is_completed)) & (df["Days_Until_Due"] <= 21)].copy()
+
+    acknowledgements = read_acknowledgements()
+    active_rows = []
+    for _, row in df.iterrows():
+        record_id = str(row.get("Calibration_ID", "")).strip()
+        saved = acknowledgements.get(record_id, {})
+        snoozed_until = pd.to_datetime(saved.get("snoozed_until"), errors="coerce")
+        if pd.notna(snoozed_until) and snoozed_until.date() >= date.today():
+            continue
+        if saved.get("last_notified_on") == date.today().isoformat():
+            continue
+        active_rows.append(row)
+
+    return pd.DataFrame(active_rows)
+
+
+def message_from_records(records):
+    overdue = int((records["Days_Until_Due"] < 0).sum())
+    due_21 = int((records["Days_Until_Due"] == 21).sum())
+    due_soon = int(((records["Days_Until_Due"] >= 0) & (records["Days_Until_Due"] < 21)).sum())
+    lines = [
+        f"{len(records)} calibration reminder(s)",
+        f"Overdue: {overdue}",
+        f"Due exactly 21 days from today: {due_21}",
+        f"Due within 21 days: {due_soon}",
+        "",
+    ]
+    for _, row in records.head(8).iterrows():
+        due_date = pd.Timestamp(row["Next_Due_Date"]).strftime("%Y-%m-%d")
+        equipment = str(row.get("Equipment_Type", "Equipment")).strip()
+        serial = str(row.get("Serial_No", "")).strip()
+        lines.append(f"- {equipment} {serial} due {due_date}")
+    if len(records) > 8:
+        lines.append(f"- plus {len(records) - 8} more")
+    return "\n".join(lines)
+
+
+def show_desktop_prompt(message):
+    script = (
+        "$ws = New-Object -ComObject WScript.Shell; "
+        "$ws.Popup($args[0], 20, 'Calibration Reminder', 0x40) | Out-Null"
+    )
+    subprocess.run(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script, message],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def registered_email_recipients():
+    if not USERS_FILE.exists():
+        return []
+    try:
+        users = json.loads(USERS_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    recipients = []
+    for user in users.values():
+        email = str(user.get("email", "")).strip()
+        if email and user.get("status") == "approved":
+            recipients.append(email)
+    return sorted(set(recipients))
+
+
+def send_email(message):
+    configured = os.getenv("CALIBRATION_EMAIL_TO", "")
+    recipients = [item.strip() for item in configured.split(",") if item.strip()]
+    if not recipients:
+        recipients = registered_email_recipients()
+    host = os.getenv("SMTP_HOST")
+    if not recipients or not host:
+        return
+
+    email = EmailMessage()
+    email["Subject"] = "Calibration reminder"
+    email["From"] = os.getenv("SMTP_FROM", os.getenv("SMTP_USER", "calibration-reminder@localhost"))
+    email["To"] = ", ".join(recipients)
+    email.set_content(message)
+
+    port = int(os.getenv("SMTP_PORT", "587"))
+    with smtplib.SMTP(host, port, timeout=20) as smtp:
+        if os.getenv("SMTP_STARTTLS", "1") == "1":
+            smtp.starttls()
+        if os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD"):
+            smtp.login(os.getenv("SMTP_USER"), os.getenv("SMTP_PASSWORD"))
+        smtp.send_message(email)
+
+
+def send_teams(message):
+    webhook = os.getenv("CALIBRATION_TEAMS_WEBHOOK")
+    if not webhook:
+        return
+    payload = json.dumps({"text": message}).encode("utf-8")
+    req = request.Request(webhook, data=payload, headers={"Content-Type": "application/json"})
+    with request.urlopen(req, timeout=20):
+        pass
+
+
+def mark_notified(records):
+    payload = read_acknowledgements()
+    today = date.today().isoformat()
+    for record_id in records["Calibration_ID"].astype(str):
+        payload.setdefault(record_id, {})["last_notified_on"] = today
+    write_acknowledgements(payload)
+
+
+def main():
+    records = load_due_records()
+    if records.empty:
+        return
+    message = message_from_records(records)
+    show_desktop_prompt(message)
+    send_email(message)
+    send_teams(message)
+    mark_notified(records)
+
+
+if __name__ == "__main__":
+    main()

@@ -3,7 +3,9 @@ import pandas as pd
 import plotly.express as px
 import time
 import base64
+import json
 from click import style
+from datetime import date, timedelta
 from pathlib import Path
 import uuid
 import html
@@ -12,6 +14,7 @@ from urllib.parse import quote
 BASE_DIR = Path(__file__).resolve().parent
 
 EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
+CALIBRATION_ACK_FILE = BASE_DIR / "data" / "calibration_acknowledgements.json"
 ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
@@ -46,6 +49,161 @@ def load_master_data(file_path):
     except Exception as e:
         st.error(f"Error loading master data: {e}")
         return {}
+
+
+# =========================
+# CALIBRATION REMINDERS
+# =========================
+
+CALIBRATION_COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
+
+
+def _today():
+    return pd.Timestamp(date.today())
+
+
+def _read_calibration_acknowledgements():
+    if not CALIBRATION_ACK_FILE.exists():
+        return {}
+    try:
+        with CALIBRATION_ACK_FILE.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        return payload if isinstance(payload, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _write_calibration_acknowledgements(payload):
+    CALIBRATION_ACK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with CALIBRATION_ACK_FILE.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+
+
+def calibration_record_completed(status):
+    value = str(status or "").strip().lower()
+    return any(term in value for term in CALIBRATION_COMPLETE_TERMS)
+
+
+def _calibration_alert_status(row):
+    if calibration_record_completed(row.get("Status")):
+        return "Completed"
+    due_date = row.get("Next_Due_Date")
+    if pd.isna(due_date):
+        return "No due date"
+    days = int((pd.Timestamp(due_date).normalize() - _today()).days)
+    if days < 0:
+        return "Overdue"
+    if days == 21:
+        return "Due in 21 days"
+    if days < 21:
+        return "Due soon"
+    return "OK"
+
+
+def get_calibration_log(data):
+    df = data.get("Calibration Log", pd.DataFrame()) if isinstance(data, dict) else pd.DataFrame()
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return pd.DataFrame()
+
+    log = df.copy()
+    if "Calibration_ID" not in log.columns:
+        log["Calibration_ID"] = [f"CAL-{index + 1:03d}" for index in range(len(log))]
+
+    for column in ["Calibration_Date", "Next_Due_Date", "Reminder_Date", "Acknowledged_On", "Snoozed_Until", "Last_Notified_On"]:
+        if column in log.columns:
+            log[column] = pd.to_datetime(log[column], errors="coerce")
+        else:
+            log[column] = pd.NaT
+
+    if "Status" not in log.columns:
+        log["Status"] = ""
+
+    acknowledgements = _read_calibration_acknowledgements()
+    for index, row in log.iterrows():
+        record_id = str(row.get("Calibration_ID", "")).strip()
+        saved = acknowledgements.get(record_id, {})
+        for column, key in [
+            ("Acknowledged_On", "acknowledged_on"),
+            ("Snoozed_Until", "snoozed_until"),
+            ("Last_Notified_On", "last_notified_on"),
+        ]:
+            if saved.get(key):
+                log.at[index, column] = pd.to_datetime(saved.get(key), errors="coerce")
+        if saved.get("note"):
+            log.at[index, "Notification_Notes"] = saved.get("note")
+
+    log["Days_Until_Due"] = (log["Next_Due_Date"].dt.normalize() - _today()).dt.days
+    log["Alert_Status"] = log.apply(_calibration_alert_status, axis=1)
+    log["Is_Completed"] = log["Status"].apply(calibration_record_completed)
+    log["Is_Snoozed"] = log["Snoozed_Until"].notna() & (log["Snoozed_Until"].dt.normalize() >= _today())
+    return log
+
+
+def get_calibration_reminders(data, include_snoozed=False):
+    log = get_calibration_log(data)
+    if log.empty or "Next_Due_Date" not in log.columns:
+        return log
+
+    reminders = log[
+        log["Next_Due_Date"].notna()
+        & (~log["Is_Completed"])
+        & (log["Days_Until_Due"] <= 21)
+    ].copy()
+    if not include_snoozed:
+        reminders = reminders[~reminders["Is_Snoozed"]]
+    return reminders.sort_values(["Days_Until_Due", "Equipment_Type"], na_position="last")
+
+
+def get_calibration_summary(data):
+    log = get_calibration_log(data)
+    reminders = get_calibration_reminders(data)
+    if log.empty:
+        return {
+            "total": 0,
+            "active": 0,
+            "overdue": 0,
+            "due_in_21_days": 0,
+            "due_soon": 0,
+            "snoozed": 0,
+        }
+
+    active = log[~log["Is_Completed"]]
+    return {
+        "total": int(len(log)),
+        "active": int(len(active)),
+        "overdue": int((active["Days_Until_Due"] < 0).sum()),
+        "due_in_21_days": int((active["Days_Until_Due"] == 21).sum()),
+        "due_soon": int(((active["Days_Until_Due"] >= 0) & (active["Days_Until_Due"] < 21)).sum()),
+        "snoozed": int(log["Is_Snoozed"].sum()),
+        "reminders": int(len(reminders)),
+    }
+
+
+def acknowledge_calibration(record_id, note=""):
+    payload = _read_calibration_acknowledgements()
+    record = payload.setdefault(str(record_id), {})
+    record["acknowledged_on"] = date.today().isoformat()
+    if note:
+        record["note"] = note
+    _write_calibration_acknowledgements(payload)
+
+
+def snooze_calibration(record_id, days=1, note=""):
+    payload = _read_calibration_acknowledgements()
+    record = payload.setdefault(str(record_id), {})
+    record["snoozed_until"] = (date.today() + timedelta(days=int(days))).isoformat()
+    if note:
+        record["note"] = note
+    _write_calibration_acknowledgements(payload)
+
+
+def mark_calibration_notified(record_ids):
+    payload = _read_calibration_acknowledgements()
+    today_value = date.today().isoformat()
+    for record_id in record_ids:
+        payload.setdefault(str(record_id), {})["last_notified_on"] = today_value
+    _write_calibration_acknowledgements(payload)
+
 # =========================
 # THEME
 # =========================
@@ -167,6 +325,7 @@ def get_navigation_pages():
     label_overrides = {
         "Access_Admin": "Access Admin",
         "Audit_Surveillance": "Audit & Surveillance",
+        "Calibration_Log": "Calibration Log",
         "Concrete_Tracker": "Concrete Tracker",
         "CTQ_Dashboard": "CTQ Dashboard",
         "Daily_Reports": "Daily Reports",
@@ -189,6 +348,7 @@ def get_navigation_pages():
         "Quality Tools",
         "Standards Library",
         "Learning Academy",
+        "Calibration Log",
         "Concrete Tracker",
         "NCR Tracker",
         "OBS Tracker",
