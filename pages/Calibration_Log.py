@@ -1,5 +1,7 @@
 from pathlib import Path
 from datetime import date
+from email.message import EmailMessage
+from email.utils import formataddr
 from io import BytesIO
 import json
 import sys
@@ -167,10 +169,26 @@ def calibration_email_body(report_title, pdf_name):
         "Dear Team,\n\n"
         f"Please find the {report_title.lower()} ready for review.\n\n"
         f"PDF file: {pdf_name}\n\n"
-        "Note: this email app link cannot attach files automatically. "
-        "Please attach the downloaded PDF before sending.\n\n"
         "Regards,"
     )
+
+
+def email_draft_bytes(recipient, cc, subject, body, pdf_path):
+    email = EmailMessage()
+    email["Subject"] = subject.strip() or "Calibration Log Report"
+    email["From"] = formataddr(("QA/QC Dashboard", "no-reply@qaqc.local"))
+    if recipient.strip():
+        email["To"] = recipient.strip()
+    if cc.strip():
+        email["Cc"] = cc.strip()
+    email.set_content(body)
+    email.add_attachment(
+        pdf_path.read_bytes(),
+        maintype="application",
+        subtype="pdf",
+        filename=pdf_path.name,
+    )
+    return email.as_bytes()
 
 
 def mailto_url(recipient, cc, subject, body):
@@ -212,7 +230,16 @@ def render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix):
                 height=180,
                 key=f"{key_prefix}_mailto_body",
             )
-            st.warning("PDF files cannot be attached automatically through an email app link. Download the PDF, open your email app, then attach the PDF manually.")
+            st.download_button(
+                "Download Email Draft with PDF Attached",
+                data=email_draft_bytes(recipient, cc, subject, body, pdf_path),
+                file_name=f"{pdf_path.stem}_email_draft.eml",
+                mime="message/rfc822",
+                use_container_width=True,
+                key=f"{key_prefix}_download_eml_draft",
+            )
+            st.caption("Open the downloaded email draft in Outlook or another mail app; the PDF is already attached inside the draft file.")
+            st.warning("The direct email-app link below cannot attach files. Use the email draft download above when you want the PDF attached automatically without SMTP.")
             if recipient.strip() or cc.strip():
                 st.link_button("Open Email App", mailto_url(recipient, cc, subject, body), use_container_width=True)
             else:
