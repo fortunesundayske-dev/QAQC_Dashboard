@@ -3,6 +3,7 @@ from datetime import date
 from email.message import EmailMessage
 from email.utils import formataddr
 from io import BytesIO
+import html
 import json
 import sys
 from urllib.parse import quote, urlencode
@@ -31,6 +32,252 @@ if str(BASE_DIR) not in sys.path:
 
 st.set_page_config(page_title="Calibration Log", layout="wide")
 inject_global_ui()
+
+
+def render_calibration_page_styles():
+    st.markdown(
+        """
+<style>
+.calibration-shell {
+    margin-top: -0.35rem;
+}
+
+.cal-title-row {
+    align-items: end;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin: 0.55rem 0 0.7rem;
+}
+
+.cal-title h1 {
+    color: #e5edf8;
+    font-size: 1.75rem;
+    font-weight: 850;
+    letter-spacing: 0;
+    margin: 0;
+}
+
+.cal-title p {
+    color: #9fb0c7;
+    font-size: 0.78rem;
+    margin: 0.3rem 0 0;
+}
+
+.cal-title__info {
+    border: 1px solid rgba(148, 163, 184, 0.42);
+    border-radius: 999px;
+    color: #9fb0c7;
+    display: inline-flex;
+    font-size: 0.68rem;
+    height: 1rem;
+    justify-content: center;
+    margin-left: 0.35rem;
+    vertical-align: middle;
+    width: 1rem;
+}
+
+.cal-toolbar {
+    align-items: center;
+    display: flex;
+    gap: 0.55rem;
+    justify-content: flex-end;
+}
+
+.cal-chip {
+    align-items: center;
+    background: linear-gradient(180deg, rgba(18, 32, 51, 0.96), rgba(8, 17, 31, 0.98));
+    border: 1px solid rgba(96, 165, 250, 0.18);
+    border-radius: 7px;
+    color: #dbeafe;
+    display: inline-flex;
+    font-size: 0.72rem;
+    font-weight: 750;
+    gap: 0.4rem;
+    min-height: 2rem;
+    padding: 0.45rem 0.7rem;
+}
+
+.cal-metric-grid {
+    display: grid;
+    gap: 0.7rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    margin: 0.75rem 0 0.65rem;
+}
+
+.cal-metric {
+    align-items: center;
+    background: linear-gradient(145deg, rgba(22, 35, 55, 0.98), rgba(12, 23, 39, 0.98));
+    border: 1px solid rgba(96, 165, 250, 0.14);
+    border-radius: 8px;
+    box-shadow: 0 15px 34px rgba(0, 0, 0, 0.28);
+    display: grid;
+    gap: 0.78rem;
+    grid-template-columns: auto 1fr;
+    min-height: 5.25rem;
+    padding: 0.85rem;
+}
+
+.cal-metric__icon {
+    align-items: center;
+    background: var(--metric-color, #2563eb);
+    border-radius: 999px;
+    box-shadow: 0 0 22px color-mix(in srgb, var(--metric-color, #2563eb) 44%, transparent);
+    color: #ffffff;
+    display: flex;
+    font-size: 1rem;
+    font-weight: 950;
+    height: 2.7rem;
+    justify-content: center;
+    width: 2.7rem;
+}
+
+.cal-metric__label {
+    color: #cbd5e1;
+    font-size: 0.72rem;
+    font-weight: 850;
+}
+
+.cal-metric__value {
+    color: #ffffff;
+    font-size: 1.65rem;
+    font-weight: 950;
+    line-height: 1;
+    margin-top: 0.25rem;
+}
+
+.cal-metric__sub {
+    color: #94a3b8;
+    font-size: 0.66rem;
+    margin-top: 0.28rem;
+}
+
+.cal-metric--danger .cal-metric__value,
+.cal-alert strong {
+    color: #ff4d5e;
+}
+
+.cal-alert {
+    align-items: center;
+    background: linear-gradient(90deg, rgba(127, 29, 29, 0.45), rgba(88, 28, 64, 0.28));
+    border: 1px solid rgba(248, 113, 113, 0.24);
+    border-radius: 7px;
+    color: #fecaca;
+    display: flex;
+    font-size: 0.76rem;
+    font-weight: 780;
+    gap: 0.55rem;
+    justify-content: space-between;
+    margin: 0.55rem 0 0.65rem;
+    padding: 0.75rem 0.9rem;
+}
+
+.cal-alert__text {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.cal-action-panel {
+    background:
+        linear-gradient(135deg, rgba(17, 30, 48, 0.98), rgba(9, 20, 35, 0.98));
+    border: 1px solid rgba(96, 165, 250, 0.14);
+    border-radius: 8px;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+    margin: 0.65rem 0;
+    padding: 1rem;
+}
+
+.cal-action-panel h3 {
+    color: #dbeafe;
+    font-size: 1rem;
+    font-weight: 850;
+    margin: 0 0 0.72rem;
+}
+
+.cal-action-panel p,
+.cal-table-caption {
+    color: #9fb0c7;
+    font-size: 0.72rem;
+    margin: 0;
+}
+
+.cal-table-toolbar {
+    align-items: center;
+    background: linear-gradient(180deg, rgba(14, 26, 43, 0.95), rgba(8, 17, 31, 0.95));
+    border: 1px solid rgba(96, 165, 250, 0.12);
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.65rem;
+    padding: 0.55rem 0.7rem;
+}
+
+.cal-search-label,
+.cal-table-tools {
+    color: #9fb0c7;
+    font-size: 0.72rem;
+}
+
+.cal-table-tools {
+    display: flex;
+    gap: 0.6rem;
+}
+
+div[data-testid="stTabs"] div[role="tablist"] {
+    border-bottom: 1px solid rgba(96, 165, 250, 0.16);
+    gap: 0.35rem;
+}
+
+div[data-testid="stTabs"] button[role="tab"] {
+    border-radius: 7px 7px 0 0;
+    color: #cbd5e1;
+    font-size: 0.78rem;
+    font-weight: 800;
+    min-height: 2.25rem;
+}
+
+div[data-testid="stTabs"] button[aria-selected="true"] {
+    background: linear-gradient(180deg, rgba(37, 99, 235, 0.22), rgba(14, 165, 233, 0.1));
+    border-bottom: 2px solid #0ea5e9;
+    color: #ffffff;
+}
+
+div[data-testid="stDataFrame"] {
+    border-radius: 0 0 8px 8px !important;
+    overflow: hidden;
+}
+
+@media (max-width: 1100px) {
+    .cal-metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cal-title-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 620px) {
+    .cal-metric-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cal-toolbar,
+    .cal-alert,
+    .cal-table-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+render_calibration_page_styles()
 
 if not auth.login():
     st.stop()
@@ -191,6 +438,32 @@ def email_draft_bytes(recipient, cc, subject, body, pdf_path):
     return email.as_bytes()
 
 
+def render_metric_grid(summary, overdue_count, due_21_count):
+    metrics = [
+        ("Equipment Records", summary["total"], "Total registered equipment", "▣", "#1d73e8", False),
+        ("Active Records", summary["active"], "Currently in use", "⌁", "#22c55e", False),
+        ("Overdue", overdue_count, "Require immediate attention", "!", "#ef4444", True),
+        ("Due in 21 Days", due_21_count, "Upcoming calibrations", "▦", "#d97706", False),
+        ("Snoozed", summary["snoozed"], "Snoozed reminders", "Z", "#7c3aed", False),
+    ]
+    cards = []
+    for label, value, sublabel, icon, color, danger in metrics:
+        danger_class = " cal-metric--danger" if danger else ""
+        cards.append(
+            f"""
+<div class="cal-metric{danger_class}" style="--metric-color: {color};">
+    <div class="cal-metric__icon">{html.escape(icon)}</div>
+    <div>
+        <div class="cal-metric__label">{html.escape(label)}</div>
+        <div class="cal-metric__value">{html.escape(str(value))}</div>
+        <div class="cal-metric__sub">{html.escape(sublabel)}</div>
+    </div>
+</div>
+"""
+        )
+    st.markdown('<div class="cal-metric-grid">' + "".join(cards) + "</div>", unsafe_allow_html=True)
+
+
 def mailto_url(recipient, cc, subject, body):
     query = {"subject": subject, "body": body}
     if cc.strip():
@@ -249,50 +522,84 @@ def render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix):
 
 
 def render_calibration_report_actions(records, title, key_prefix):
-    st.markdown(f"#### {title}")
-    action_cols = st.columns([1, 1, 2])
+    with st.container():
+        st.markdown(
+            f"""
+<div class="cal-action-panel">
+    <h3>{html.escape(title)}</h3>
+    <p>PDF covers the records shown below. Email opens through your browser using your default email app.</p>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+        action_cols = st.columns([1, 1, 2.2])
 
-    with action_cols[0]:
-        if st.button("Create PDF", use_container_width=True, key=f"{key_prefix}_create_pdf"):
-            try:
-                pdf_path = generate_calibration_pdf(records, report_title=f"{title} Calibration Report")
-                st.success(f"PDF created: {pdf_path.name}")
-                st.download_button(
-                    "Download/Open PDF",
-                    data=pdf_path.read_bytes(),
-                    file_name=pdf_path.name,
-                    mime="application/pdf",
-                    use_container_width=True,
-                    key=f"{key_prefix}_download_pdf",
-                )
-            except Exception as exc:
-                st.error(f"PDF could not be created: {exc}")
-    with action_cols[1]:
-        if st.button("Create PDF and Email", use_container_width=True, key=f"{key_prefix}_email_pdf"):
-            try:
-                report_title = f"{title} Calibration Report"
-                pdf_path = generate_calibration_pdf(records, report_title=report_title)
-                st.session_state[f"{key_prefix}_calibration_pdf_path"] = str(pdf_path)
-                render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix)
-            except Exception as exc:
-                st.error(f"PDF could not be created: {exc}")
-    with action_cols[2]:
-        st.caption("PDF covers the records shown below. Email opens through your browser using your default email app.")
+        with action_cols[0]:
+            if st.button("▣  Create PDF", use_container_width=True, key=f"{key_prefix}_create_pdf"):
+                try:
+                    pdf_path = generate_calibration_pdf(records, report_title=f"{title} Calibration Report")
+                    st.success(f"PDF created: {pdf_path.name}")
+                    st.download_button(
+                        "Download/Open PDF",
+                        data=pdf_path.read_bytes(),
+                        file_name=pdf_path.name,
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key=f"{key_prefix}_download_pdf",
+                    )
+                except Exception as exc:
+                    st.error(f"PDF could not be created: {exc}")
+        with action_cols[1]:
+            if st.button("✉  Create PDF and Email", use_container_width=True, key=f"{key_prefix}_email_pdf"):
+                try:
+                    report_title = f"{title} Calibration Report"
+                    pdf_path = generate_calibration_pdf(records, report_title=report_title)
+                    st.session_state[f"{key_prefix}_calibration_pdf_path"] = str(pdf_path)
+                    render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix)
+                except Exception as exc:
+                    st.error(f"PDF could not be created: {exc}")
+        with action_cols[2]:
+            st.markdown('<p class="cal-table-caption">Review, export, then attach the generated report or email draft.</p>', unsafe_allow_html=True)
 
 
-st.title("Calibration Log")
-st.markdown("Monitor equipment calibration status, overdue items, and reminder actions.")
+def render_alert_banner(overdue_count):
+    if overdue_count <= 0:
+        st.markdown(
+            """
+<div class="cal-alert">
+    <div class="cal-alert__text"><span>✓</span><span>No overdue calibration items.</span></div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+        return
+    st.markdown(
+        f"""
+<div class="cal-alert">
+    <div class="cal-alert__text"><span>▲</span><span><strong>{overdue_count}</strong> equipment item(s) are overdue for calibration.</span></div>
+    <span class="cal-chip">View Overdue Equipment ›</span>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def render_table_toolbar(record_count):
+    st.markdown(
+        f"""
+<div class="cal-table-toolbar">
+    <div class="cal-search-label">⌕ Search calibration records...</div>
+    <div class="cal-table-tools"><span>Columns</span><span>Export</span><span>Show 10</span></div>
+</div>
+<div class="cal-table-caption">Showing calibration records for the selected view. Total records: {record_count}</div>
+""",
+        unsafe_allow_html=True,
+    )
+
 
 if log.empty:
     st.warning("No calibration records are available in the master workbook.")
     st.stop()
-
-metric_1, metric_2, metric_3, metric_4, metric_5 = st.columns(5)
-metric_1.metric("Equipment records", summary["total"])
-metric_2.metric("Active records", summary["active"])
-metric_3.metric("Overdue", summary["overdue"])
-metric_4.metric("Due in 21 days", summary["due_in_21_days"])
-metric_5.metric("Snoozed", summary["snoozed"])
 
 reminders = get_calibration_reminders(data)
 overdue = reminders[reminders["Days_Until_Due"] < 0]
@@ -315,14 +622,41 @@ display_cols = [
     "Snoozed_Until",
 ]
 
-tab_alerts, tab_overdue, tab_all = st.tabs(["Reminder Actions", "Overdue Equipment", "All Calibration Records"])
+st.markdown('<div class="calibration-shell">', unsafe_allow_html=True)
+st.markdown(
+    """
+<div class="cal-title-row">
+    <div class="cal-title">
+        <h1>Calibration Log <span class="cal-title__info">i</span></h1>
+        <p>Monitor equipment calibration status, overdue items, and reminder actions.</p>
+    </div>
+    <div class="cal-toolbar">
+        <span class="cal-chip">Filter</span>
+        <span class="cal-chip">May 1 – Jun 2, 2026</span>
+    </div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
+render_metric_grid(summary, len(overdue), len(due_21))
+
+tab_alerts, tab_overdue, tab_all = st.tabs(
+    [
+        "Reminder Actions",
+        f"Overdue Equipment ({len(overdue)})",
+        "All Calibration Records",
+    ]
+)
 
 with tab_alerts:
     if reminders.empty:
         st.success("No active calibration reminders today.")
     else:
+        render_alert_banner(len(overdue))
         render_calibration_report_actions(reminders, "Reminder report actions", "due")
         st.markdown("#### Active reminders")
+        render_table_toolbar(len(reminders))
         st.dataframe(reminders[display_cols], use_container_width=True, hide_index=True)
 
         st.markdown("#### Acknowledge or snooze")
@@ -357,10 +691,11 @@ with tab_alerts:
 
 with tab_overdue:
     if overdue.empty:
-        st.success("No overdue calibration items.")
+        render_alert_banner(0)
     else:
-        st.error(f"{len(overdue)} equipment item(s) are overdue for calibration.")
+        render_alert_banner(len(overdue))
         render_calibration_report_actions(overdue, "Overdue report actions", "overdue")
+        render_table_toolbar(len(overdue))
         st.dataframe(overdue[display_cols], use_container_width=True, hide_index=True)
 
 with tab_all:
@@ -388,4 +723,7 @@ with tab_all:
                 mask = mask | visible[column].astype(str).str.lower().str.contains(needle, na=False)
         visible = visible[mask]
 
+    render_table_toolbar(len(visible))
     st.dataframe(visible[display_cols], use_container_width=True, hide_index=True, height=520)
+
+st.markdown("</div>", unsafe_allow_html=True)
