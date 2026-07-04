@@ -45,17 +45,17 @@ log = get_calibration_log(data)
 summary = get_calibration_summary(data)
 
 
-def approved_notification_emails():
+def registered_account_emails():
     try:
         users = json.loads(USERS_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
-    recipients = [
+    emails = [
         str(user.get("email", "")).strip()
         for user in users.values()
-        if user.get("status") == "approved" and str(user.get("email", "")).strip()
+        if str(user.get("email", "")).strip()
     ]
-    return sorted(set(recipients))
+    return sorted(set(emails))
 
 
 def clean_pdf_value(value):
@@ -202,9 +202,9 @@ def render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix):
             st.caption("The PDF is saved in outputs/calibration_reports and can be opened from your browser downloads.")
 
         with email_tab:
-            default_recipient = ", ".join(approved_notification_emails())
-            recipient = st.text_input("Recipient", value=default_recipient, key=f"{key_prefix}_mailto_recipient")
-            cc = st.text_input("CC", key=f"{key_prefix}_mailto_cc")
+            default_cc = ", ".join(registered_account_emails())
+            recipient = st.text_input("Recipient", key=f"{key_prefix}_mailto_recipient")
+            cc = st.text_input("CC", value=default_cc, key=f"{key_prefix}_mailto_cc")
             subject = st.text_input("Subject", value=report_title, key=f"{key_prefix}_mailto_subject")
             body = st.text_area(
                 "Email body",
@@ -213,10 +213,10 @@ def render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix):
                 key=f"{key_prefix}_mailto_body",
             )
             st.warning("PDF files cannot be attached automatically through an email app link. Download the PDF, open your email app, then attach the PDF manually.")
-            if recipient.strip():
+            if recipient.strip() or cc.strip():
                 st.link_button("Open Email App", mailto_url(recipient, cc, subject, body), use_container_width=True)
             else:
-                st.info("Enter a recipient email to open your email app.")
+                st.info("Enter a recipient or keep registered account emails in CC to open your email app.")
 
     _dialog()
 
