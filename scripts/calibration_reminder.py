@@ -19,6 +19,8 @@ SMTP_CONFIG_FILE = BASE_DIR / "data" / "smtp_config.json"
 USERS_FILE = BASE_DIR / "data" / "users.json"
 CLASSIC_OUTLOOK_EXE = Path(r"C:\Program Files\Microsoft Office\root\Office16\OUTLOOK.EXE")
 CLASSIC_OUTLOOK_SHORTCUT = Path.home() / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Outlook.lnk"
+POWERSHELL_EXE = Path(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
+CMD_EXE = Path(r"C:\Windows\System32\cmd.exe")
 COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
 
 
@@ -32,6 +34,40 @@ def classic_outlook_launcher():
         if candidate.exists():
             return candidate
     return None
+
+
+def open_file_with_default_app(path):
+    path = Path(path)
+    if POWERSHELL_EXE.exists():
+        result = subprocess.run(
+            [
+                str(POWERSHELL_EXE),
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "Invoke-Item -LiteralPath $args[0]",
+                str(path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    elif CMD_EXE.exists():
+        result = subprocess.run(
+            [str(CMD_EXE), "/c", "start", "", str(path)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    else:
+        raise RuntimeError("Windows shell launcher was not found.")
+
+    if result.returncode != 0:
+        error = (result.stderr or result.stdout or "Unknown Windows launch error.").strip()
+        raise RuntimeError(error)
 
 
 def read_acknowledgements():
@@ -405,7 +441,7 @@ def show_desktop_prompt(message):
         "$ws.Popup($args[0], 20, 'Calibration Reminder', 0x40) | Out-Null"
     )
     subprocess.run(
-        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script, message],
+        [str(POWERSHELL_EXE), "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script, message],
         check=False,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -474,7 +510,7 @@ $mail.Send()
 """
         result = subprocess.run(
             [
-                "powershell",
+                str(POWERSHELL_EXE),
                 "-NoProfile",
                 "-ExecutionPolicy",
                 "Bypass",
@@ -523,7 +559,7 @@ def open_classic_outlook_draft(message, recipients, attachment_pdf=None, attachm
     mailto = f"{recipient_text}?subject={quote(subject)}"
     result = subprocess.run(
         [
-            "powershell",
+            str(POWERSHELL_EXE),
             "-NoProfile",
             "-ExecutionPolicy",
             "Bypass",
@@ -574,24 +610,7 @@ def open_email_app_draft(message, recipients, attachment_pdf=None, attachment_na
     eml_path.write_bytes(email.as_bytes())
 
     try:
-        result = subprocess.run(
-            [
-                "powershell",
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                "Invoke-Item -LiteralPath $args[0]",
-                str(eml_path),
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=20,
-        )
-        if result.returncode != 0:
-            error = (result.stderr or result.stdout or "Unknown Windows launch error.").strip()
-            raise RuntimeError(error)
+        open_file_with_default_app(eml_path)
     except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         raise RuntimeError(f"Windows could not open the email draft file: {exc}") from exc
     return eml_path, attachment_path
