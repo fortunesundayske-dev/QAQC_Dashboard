@@ -528,6 +528,64 @@ def project_performance(data):
     return merged.groupby("Project", as_index=False)["Compliance %"].mean().sort_values("Compliance %", ascending=False)
 
 
+def search_dashboard_records(data, query, max_results=25):
+    query = str(query or "").strip().lower()
+    if not query:
+        return pd.DataFrame(columns=["Module", "Record", "Match", "Open"])
+
+    module_pages = {
+        "NCR Log": ("NCR Register", "pages/NCR_Tracker.py"),
+        "OBS Log": ("OBS Register", "pages/OBS_Tracker.py"),
+        "Daily Reports": ("Daily Reports", "pages/Daily_Reports.py"),
+        "Concrete Tracker": ("Concrete Tracker", "pages/Concrete_Tracker.py"),
+        "Calibration Log": ("Calibration Log", "pages/Calibration_Log.py"),
+        "Audit Register": ("Audit Schedule", "pages/Audit_Surveillance.py"),
+        "Surveillance Register": ("Audit Schedule", "pages/Audit_Surveillance.py"),
+        "Document Register": ("Document Library", "pages/Document_Status.py"),
+        "ITR Log": ("ITR Tracker", "pages/ITR_Tracker.py"),
+        "CTQ Log": ("CTQ Dashboard", "pages/CTQ_Dashboard.py"),
+        "KPI KRA Register": ("KPI KRA Register", "pages/KPI_KRA_Register.py"),
+        "Defect-Rework Log": ("Defect & Rework", "pages/Defect_Rework_Tracker.py"),
+        "Lessons Learned": ("Lessons Learned", "pages/Lessons_Learned.py"),
+    }
+    rows = []
+    for sheet, frame in data.items():
+        if not isinstance(frame, pd.DataFrame) or frame.empty:
+            continue
+        module_label, page_path = module_pages.get(sheet, (sheet, "app.py"))
+        text_columns = [col for col in frame.columns if frame[col].dtype == "object" or str(frame[col].dtype).startswith("datetime")]
+        if not text_columns:
+            text_columns = list(frame.columns)
+        search_frame = frame[text_columns].fillna("").astype(str)
+        mask = search_frame.apply(lambda col: col.str.lower().str.contains(query, na=False, regex=False)).any(axis=1)
+        matches = frame[mask].head(max_results)
+        for _, row in matches.iterrows():
+            record = next(
+                (
+                    str(row.get(col, "")).strip()
+                    for col in ["NCR_ID", "OBS_ID", "ITR_ID", "CTQ_ID", "Calibration_ID", "Audit_ID", "Surveillance_ID", "Document_ID", "KPI"]
+                    if str(row.get(col, "")).strip()
+                ),
+                sheet,
+            )
+            matched_values = [
+                str(row.get(col, "")).strip()
+                for col in text_columns
+                if query in str(row.get(col, "")).lower()
+            ]
+            rows.append(
+                {
+                    "Module": module_label,
+                    "Record": record,
+                    "Match": " | ".join(matched_values[:2])[:180],
+                    "Open": "/" if page_path == "app.py" else f"/{Path(page_path).stem}",
+                }
+            )
+            if len(rows) >= max_results:
+                return pd.DataFrame(rows)
+    return pd.DataFrame(rows)
+
+
 inject_enterprise_theme()
 if not auth.login():
     st.stop()
@@ -551,6 +609,15 @@ if calibration_summary.get("reminders", 0):
         f"Calibration reminder: {calibration_summary['reminders']} equipment item(s) need attention. "
         f"{calibration_summary['overdue']} overdue, {calibration_summary['due_in_21_days']} due exactly 21 days from today."
     )
+
+home_search = st.text_input("Search dashboard", placeholder="Search KPI, KRA, NCR, OBS, ITR, calibration, document, project...")
+if home_search:
+    search_results = search_dashboard_records(filtered_data, home_search)
+    if search_results.empty:
+        st.info("No dashboard records match your search.")
+    else:
+        st.caption(f"{len(search_results)} result(s) found")
+        st.dataframe(search_results, use_container_width=True, hide_index=True, height=260)
 
 ncr = filtered_data.get("NCR Log", pd.DataFrame())
 obs = filtered_data.get("OBS Log", pd.DataFrame())
@@ -639,6 +706,7 @@ quick_links = [
     ("OBS Register", "pages/OBS_Tracker.py", "#f97316", "O"),
     ("Daily Reports", "pages/Daily_Reports.py", "#7c3aed", "R"),
     ("Concrete Tracker", "pages/Concrete_Tracker.py", "#0ea5e9", "C"),
+    ("KPI KRA Register", "pages/KPI_KRA_Register.py", "#14b8a6", "K"),
     ("Calibration Log", "pages/Calibration_Log.py", "#dc2626", "!"),
     ("Audit Schedule", "pages/Audit_Surveillance.py", "#22c55e", "A"),
     ("Document Library", "pages/Document_Status.py", "#2563eb", "D"),
