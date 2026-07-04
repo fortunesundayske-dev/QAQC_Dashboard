@@ -1,8 +1,7 @@
 from pathlib import Path
-import importlib
 import json
-import os
 import sys
+from urllib.parse import quote, urlencode
 
 import pandas as pd
 import streamlit as st
@@ -13,6 +12,7 @@ from utils import (
     get_calibration_log,
     get_calibration_reminders,
     get_calibration_summary,
+    generate_calibration_pdf,
     inject_global_ui,
     load_master_data,
     render_navigation,
@@ -24,9 +24,6 @@ from utils import (
 BASE_DIR = Path(__file__).parents[1]
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
-from scripts import calibration_reminder
-
-calibration_reminder = importlib.reload(calibration_reminder)
 
 
 st.set_page_config(page_title="Calibration Log", layout="wide")
@@ -59,48 +56,95 @@ def approved_notification_emails():
     return sorted(set(recipients))
 
 
-def smtp_configured():
-    return bool(calibration_reminder.smtp_setting("SMTP_HOST"))
+def calibration_email_body(report_title, pdf_name):
+    return (
+        "Dear Team,\n\n"
+        f"Please find the {report_title.lower()} ready for review.\n\n"
+        f"PDF file: {pdf_name}\n\n"
+        "Note: this email app link cannot attach files automatically. "
+        "Please attach the downloaded PDF before sending.\n\n"
+        "Regards,"
+    )
+
+
+def mailto_url(recipient, cc, subject, body):
+    query = {"subject": subject, "body": body}
+    if cc.strip():
+        query["cc"] = cc.strip()
+    return f"mailto:{quote(recipient.strip(), safe='@,;')}" + "?" + urlencode(query)
+
+
+def render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix):
+    @st.dialog("Calibration PDF")
+    def _dialog():
+        if not pdf_path.exists():
+            st.error("The generated calibration PDF could not be found.")
+            return
+
+        pdf_bytes = pdf_path.read_bytes()
+        open_tab, email_tab = st.tabs(["Download/Open PDF", "Open Email App"])
+
+        with open_tab:
+            st.download_button(
+                "Download/Open PDF",
+                data=pdf_bytes,
+                file_name=pdf_path.name,
+                mime="application/pdf",
+                use_container_width=True,
+                key=f"{key_prefix}_dialog_download_pdf",
+            )
+            st.caption("The PDF is saved in outputs/calibration_reports and can be opened from your browser downloads.")
+
+        with email_tab:
+            default_recipient = ", ".join(approved_notification_emails())
+            recipient = st.text_input("Recipient", value=default_recipient, key=f"{key_prefix}_mailto_recipient")
+            cc = st.text_input("CC", key=f"{key_prefix}_mailto_cc")
+            subject = st.text_input("Subject", value=report_title, key=f"{key_prefix}_mailto_subject")
+            body = st.text_area(
+                "Email body",
+                value=calibration_email_body(report_title, pdf_path.name),
+                height=180,
+                key=f"{key_prefix}_mailto_body",
+            )
+            st.warning("PDF files cannot be attached automatically through an email app link. Download the PDF, open your email app, then attach the PDF manually.")
+            if recipient.strip():
+                st.link_button("Open Email App", mailto_url(recipient, cc, subject, body), use_container_width=True)
+            else:
+                st.info("Enter a recipient email to open your email app.")
+
+    _dialog()
 
 
 def render_calibration_report_actions(records, title, key_prefix):
     st.markdown(f"#### {title}")
     action_cols = st.columns([1, 1, 2])
-    try:
-        pdf_bytes = calibration_reminder.create_due_records_pdf(records)
-    except Exception as exc:
-        st.error(f"PDF could not be created: {exc}")
-        return
 
     with action_cols[0]:
-        st.download_button(
-            "Create PDF",
-            data=pdf_bytes,
-            file_name=f"{key_prefix}_calibration_report.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            key=f"{key_prefix}_download_pdf",
-        )
+        if st.button("Create PDF", use_container_width=True, key=f"{key_prefix}_create_pdf"):
+            try:
+                pdf_path = generate_calibration_pdf(records, report_title=f"{title} Calibration Report")
+                st.success(f"PDF created: {pdf_path.name}")
+                st.download_button(
+                    "Download/Open PDF",
+                    data=pdf_path.read_bytes(),
+                    file_name=pdf_path.name,
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key=f"{key_prefix}_download_pdf",
+                )
+            except Exception as exc:
+                st.error(f"PDF could not be created: {exc}")
     with action_cols[1]:
         if st.button("Create PDF and Email", use_container_width=True, key=f"{key_prefix}_email_pdf"):
-            if not email_recipients:
-                st.error("No approved user email is available.")
-            else:
-                try:
-                    message = calibration_reminder.message_from_records(records, limit=None)
-                    draft_path, attachment_path = calibration_reminder.open_email_app_draft(
-                        message,
-                        email_recipients,
-                        attachment_pdf=pdf_bytes,
-                        attachment_name=f"{key_prefix}_calibration_report.pdf",
-                    )
-                    st.success("Email draft created with the PDF attached. Choose/open your email app, review it, and click Send.")
-                    st.caption(f"Email draft saved at: {draft_path}")
-                    st.caption(f"PDF saved at: {attachment_path}")
-                except Exception as exc:
-                    st.error(f"Email draft could not be opened: {exc}")
+            try:
+                report_title = f"{title} Calibration Report"
+                pdf_path = generate_calibration_pdf(records, report_title=report_title)
+                st.session_state[f"{key_prefix}_calibration_pdf_path"] = str(pdf_path)
+                render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix)
+            except Exception as exc:
+                st.error(f"PDF could not be created: {exc}")
     with action_cols[2]:
-        st.caption("PDF covers the records shown below. The email draft opens with the PDF attached.")
+        st.caption("PDF covers the records shown below. Email opens through your browser using your default email app.")
 
 
 st.title("Calibration Log")
@@ -116,9 +160,6 @@ metric_2.metric("Active records", summary["active"])
 metric_3.metric("Overdue", summary["overdue"])
 metric_4.metric("Due in 21 days", summary["due_in_21_days"])
 metric_5.metric("Snoozed", summary["snoozed"])
-
-email_recipients = approved_notification_emails()
-smtp_ready = smtp_configured()
 
 reminders = get_calibration_reminders(data)
 overdue = reminders[reminders["Days_Until_Due"] < 0]
@@ -141,7 +182,7 @@ display_cols = [
     "Snoozed_Until",
 ]
 
-tab_alerts, tab_overdue, tab_all, tab_email = st.tabs(["Reminder Actions", "Overdue Equipment", "All Calibration Records", "Email Setup"])
+tab_alerts, tab_overdue, tab_all = st.tabs(["Reminder Actions", "Overdue Equipment", "All Calibration Records"])
 
 with tab_alerts:
     if reminders.empty:
@@ -215,66 +256,3 @@ with tab_all:
         visible = visible[mask]
 
     st.dataframe(visible[display_cols], use_container_width=True, hide_index=True, height=520)
-
-with tab_email:
-    st.markdown("#### Calibration email setup")
-    st.caption("Settings are saved on this PC for the scheduled reminder and trial email.")
-    st.info(
-        "For Outlook.com/Hotmail, use `smtp-mail.outlook.com`, port `587`, STARTTLS enabled. "
-        "For Microsoft 365 work mail, use `smtp.office365.com`, port `587`, STARTTLS enabled. "
-        "Use the full sender email address as the username. If MFA is on, use an app password."
-    )
-    existing = calibration_reminder.read_smtp_config()
-
-    with st.form("smtp_setup_form"):
-        col_a, col_b = st.columns(2)
-        with col_a:
-            smtp_host = st.text_input("SMTP host", value=existing.get("SMTP_HOST", "smtp-mail.outlook.com"))
-            smtp_port = st.text_input("SMTP port", value=str(existing.get("SMTP_PORT", "587")))
-            smtp_user = st.text_input("Sender mailbox / username", value=existing.get("SMTP_USER", ""))
-            smtp_from = st.text_input("Sender email address", value=existing.get("SMTP_FROM", existing.get("SMTP_USER", "")))
-        with col_b:
-            from_name = st.text_input("Sender display name", value=existing.get("CALIBRATION_EMAIL_FROM_NAME", "KPKAUE Fortune QA"))
-            smtp_password = st.text_input("SMTP password or app password", type="password", value=existing.get("SMTP_PASSWORD", ""))
-            starttls = st.checkbox("Use STARTTLS", value=existing.get("SMTP_STARTTLS", "1") == "1")
-            ssl = st.checkbox("Use SSL", value=existing.get("SMTP_SSL", "0") == "1")
-
-        save_col, test_col = st.columns(2)
-        save_clicked = save_col.form_submit_button("Save SMTP settings", use_container_width=True)
-        test_clicked = test_col.form_submit_button("Save and send trial email", use_container_width=True)
-
-    if save_clicked or test_clicked:
-        port_value = str(smtp_port).strip()
-        if not smtp_host or not smtp_port or not smtp_user or not smtp_password:
-            st.error("SMTP host, port, sender mailbox, and password are required.")
-        elif ssl and port_value != "465":
-            st.error("SSL is only for port 465. For Outlook port 587, uncheck SSL and keep STARTTLS checked.")
-        elif starttls and ssl:
-            st.error("Choose either STARTTLS or SSL, not both. For Outlook port 587, use STARTTLS only.")
-        else:
-            config = {
-                "SMTP_HOST": smtp_host.strip(),
-                "SMTP_PORT": port_value,
-                "SMTP_USER": smtp_user.strip(),
-                "SMTP_PASSWORD": smtp_password,
-                "SMTP_FROM": (smtp_from or smtp_user).strip(),
-                "SMTP_STARTTLS": "1" if starttls else "0",
-                "SMTP_SSL": "1" if ssl else "0",
-                "CALIBRATION_EMAIL_FROM_NAME": from_name.strip() or "KPKAUE Fortune QA",
-            }
-            calibration_reminder.write_smtp_config(config)
-            st.success("SMTP settings saved.")
-
-            if test_clicked:
-                try:
-                    records = calibration_reminder.load_due_records()
-                    sample = records.head(10) if not records.empty else records
-                    message = calibration_reminder.message_from_records(sample, limit=None)
-                    pdf_report = calibration_reminder.create_due_records_pdf(sample) if not sample.empty else None
-                    calibration_reminder.send_email(message, attachment_pdf=pdf_report)
-                    st.success(f"Trial email sent to: {', '.join(calibration_reminder.registered_email_recipients())}")
-                except Exception as exc:
-                    st.error(f"Trial email failed: {exc}")
-
-    st.markdown("#### Email loop")
-    st.write(", ".join(approved_notification_emails()))

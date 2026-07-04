@@ -10,11 +10,13 @@ from pathlib import Path
 import uuid
 import html
 from urllib.parse import quote
+from io import BytesIO
 
 BASE_DIR = Path(__file__).resolve().parent
 
 EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 CALIBRATION_ACK_FILE = BASE_DIR / "data" / "calibration_acknowledgements.json"
+CALIBRATION_REPORT_DIR = BASE_DIR / "outputs" / "calibration_reports"
 ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
@@ -205,6 +207,199 @@ def mark_calibration_notified(record_ids):
     for record_id in record_ids:
         payload.setdefault(str(record_id), {})["last_notified_on"] = today_value
     _write_calibration_acknowledgements(payload)
+
+
+def _clean_report_value(value):
+    if pd.isna(value):
+        return ""
+    if isinstance(value, pd.Timestamp):
+        return value.strftime("%Y-%m-%d")
+    if hasattr(value, "strftime") and not isinstance(value, str):
+        try:
+            return value.strftime("%Y-%m-%d")
+        except (TypeError, ValueError):
+            pass
+    return str(value).strip()
+
+
+def _safe_report_filename(title):
+    safe = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in str(title))
+    return safe.strip("_").lower() or "calibration_report"
+
+
+def _pdf_escape(value):
+    return str(value).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _build_simple_pdf(lines):
+    page_width = 842
+    page_height = 595
+    margin_left = 36
+    top = 550
+    line_height = 13
+    max_chars = 132
+    pages = []
+    current = []
+    y = top
+
+    for line in lines:
+        chunks = [line[i : i + max_chars] for i in range(0, len(line), max_chars)] or [""]
+        for chunk in chunks:
+            if y < 40:
+                pages.append(current)
+                current = []
+                y = top
+            current.append((y, chunk))
+            y -= line_height
+    if current:
+        pages.append(current)
+
+    objects = []
+    page_ids = []
+    font_id = 3
+    pages_id = 1
+    catalog_id = 2
+    next_id = 4
+    for page in pages:
+        content_lines = ["BT", "/F1 9 Tf", f"{margin_left} {top} Td", "12 TL"]
+        previous_y = top
+        for y_value, text in page:
+            content_lines.append(f"0 -{previous_y - y_value} Td")
+            content_lines.append(f"({_pdf_escape(text)}) Tj")
+            previous_y = y_value
+        content_lines.append("ET")
+        stream = "\n".join(content_lines).encode("latin-1", errors="replace")
+        content_id = next_id
+        next_id += 1
+        page_id = next_id
+        next_id += 1
+        objects.append((content_id, b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream"))
+        objects.append(
+            (
+                page_id,
+                f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {page_width} {page_height}] "
+                f"/Resources << /Font << /F1 {font_id} 0 R >> >> /Contents {content_id} 0 R >>".encode("ascii"),
+            )
+        )
+        page_ids.append(page_id)
+
+    kids = " ".join(f"{page_id} 0 R" for page_id in page_ids)
+    base_objects = [
+        (pages_id, f"<< /Type /Pages /Kids [{kids}] /Count {len(page_ids)} >>".encode("ascii")),
+        (catalog_id, f"<< /Type /Catalog /Pages {pages_id} 0 R >>".encode("ascii")),
+        (font_id, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
+    ]
+    all_objects = sorted(base_objects + objects, key=lambda item: item[0])
+
+    output = BytesIO()
+    output.write(b"%PDF-1.4\n")
+    offsets = {0: 0}
+    for obj_id, body in all_objects:
+        offsets[obj_id] = output.tell()
+        output.write(f"{obj_id} 0 obj\n".encode("ascii"))
+        output.write(body)
+        output.write(b"\nendobj\n")
+    xref_position = output.tell()
+    max_id = max(offsets)
+    output.write(f"xref\n0 {max_id + 1}\n".encode("ascii"))
+    output.write(b"0000000000 65535 f \n")
+    for obj_id in range(1, max_id + 1):
+        output.write(f"{offsets[obj_id]:010d} 00000 n \n".encode("ascii"))
+    output.write(
+        f"trailer\n<< /Size {max_id + 1} /Root {catalog_id} 0 R >>\nstartxref\n{xref_position}\n%%EOF\n".encode("ascii")
+    )
+    return output.getvalue()
+
+
+def generate_calibration_pdf(records, report_title="Calibration Log Report", output_dir=CALIBRATION_REPORT_DIR):
+    if not isinstance(records, pd.DataFrame) or records.empty:
+        raise RuntimeError("No calibration records are available for PDF export.")
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+    pdf_path = output_dir / f"{timestamp}_{_safe_report_filename(report_title)}.pdf"
+
+    export = records.copy()
+    preferred_columns = [
+        "Calibration_ID",
+        "Equipment_Category",
+        "Project",
+        "Equipment_Type",
+        "Make_Model",
+        "Serial_No",
+        "Certificate_No",
+        "Calibration_Date",
+        "Next_Due_Date",
+        "Days_Until_Due",
+        "Alert_Status",
+        "Status",
+    ]
+    columns = [column for column in preferred_columns if column in export.columns]
+    if not columns:
+        columns = list(export.columns[:10])
+    export = export[columns].copy()
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            rightMargin=9 * mm,
+            leftMargin=9 * mm,
+            topMargin=9 * mm,
+            bottomMargin=9 * mm,
+            title=report_title,
+        )
+        styles = getSampleStyleSheet()
+        cell_style = styles["BodyText"]
+        cell_style.fontSize = 7
+        cell_style.leading = 8
+        rows = [[column.replace("_", " ") for column in columns]]
+        for _, row in export.iterrows():
+            rows.append([Paragraph(_clean_report_value(row.get(column)), cell_style) for column in columns])
+
+        story = [
+            Paragraph(report_title, styles["Title"]),
+            Paragraph(f"Generated on {date.today().strftime('%Y-%m-%d')} for {len(export)} record(s).", styles["Normal"]),
+            Spacer(1, 5 * mm),
+        ]
+        table = Table(rows, repeatRows=1)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#111827")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1d5db")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9fafb")]),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
+        story.append(table)
+        doc.build(story)
+        pdf_path.write_bytes(buffer.getvalue())
+    except ImportError:
+        lines = [report_title, f"Generated on {date.today().strftime('%Y-%m-%d')} for {len(export)} record(s).", ""]
+        lines.append(" | ".join(column.replace("_", " ") for column in columns))
+        for _, row in export.iterrows():
+            lines.append(" | ".join(_clean_report_value(row.get(column)) for column in columns))
+        pdf_path.write_bytes(_build_simple_pdf(lines))
+
+    return pdf_path
+
 
 # =========================
 # THEME
