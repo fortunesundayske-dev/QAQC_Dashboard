@@ -1,4 +1,6 @@
 from pathlib import Path
+from datetime import date
+from io import BytesIO
 import json
 import sys
 from urllib.parse import quote, urlencode
@@ -12,7 +14,6 @@ from utils import (
     get_calibration_log,
     get_calibration_reminders,
     get_calibration_summary,
-    generate_calibration_pdf,
     inject_global_ui,
     load_master_data,
     render_navigation,
@@ -38,6 +39,7 @@ getattr(auth, "render_user_sidebar", lambda: None)()
 
 DATA_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 USERS_FILE = BASE_DIR / "data" / "users.json"
+CALIBRATION_REPORT_DIR = BASE_DIR / "outputs" / "calibration_reports"
 data = load_master_data(DATA_FILE)
 log = get_calibration_log(data)
 summary = get_calibration_summary(data)
@@ -54,6 +56,110 @@ def approved_notification_emails():
         if user.get("status") == "approved" and str(user.get("email", "")).strip()
     ]
     return sorted(set(recipients))
+
+
+def clean_pdf_value(value):
+    if pd.isna(value):
+        return ""
+    if isinstance(value, pd.Timestamp):
+        return value.strftime("%Y-%m-%d")
+    if hasattr(value, "strftime") and not isinstance(value, str):
+        try:
+            return value.strftime("%Y-%m-%d")
+        except (TypeError, ValueError):
+            pass
+    return str(value).strip()
+
+
+def safe_report_filename(title):
+    safe = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in str(title))
+    return safe.strip("_").lower() or "calibration_report"
+
+
+def generate_calibration_pdf(records, report_title="Calibration Log Report"):
+    if not isinstance(records, pd.DataFrame) or records.empty:
+        raise RuntimeError("No calibration records are available for PDF export.")
+
+    CALIBRATION_REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+    pdf_path = CALIBRATION_REPORT_DIR / f"{timestamp}_{safe_report_filename(report_title)}.pdf"
+
+    export = records.copy()
+    columns = [
+        column
+        for column in [
+            "Calibration_ID",
+            "Equipment_Category",
+            "Project",
+            "Equipment_Type",
+            "Make_Model",
+            "Serial_No",
+            "Certificate_No",
+            "Calibration_Date",
+            "Next_Due_Date",
+            "Days_Until_Due",
+            "Alert_Status",
+            "Status",
+        ]
+        if column in export.columns
+    ]
+    export = export[columns or list(export.columns[:10])].copy()
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            rightMargin=9 * mm,
+            leftMargin=9 * mm,
+            topMargin=9 * mm,
+            bottomMargin=9 * mm,
+            title=report_title,
+        )
+        styles = getSampleStyleSheet()
+        cell_style = styles["BodyText"]
+        cell_style.fontSize = 7
+        cell_style.leading = 8
+        table_rows = [[column.replace("_", " ") for column in export.columns]]
+        for _, row in export.iterrows():
+            table_rows.append([Paragraph(clean_pdf_value(row.get(column)), cell_style) for column in export.columns])
+
+        story = [
+            Paragraph(report_title, styles["Title"]),
+            Paragraph(f"Generated on {date.today().strftime('%Y-%m-%d')} for {len(export)} record(s).", styles["Normal"]),
+            Spacer(1, 5 * mm),
+        ]
+        table = Table(table_rows, repeatRows=1)
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#111827")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 7),
+                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1d5db")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9fafb")]),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ]
+            )
+        )
+        story.append(table)
+        doc.build(story)
+        pdf_path.write_bytes(buffer.getvalue())
+    except ImportError as exc:
+        raise RuntimeError("PDF generation needs the reportlab package installed.") from exc
+
+    return pdf_path
 
 
 def calibration_email_body(report_title, pdf_name):
