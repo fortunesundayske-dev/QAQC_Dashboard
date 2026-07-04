@@ -2364,20 +2364,23 @@ def inject_global_ui():
 
     .nav-popover-menu {
         display: grid;
-        gap: 0.35rem;
+        gap: 0.16rem;
+        max-height: 18rem;
         min-width: 16rem;
-        padding: 0.2rem;
+        overflow-y: auto;
+        padding: 0.12rem;
     }
 
     .nav-popover-link {
         background: rgba(15, 23, 42, 0.72);
         border: 1px solid rgba(148, 163, 184, 0.16);
-        border-radius: 7px;
+        border-radius: 6px;
         color: #e5edf8 !important;
         display: block;
-        font-size: 0.82rem;
+        font-size: 0.76rem;
         font-weight: 800;
-        padding: 0.55rem 0.7rem;
+        line-height: 1.05;
+        padding: 0.28rem 0.55rem;
         text-decoration: none !important;
     }
 

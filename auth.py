@@ -151,10 +151,20 @@ def _valid_password(password):
 
 
 def _send_approval_email(user):
-    smtp_host = os.getenv("QAQC_SMTP_HOST")
-    smtp_user = os.getenv("QAQC_SMTP_USER")
-    smtp_password = os.getenv("QAQC_SMTP_PASSWORD")
-    sender = os.getenv("QAQC_SMTP_FROM", smtp_user or "no-reply@qaqc.local")
+    smtp_config = {}
+    smtp_config_file = DATA_DIR / "smtp_config.json"
+    if smtp_config_file.exists():
+        try:
+            smtp_config = json.loads(smtp_config_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            smtp_config = {}
+
+    smtp_host = os.getenv("QAQC_SMTP_HOST") or os.getenv("SMTP_HOST") or smtp_config.get("SMTP_HOST")
+    smtp_user = os.getenv("QAQC_SMTP_USER") or os.getenv("SMTP_USER") or smtp_config.get("SMTP_USER")
+    smtp_password = os.getenv("QAQC_SMTP_PASSWORD") or os.getenv("SMTP_PASSWORD") or smtp_config.get("SMTP_PASSWORD")
+    smtp_port = int(os.getenv("QAQC_SMTP_PORT") or os.getenv("SMTP_PORT") or smtp_config.get("SMTP_PORT", "587"))
+    smtp_from = os.getenv("QAQC_SMTP_FROM") or os.getenv("SMTP_FROM") or smtp_config.get("SMTP_FROM")
+    sender = smtp_from or smtp_user or "no-reply@qaqc.local"
 
     if not smtp_host or not smtp_user or not smtp_password:
         return False
@@ -170,7 +180,12 @@ def _send_approval_email(user):
         "Regards,\nQA/QC Dashboard Security"
     )
 
-    with smtplib.SMTP_SSL(smtp_host, int(os.getenv("QAQC_SMTP_PORT", "465"))) as smtp:
+    use_ssl = str(os.getenv("QAQC_SMTP_SSL") or os.getenv("SMTP_SSL") or smtp_config.get("SMTP_SSL", "0")) == "1" or smtp_port == 465
+    use_starttls = str(os.getenv("QAQC_SMTP_STARTTLS") or os.getenv("SMTP_STARTTLS") or smtp_config.get("SMTP_STARTTLS", "1")) == "1"
+    smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
+    with smtp_class(smtp_host, smtp_port, timeout=20) as smtp:
+        if not use_ssl and use_starttls:
+            smtp.starttls()
         smtp.login(smtp_user, smtp_password)
         smtp.send_message(msg)
     return True
@@ -339,6 +354,10 @@ def login():
                     st.error("Invalid username or password.")
                     return False
 
+                if user.get("status") == "restricted":
+                    st.warning("Your account has been restricted. Contact an administrator for access.")
+                    return False
+
                 if user.get("status") != "approved":
                     st.warning("Your account is waiting for administrator approval.")
                     return False
@@ -495,6 +514,11 @@ def approved_users():
     return {key: value for key, value in users.items() if value.get("status") == "approved"}
 
 
+def restricted_users():
+    users = _load_users()
+    return {key: value for key, value in users.items() if value.get("status") == "restricted"}
+
+
 def approve_user(username, role="user"):
     users = _load_users()
     user = users.get(username)
@@ -517,6 +541,52 @@ def approve_user(username, role="user"):
     if email_sent:
         return True, "Approved and email sent."
     return True, "Approved. Configure SMTP environment variables to send approval email."
+
+
+def restrict_user(username):
+    users = _load_users()
+    admin = current_user()
+    if username not in users:
+        return False, "User not found."
+    if admin and username == admin.get("username"):
+        return False, "You cannot restrict your own active admin account."
+    users[username]["status"] = "restricted"
+    users[username]["restricted_at"] = _utc_now()
+    users[username]["restricted_by"] = admin["username"] if admin else "admin"
+    users[username].pop("session_token_hash", None)
+    if not _try_save_users(users):
+        return False, "Restriction could not be saved on this deployment."
+    return True, "User restricted."
+
+
+def unrestrict_user(username):
+    users = _load_users()
+    admin = current_user()
+    if username not in users:
+        return False, "User not found."
+    users[username]["status"] = "approved"
+    users[username]["unrestricted_at"] = _utc_now()
+    users[username]["unrestricted_by"] = admin["username"] if admin else "admin"
+    if not users[username].get("approved_at"):
+        users[username]["approved_at"] = _utc_now()
+    if not users[username].get("approved_by"):
+        users[username]["approved_by"] = admin["username"] if admin else "admin"
+    if not _try_save_users(users):
+        return False, "Unrestrict could not be saved on this deployment."
+    return True, "User unrestricted."
+
+
+def delete_user(username):
+    users = _load_users()
+    admin = current_user()
+    if username not in users:
+        return False, "User not found."
+    if admin and username == admin.get("username"):
+        return False, "You cannot delete your own active admin account."
+    users.pop(username, None)
+    if not _try_save_users(users):
+        return False, "Delete could not be saved on this deployment."
+    return True, "User deleted."
 
 
 def reject_user(username):
