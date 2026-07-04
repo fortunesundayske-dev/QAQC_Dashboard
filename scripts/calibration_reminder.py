@@ -51,10 +51,15 @@ def write_acknowledgements(payload):
 def read_smtp_config():
     if not SMTP_CONFIG_FILE.exists():
         return {}
-    try:
-        config = json.loads(SMTP_CONFIG_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
+    config = None
+    for encoding in ("utf-8-sig", "utf-16"):
+        try:
+            config = json.loads(SMTP_CONFIG_FILE.read_text(encoding=encoding))
+            break
+        except UnicodeError:
+            continue
+        except (OSError, json.JSONDecodeError):
+            return {}
     return config if isinstance(config, dict) else {}
 
 
@@ -569,8 +574,25 @@ def open_email_app_draft(message, recipients, attachment_pdf=None, attachment_na
     eml_path.write_bytes(email.as_bytes())
 
     try:
-        os.startfile(str(eml_path))
-    except OSError as exc:
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "Invoke-Item -LiteralPath $args[0]",
+                str(eml_path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        if result.returncode != 0:
+            error = (result.stderr or result.stdout or "Unknown Windows launch error.").strip()
+            raise RuntimeError(error)
+    except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
         raise RuntimeError(f"Windows could not open the email draft file: {exc}") from exc
     return eml_path, attachment_path
 
