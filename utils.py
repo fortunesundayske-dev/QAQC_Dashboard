@@ -546,9 +546,9 @@ def extract_projects(data):
 def render_navigation():
     pages = get_navigation_pages()
 
-    nav_col, tool_col = st.columns([0.78, 0.22], gap="small")
+    nav_col, tool_col = st.columns([0.18, 0.82], gap="small")
     with nav_col:
-        with st.popover("›  Page Navigation", use_container_width=True):
+        with st.popover("›  Page Navigation", use_container_width=False):
             suffix = _auth_query_suffix()
             links = []
             for label, page in pages.items():
@@ -2341,13 +2341,21 @@ def inject_global_ui():
         box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22) !important;
         color: #e5edf8 !important;
         justify-content: flex-start !important;
+        max-width: 15rem !important;
         min-height: 2.4rem !important;
+        min-width: 13rem !important;
         padding: 0 0.8rem !important;
+        width: fit-content !important;
     }
 
     div[data-testid="stPopover"] button:hover {
         border-color: rgba(56, 189, 248, 0.38) !important;
         color: #ffffff !important;
+    }
+
+    div[data-testid="stPopover"] {
+        max-width: 15rem !important;
+        width: fit-content !important;
     }
 
     .command-tools--compact {
@@ -2366,9 +2374,11 @@ def inject_global_ui():
         display: grid;
         gap: 0.16rem;
         max-height: 18rem;
-        min-width: 16rem;
+        max-width: 15rem;
+        min-width: 13rem;
         overflow-y: auto;
         padding: 0.12rem;
+        width: 15rem;
     }
 
     .nav-popover-link {

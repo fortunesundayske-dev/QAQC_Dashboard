@@ -116,12 +116,6 @@ metric_5.metric("Snoozed", summary["snoozed"])
 
 email_recipients = approved_notification_emails()
 smtp_ready = smtp_configured()
-if email_recipients and smtp_ready:
-    st.success("Email reminders will be sent to: " + ", ".join(email_recipients))
-elif email_recipients:
-    st.info("Email reminder recipients: " + ", ".join(email_recipients) + ". Configure SMTP to send emails automatically.")
-else:
-    st.warning("No approved user email is available for calibration reminders.")
 
 reminders = get_calibration_reminders(data)
 overdue = reminders[reminders["Days_Until_Due"] < 0]

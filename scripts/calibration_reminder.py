@@ -19,7 +19,20 @@ ACK_FILE = BASE_DIR / "data" / "calibration_acknowledgements.json"
 SMTP_CONFIG_FILE = BASE_DIR / "data" / "smtp_config.json"
 USERS_FILE = BASE_DIR / "data" / "users.json"
 CLASSIC_OUTLOOK_EXE = Path(r"C:\Program Files\Microsoft Office\root\Office16\OUTLOOK.EXE")
+CLASSIC_OUTLOOK_SHORTCUT = Path.home() / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Outlook.lnk"
 COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
+
+
+def classic_outlook_launcher():
+    candidates = [
+        CLASSIC_OUTLOOK_EXE,
+        Path(r"C:\Program Files (x86)\Microsoft Office\root\Office16\OUTLOOK.EXE"),
+        CLASSIC_OUTLOOK_SHORTCUT,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def read_acknowledgements():
@@ -413,8 +426,11 @@ def registered_email_recipients():
 def send_email_via_classic_outlook(message, recipients, attachment_pdf=None, attachment_name="calibration_due_report.pdf"):
     if not recipients:
         raise RuntimeError("Cannot send Outlook email. Missing email recipients.")
-    if not CLASSIC_OUTLOOK_EXE.exists():
-        raise RuntimeError(f"Classic Outlook was not found at {CLASSIC_OUTLOOK_EXE}.")
+    outlook_launcher = classic_outlook_launcher()
+    if not outlook_launcher:
+        raise RuntimeError(
+            "Classic Outlook was not found. Expected Outlook.exe under Microsoft Office or Outlook.lnk in the Start Menu."
+        )
 
     sender_name = smtp_setting("CALIBRATION_EMAIL_FROM_NAME", "KPKAUE Fortune QA")
     subject = "Calibration reminder - equipment due for calibration"
@@ -460,7 +476,7 @@ $mail.Send()
                 "Bypass",
                 "-Command",
                 script,
-                str(CLASSIC_OUTLOOK_EXE),
+                str(outlook_launcher),
                 str(recipients_file),
                 str(body_file),
                 attachment_arg,
@@ -481,8 +497,11 @@ $mail.Send()
 def open_classic_outlook_draft(message, recipients, attachment_pdf=None, attachment_name="calibration_due_report.pdf"):
     if not recipients:
         raise RuntimeError("Cannot open Outlook draft. Missing email recipients.")
-    if not CLASSIC_OUTLOOK_EXE.exists():
-        raise RuntimeError(f"Classic Outlook was not found at {CLASSIC_OUTLOOK_EXE}.")
+    outlook_launcher = classic_outlook_launcher()
+    if not outlook_launcher:
+        raise RuntimeError(
+            "Classic Outlook was not found. Expected Outlook.exe under Microsoft Office or Outlook.lnk in the Start Menu."
+        )
     if not attachment_pdf:
         raise RuntimeError("Cannot open Outlook draft. Missing PDF attachment.")
 
@@ -506,7 +525,7 @@ def open_classic_outlook_draft(message, recipients, attachment_pdf=None, attachm
             "Bypass",
             "-Command",
             "Start-Process -FilePath $args[0] -ArgumentList @('/c','ipm.note','/m',$args[1],'/a',$args[2])",
-            str(CLASSIC_OUTLOOK_EXE),
+            str(outlook_launcher),
             mailto,
             str(attachment_path),
         ],
