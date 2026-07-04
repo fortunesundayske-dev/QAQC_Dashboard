@@ -59,6 +59,46 @@ def approved_notification_emails():
 def smtp_configured():
     return bool(calibration_reminder.smtp_setting("SMTP_HOST"))
 
+
+def render_calibration_report_actions(records, title, key_prefix):
+    st.markdown(f"#### {title}")
+    action_cols = st.columns([1, 1, 2])
+    try:
+        pdf_bytes = calibration_reminder.create_due_records_pdf(records)
+    except Exception as exc:
+        st.error(f"PDF could not be created: {exc}")
+        return
+
+    with action_cols[0]:
+        st.download_button(
+            "Create PDF",
+            data=pdf_bytes,
+            file_name=f"{key_prefix}_calibration_report.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key=f"{key_prefix}_download_pdf",
+        )
+    with action_cols[1]:
+        if st.button("Create PDF and Email", use_container_width=True, key=f"{key_prefix}_email_pdf"):
+            if not smtp_ready:
+                st.error("SMTP is not configured. Open Email Setup and save the sender mailbox first.")
+            elif not email_recipients:
+                st.error("No approved user email is available.")
+            else:
+                try:
+                    message = calibration_reminder.message_from_records(records, limit=None)
+                    calibration_reminder.send_email(
+                        message,
+                        attachment_pdf=pdf_bytes,
+                        attachment_name=f"{key_prefix}_calibration_report.pdf",
+                    )
+                    st.success("PDF email sent to: " + ", ".join(email_recipients))
+                except Exception as exc:
+                    st.error(f"PDF email failed: {exc}")
+    with action_cols[2]:
+        st.caption("PDF covers the records shown below. Email goes only to approved dashboard users.")
+
+
 st.title("Calibration Log")
 st.markdown("Monitor equipment calibration status, overdue items, and reminder actions.")
 
@@ -109,24 +149,9 @@ with tab_alerts:
     if reminders.empty:
         st.success("No active calibration reminders today.")
     else:
+        render_calibration_report_actions(reminders, "Reminder report actions", "due")
         st.markdown("#### Active reminders")
         st.dataframe(reminders[display_cols], use_container_width=True, hide_index=True)
-
-        pdf_cols = st.columns([1, 2])
-        with pdf_cols[0]:
-            try:
-                pdf_bytes = calibration_reminder.create_due_records_pdf(reminders)
-                st.download_button(
-                    "Create PDF",
-                    data=pdf_bytes,
-                    file_name="calibration_due_report.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                )
-            except Exception as exc:
-                st.error(f"PDF could not be created: {exc}")
-        with pdf_cols[1]:
-            st.caption("Download the due calibration report PDF and attach it to an email when needed.")
 
         st.markdown("#### Acknowledge or snooze")
         action_cols = st.columns([1.4, 1, 1, 1.3])
@@ -163,6 +188,7 @@ with tab_overdue:
         st.success("No overdue calibration items.")
     else:
         st.error(f"{len(overdue)} equipment item(s) are overdue for calibration.")
+        render_calibration_report_actions(overdue, "Overdue report actions", "overdue")
         st.dataframe(overdue[display_cols], use_container_width=True, hide_index=True)
 
 with tab_all:

@@ -161,7 +161,7 @@ def create_due_records_pdf(records):
         from reportlab.lib.units import mm
         from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
     except ImportError as exc:
-        raise RuntimeError("PDF export requires reportlab. Install project requirements and try again.") from exc
+        return create_due_records_pdf_fallback(records)
 
     export = records.copy()
     if "Days_Until_Due" not in export.columns and "Next_Due_Date" in export.columns:
@@ -254,6 +254,129 @@ def create_due_records_pdf(records):
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
+
+
+def create_due_records_pdf_fallback(records):
+    export = records.copy()
+    if "Days_Until_Due" not in export.columns and "Next_Due_Date" in export.columns:
+        today = pd.Timestamp(date.today())
+        export["Next_Due_Date"] = pd.to_datetime(export["Next_Due_Date"], errors="coerce")
+        export["Days_Until_Due"] = (export["Next_Due_Date"].dt.normalize() - today).dt.days
+
+    def clean_pdf_text(value):
+        text = clean_text(value).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        return text.encode("latin-1", errors="replace").decode("latin-1")
+
+    def due_status(days):
+        try:
+            days = int(days)
+        except (TypeError, ValueError):
+            return ""
+        if days < 0:
+            return f"Overdue by {abs(days)} day(s)"
+        if days == 0:
+            return "Due today"
+        return f"Due in {days} day(s)"
+
+    def date_text(value):
+        timestamp = pd.to_datetime(value, errors="coerce")
+        return "" if pd.isna(timestamp) else timestamp.strftime("%Y-%m-%d")
+
+    rows = [
+        "Calibration Due Report",
+        f"Generated on {date.today().strftime('%Y-%m-%d')} for {len(export)} due record(s).",
+        "",
+    ]
+    for _, row in export.sort_values(["Days_Until_Due", "Equipment_Type"], na_position="last").iterrows():
+        rows.append(
+            " | ".join(
+                [
+                    clean_text(row.get("Calibration_ID", "")),
+                    clean_text(row.get("Project", "")),
+                    clean_text(row.get("Equipment_Type", "")),
+                    clean_text(row.get("Serial_No", "")),
+                    date_text(row.get("Next_Due_Date")),
+                    due_status(row.get("Days_Until_Due")),
+                ]
+            )
+        )
+
+    page_width = 842
+    page_height = 595
+    margin_left = 36
+    top = 550
+    line_height = 13
+    max_chars = 132
+    pages = []
+    current = []
+    y = top
+    for row in rows:
+        chunks = [row[i : i + max_chars] for i in range(0, len(row), max_chars)] or [""]
+        for chunk in chunks:
+            if y < 40:
+                pages.append(current)
+                current = []
+                y = top
+            current.append((y, chunk))
+            y -= line_height
+    if current:
+        pages.append(current)
+
+    objects = []
+    page_ids = []
+    font_id = 3
+    pages_id = 1
+    catalog_id = 2
+    next_id = 4
+    for page in pages:
+        content_lines = ["BT", "/F1 9 Tf", f"{margin_left} {top} Td", "12 TL"]
+        previous_y = top
+        for y_value, text in page:
+            content_lines.append(f"0 -{previous_y - y_value} Td")
+            content_lines.append(f"({clean_pdf_text(text)}) Tj")
+            previous_y = y_value
+        content_lines.append("ET")
+        stream = "\n".join(content_lines).encode("latin-1", errors="replace")
+        content_id = next_id
+        next_id += 1
+        page_id = next_id
+        next_id += 1
+        objects.append((content_id, b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream"))
+        objects.append(
+            (
+                page_id,
+                f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {page_width} {page_height}] "
+                f"/Resources << /Font << /F1 {font_id} 0 R >> >> /Contents {content_id} 0 R >>".encode("ascii"),
+            )
+        )
+        page_ids.append(page_id)
+
+    kids = " ".join(f"{page_id} 0 R" for page_id in page_ids)
+    base_objects = [
+        (pages_id, f"<< /Type /Pages /Kids [{kids}] /Count {len(page_ids)} >>".encode("ascii")),
+        (catalog_id, f"<< /Type /Catalog /Pages {pages_id} 0 R >>".encode("ascii")),
+        (font_id, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"),
+    ]
+    all_objects = sorted(base_objects + objects, key=lambda item: item[0])
+
+    output = BytesIO()
+    output.write(b"%PDF-1.4\n")
+    offsets = {0: 0}
+    for obj_id, body in all_objects:
+        offsets[obj_id] = output.tell()
+        output.write(f"{obj_id} 0 obj\n".encode("ascii"))
+        output.write(body)
+        output.write(b"\nendobj\n")
+    xref_position = output.tell()
+    max_id = max(offsets)
+    output.write(f"xref\n0 {max_id + 1}\n".encode("ascii"))
+    output.write(b"0000000000 65535 f \n")
+    for obj_id in range(1, max_id + 1):
+        output.write(f"{offsets[obj_id]:010d} 00000 n \n".encode("ascii"))
+    output.write(
+        f"trailer\n<< /Size {max_id + 1} /Root {catalog_id} 0 R >>\nstartxref\n{xref_position}\n%%EOF\n".encode("ascii")
+    )
+    return output.getvalue()
 
 
 def show_desktop_prompt(message):
