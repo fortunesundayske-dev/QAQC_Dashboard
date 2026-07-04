@@ -85,19 +85,19 @@ def render_calibration_report_actions(records, title, key_prefix):
             else:
                 try:
                     message = calibration_reminder.message_from_records(records, limit=None)
-                    attachment_path, body_path = calibration_reminder.open_classic_outlook_draft(
+                    draft_path, attachment_path = calibration_reminder.open_email_app_draft(
                         message,
                         email_recipients,
                         attachment_pdf=pdf_bytes,
                         attachment_name=f"{key_prefix}_calibration_report.pdf",
                     )
-                    st.success("Outlook email draft opened with the PDF attached. Review it in Outlook and click Send.")
+                    st.success("Email draft created with the PDF attached. Choose/open your email app, review it, and click Send.")
+                    st.caption(f"Email draft saved at: {draft_path}")
                     st.caption(f"PDF saved at: {attachment_path}")
-                    st.caption(f"Email body saved at: {body_path}")
                 except Exception as exc:
-                    st.error(f"Outlook draft could not be opened: {exc}")
+                    st.error(f"Email draft could not be opened: {exc}")
     with action_cols[2]:
-        st.caption("PDF covers the records shown below. Email opens in classic Outlook with the PDF attached.")
+        st.caption("PDF covers the records shown below. The email draft opens with the PDF attached.")
 
 
 st.title("Calibration Log")

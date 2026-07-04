@@ -8,7 +8,6 @@ from email.message import EmailMessage
 from email.utils import formataddr
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import quote
 
 import pandas as pd
 
@@ -538,6 +537,42 @@ def open_classic_outlook_draft(message, recipients, attachment_pdf=None, attachm
         error = (result.stderr or result.stdout or "Unknown Outlook launch error.").strip()
         raise RuntimeError(f"Classic Outlook draft could not be opened: {error}")
     return attachment_path, body_path
+
+
+def open_email_app_draft(message, recipients, attachment_pdf=None, attachment_name="calibration_due_report.pdf"):
+    if not recipients:
+        raise RuntimeError("Cannot create email draft. Missing email recipients.")
+    if not attachment_pdf:
+        raise RuntimeError("Cannot create email draft. Missing PDF attachment.")
+
+    drafts_dir = BASE_DIR / "tmp" / "email_attachments"
+    drafts_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = "".join(char if char.isalnum() or char in {"-", "_", "."} else "_" for char in attachment_name)
+    timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+    attachment_path = drafts_dir / f"{timestamp}_{safe_name}"
+    eml_path = drafts_dir / f"{timestamp}_calibration_report_email.eml"
+    attachment_path.write_bytes(attachment_pdf)
+
+    sender_address = smtp_setting("SMTP_FROM") or smtp_setting("SMTP_USER") or "calibration-reminder@localhost"
+    sender_name = smtp_setting("CALIBRATION_EMAIL_FROM_NAME", "KPKAUE Fortune QA")
+    email = EmailMessage()
+    email["Subject"] = "Calibration reminder - equipment due for calibration"
+    email["From"] = formataddr((sender_name, sender_address))
+    email["To"] = ", ".join(recipients)
+    email.set_content(message)
+    email.add_attachment(
+        attachment_pdf,
+        maintype="application",
+        subtype="pdf",
+        filename=safe_name,
+    )
+    eml_path.write_bytes(email.as_bytes())
+
+    try:
+        os.startfile(str(eml_path))
+    except OSError as exc:
+        raise RuntimeError(f"Windows could not open the email draft file: {exc}") from exc
+    return eml_path, attachment_path
 
 
 def send_email(message, attachment_pdf=None, attachment_name="calibration_due_report.pdf"):
