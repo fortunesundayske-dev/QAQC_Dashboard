@@ -8,6 +8,7 @@ from email.message import EmailMessage
 from email.utils import formataddr
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import quote
 
 import pandas as pd
 
@@ -475,6 +476,49 @@ $mail.Send()
             error = (result.stderr or result.stdout or "Unknown Outlook send error.").strip()
             raise RuntimeError(f"Classic Outlook send failed: {error}")
     return True
+
+
+def open_classic_outlook_draft(message, recipients, attachment_pdf=None, attachment_name="calibration_due_report.pdf"):
+    if not recipients:
+        raise RuntimeError("Cannot open Outlook draft. Missing email recipients.")
+    if not CLASSIC_OUTLOOK_EXE.exists():
+        raise RuntimeError(f"Classic Outlook was not found at {CLASSIC_OUTLOOK_EXE}.")
+    if not attachment_pdf:
+        raise RuntimeError("Cannot open Outlook draft. Missing PDF attachment.")
+
+    drafts_dir = BASE_DIR / "tmp" / "email_attachments"
+    drafts_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = "".join(char if char.isalnum() or char in {"-", "_", "."} else "_" for char in attachment_name)
+    timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+    attachment_path = drafts_dir / f"{timestamp}_{safe_name}"
+    body_path = drafts_dir / f"{timestamp}_email_body.txt"
+    attachment_path.write_bytes(attachment_pdf)
+    body_path.write_text(message, encoding="utf-8")
+
+    recipient_text = ";".join(recipients)
+    subject = "Calibration reminder - equipment due for calibration"
+    mailto = f"{recipient_text}?subject={quote(subject)}"
+    result = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            "Start-Process -FilePath $args[0] -ArgumentList @('/c','ipm.note','/m',$args[1],'/a',$args[2])",
+            str(CLASSIC_OUTLOOK_EXE),
+            mailto,
+            str(attachment_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    if result.returncode != 0:
+        error = (result.stderr or result.stdout or "Unknown Outlook launch error.").strip()
+        raise RuntimeError(f"Classic Outlook draft could not be opened: {error}")
+    return attachment_path, body_path
 
 
 def send_email(message, attachment_pdf=None, attachment_name="calibration_due_report.pdf"):

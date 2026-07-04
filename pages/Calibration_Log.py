@@ -80,23 +80,24 @@ def render_calibration_report_actions(records, title, key_prefix):
         )
     with action_cols[1]:
         if st.button("Create PDF and Email", use_container_width=True, key=f"{key_prefix}_email_pdf"):
-            if not smtp_ready:
-                st.error("SMTP is not configured. Open Email Setup and save the sender mailbox first.")
-            elif not email_recipients:
+            if not email_recipients:
                 st.error("No approved user email is available.")
             else:
                 try:
                     message = calibration_reminder.message_from_records(records, limit=None)
-                    calibration_reminder.send_email(
+                    attachment_path, body_path = calibration_reminder.open_classic_outlook_draft(
                         message,
+                        email_recipients,
                         attachment_pdf=pdf_bytes,
                         attachment_name=f"{key_prefix}_calibration_report.pdf",
                     )
-                    st.success("PDF email sent to: " + ", ".join(email_recipients))
+                    st.success("Outlook email draft opened with the PDF attached. Review it in Outlook and click Send.")
+                    st.caption(f"PDF saved at: {attachment_path}")
+                    st.caption(f"Email body saved at: {body_path}")
                 except Exception as exc:
-                    st.error(f"PDF email failed: {exc}")
+                    st.error(f"Outlook draft could not be opened: {exc}")
     with action_cols[2]:
-        st.caption("PDF covers the records shown below. Email goes only to approved dashboard users.")
+        st.caption("PDF covers the records shown below. Email opens in classic Outlook with the PDF attached.")
 
 
 st.title("Calibration Log")
