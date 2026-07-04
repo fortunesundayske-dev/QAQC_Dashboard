@@ -1,10 +1,10 @@
-{
-  "CALIBRATION_EMAIL_FROM_NAME": "KPKAUE Fortune QA",
-  "SMTP_FROM": "fortune.kpakue@evomeclimited.com",
-  "SMTP_HOST": "smtp.office365.com",
-  "SMTP_PASSWORD": "202411",
-  "SMTP_PORT": "587",
-  "SMTP_SSL": "0",
-  "SMTP_STARTTLS": "1",
-  "SMTP_USER": "fortune.kpakue@evomeclimited.com"
+﻿{
+    "CALIBRATION_EMAIL_FROM_NAME":  "KPKAUE Fortune QA",
+    "SMTP_FROM":  "fortune.kpakue@evomeclimited.com",
+    "SMTP_HOST":  "smtp.office365.com",
+    "SMTP_PASSWORD":  "hkrsqzyrvrsgjsxq",
+    "SMTP_PORT":  "587",
+    "SMTP_SSL":  "0",
+    "SMTP_STARTTLS":  "1",
+    "SMTP_USER":  "fortune.kpakue@evomeclimited.com"
 }
