@@ -1,13 +1,15 @@
+import ctypes
 import json
 import os
 import smtplib
-import subprocess
 import tempfile
+import time
 from datetime import date, timedelta
 from email.message import EmailMessage
 from email.utils import formataddr
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import quote
 
 import pandas as pd
 
@@ -19,8 +21,6 @@ SMTP_CONFIG_FILE = BASE_DIR / "data" / "smtp_config.json"
 USERS_FILE = BASE_DIR / "data" / "users.json"
 CLASSIC_OUTLOOK_EXE = Path(r"C:\Program Files\Microsoft Office\root\Office16\OUTLOOK.EXE")
 CLASSIC_OUTLOOK_SHORTCUT = Path.home() / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Outlook.lnk"
-POWERSHELL_EXE = Path(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
-CMD_EXE = Path(r"C:\Windows\System32\cmd.exe")
 COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
 
 
@@ -38,36 +38,25 @@ def classic_outlook_launcher():
 
 def open_file_with_default_app(path):
     path = Path(path)
-    if POWERSHELL_EXE.exists():
-        result = subprocess.run(
-            [
-                str(POWERSHELL_EXE),
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                "Invoke-Item -LiteralPath $args[0]",
-                str(path),
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=20,
-        )
-    elif CMD_EXE.exists():
-        result = subprocess.run(
-            [str(CMD_EXE), "/c", "start", "", str(path)],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=20,
-        )
-    else:
-        raise RuntimeError("Windows shell launcher was not found.")
+    try:
+        result = ctypes.windll.shell32.ShellExecuteW(None, "openas", str(path), None, None, 1)
+    except (AttributeError, OSError):
+        result = 0
+    if result and result > 32:
+        return
 
-    if result.returncode != 0:
-        error = (result.stderr or result.stdout or "Unknown Windows launch error.").strip()
-        raise RuntimeError(error)
+    if not hasattr(os, "startfile"):
+        raise RuntimeError("Windows app chooser is not available.")
+    os.startfile(str(path))
+
+
+def shell_execute_file(path, arguments=""):
+    try:
+        result = ctypes.windll.shell32.ShellExecuteW(None, "open", str(path), arguments, None, 1)
+    except (AttributeError, OSError) as exc:
+        raise OSError(f"Windows launcher is not available: {exc}") from exc
+    if result <= 32:
+        raise OSError(f"Windows launcher returned error code {result}.")
 
 
 def read_acknowledgements():
@@ -436,16 +425,10 @@ def create_due_records_pdf_fallback(records):
 
 
 def show_desktop_prompt(message):
-    script = (
-        "$ws = New-Object -ComObject WScript.Shell; "
-        "$ws.Popup($args[0], 20, 'Calibration Reminder', 0x40) | Out-Null"
-    )
-    subprocess.run(
-        [str(POWERSHELL_EXE), "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script, message],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    try:
+        ctypes.windll.user32.MessageBoxW(None, str(message), "Calibration Reminder", 0x40)
+    except (AttributeError, OSError):
+        return
 
 
 def registered_email_recipients():
@@ -476,61 +459,37 @@ def send_email_via_classic_outlook(message, recipients, attachment_pdf=None, att
     subject = "Calibration reminder - equipment due for calibration"
     with tempfile.TemporaryDirectory(prefix="qaqc_outlook_") as temp_dir:
         temp_path = Path(temp_dir)
-        body_file = temp_path / "body.txt"
-        recipients_file = temp_path / "recipients.txt"
         attachment_file = temp_path / attachment_name
-        body_file.write_text(message, encoding="utf-8")
-        recipients_file.write_text(";".join(recipients), encoding="utf-8")
         attachment_arg = ""
         if attachment_pdf:
             attachment_file.write_bytes(attachment_pdf)
             attachment_arg = str(attachment_file)
 
-        script = r"""
-$ErrorActionPreference = "Stop"
-$outlookPath = $args[0]
-$recipientsPath = $args[1]
-$bodyPath = $args[2]
-$attachmentPath = $args[3]
-$subject = $args[4]
-$senderName = $args[5]
-if (-not (Get-Process OUTLOOK -ErrorAction SilentlyContinue)) {
-    Start-Process -FilePath $outlookPath -WindowStyle Hidden | Out-Null
-    Start-Sleep -Seconds 5
-}
-$outlook = New-Object -ComObject Outlook.Application
-$mail = $outlook.CreateItem(0)
-$mail.To = [System.IO.File]::ReadAllText($recipientsPath)
-$mail.Subject = $subject
-$mail.Body = [System.IO.File]::ReadAllText($bodyPath) + "`r`n`r`nRegards,`r`n" + $senderName
-if ($attachmentPath -and (Test-Path -LiteralPath $attachmentPath)) {
-    $mail.Attachments.Add($attachmentPath) | Out-Null
-}
-$mail.Send()
-"""
-        result = subprocess.run(
-            [
-                str(POWERSHELL_EXE),
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                script,
-                str(outlook_launcher),
-                str(recipients_file),
-                str(body_file),
-                attachment_arg,
-                subject,
-                sender_name,
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        if result.returncode != 0:
-            error = (result.stderr or result.stdout or "Unknown Outlook send error.").strip()
-            raise RuntimeError(f"Classic Outlook send failed: {error}")
+        try:
+            import win32com.client
+        except ImportError as exc:
+            raise RuntimeError("Classic Outlook sending requires the pywin32 package.") from exc
+
+        try:
+            outlook = win32com.client.Dispatch("Outlook.Application")
+        except Exception:
+            try:
+                shell_execute_file(outlook_launcher)
+                time.sleep(5)
+                outlook = win32com.client.Dispatch("Outlook.Application")
+            except Exception as exc:
+                raise RuntimeError(f"Classic Outlook send failed: {exc}") from exc
+
+        try:
+            mail = outlook.CreateItem(0)
+            mail.To = ";".join(recipients)
+            mail.Subject = subject
+            mail.Body = f"{message}\r\n\r\nRegards,\r\n{sender_name}"
+            if attachment_arg:
+                mail.Attachments.Add(attachment_arg)
+            mail.Send()
+        except Exception as exc:
+            raise RuntimeError(f"Classic Outlook send failed: {exc}") from exc
     return True
 
 
@@ -557,26 +516,11 @@ def open_classic_outlook_draft(message, recipients, attachment_pdf=None, attachm
     recipient_text = ";".join(recipients)
     subject = "Calibration reminder - equipment due for calibration"
     mailto = f"{recipient_text}?subject={quote(subject)}"
-    result = subprocess.run(
-        [
-            str(POWERSHELL_EXE),
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            "Start-Process -FilePath $args[0] -ArgumentList @('/c','ipm.note','/m',$args[1],'/a',$args[2])",
-            str(outlook_launcher),
-            mailto,
-            str(attachment_path),
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=20,
-    )
-    if result.returncode != 0:
-        error = (result.stderr or result.stdout or "Unknown Outlook launch error.").strip()
-        raise RuntimeError(f"Classic Outlook draft could not be opened: {error}")
+    try:
+        arguments = f'/c ipm.note /m "{mailto}" /a "{attachment_path}"'
+        shell_execute_file(outlook_launcher, arguments)
+    except OSError as exc:
+        raise RuntimeError(f"Classic Outlook draft could not be opened: {exc}") from exc
     return attachment_path, body_path
 
 
@@ -611,7 +555,7 @@ def open_email_app_draft(message, recipients, attachment_pdf=None, attachment_na
 
     try:
         open_file_with_default_app(eml_path)
-    except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
+    except (OSError, RuntimeError) as exc:
         raise RuntimeError(f"Windows could not open the email draft file: {exc}") from exc
     return eml_path, attachment_path
 
