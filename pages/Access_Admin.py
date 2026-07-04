@@ -56,6 +56,52 @@ c2.metric("Approved users", len(approved))
 c3.metric("Restricted users", len(restricted))
 c4.metric("Admin users", sum(1 for user in approved.values() if user.get("role") == "admin"))
 
+st.markdown('<div class="section-heading">User Access Controls</div>', unsafe_allow_html=True)
+managed_users = {**approved, **restricted}
+if not managed_users:
+    st.info("No approved or restricted users are available for access control.")
+else:
+    st.caption("Use these controls to restrict access, restore access, or permanently delete an account.")
+    for username, user in managed_users.items():
+        status = user.get("status", "")
+        is_self = username == admin_username
+        with st.container(border=True):
+            detail_col, action_col, delete_col = st.columns([2.2, 1, 1])
+            with detail_col:
+                st.markdown(f"**{user.get('name', username)}**")
+                st.caption(
+                    f"Username: {username} | Email: {user.get('email', '')} | "
+                    f"Role: {user.get('role', '')} | Status: {status.title()}"
+                )
+                if is_self:
+                    st.info("This is your active admin account.")
+            with action_col:
+                if status == "restricted":
+                    if st.button("Unrestrict", key=f"quick_unrestrict_{username}", use_container_width=True):
+                        ok, message = unrestrict_user(username)
+                        if ok:
+                            st.success(message)
+                            st.rerun()
+                        else:
+                            st.error(message)
+                else:
+                    if st.button("Restrict", key=f"quick_restrict_{username}", use_container_width=True, disabled=is_self):
+                        ok, message = restrict_user(username)
+                        if ok:
+                            st.warning(message)
+                            st.rerun()
+                        else:
+                            st.error(message)
+            with delete_col:
+                confirm_delete = st.checkbox("Confirm delete", key=f"quick_confirm_delete_{username}", disabled=is_self)
+                if st.button("Delete", key=f"quick_delete_{username}", use_container_width=True, disabled=is_self or not confirm_delete):
+                    ok, message = delete_user(username)
+                    if ok:
+                        st.warning(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
+
 control_options = []
 for status, group in all_user_groups.items():
     for username, user in group.items():
@@ -202,24 +248,27 @@ if approved:
     st.markdown("#### Manage approved users")
     for username, user in approved.items():
         with st.container(border=True):
+            is_self = username == admin_username
             st.subheader(user.get("name", username))
             st.caption(f"Username: {username} | Email: {user.get('email')} | Role: {user.get('role')} | Discipline: {user.get('discipline', 'Not set')}")
             restrict_col, delete_col = st.columns(2)
-            if restrict_col.button("Restrict user", key=f"restrict_{username}", use_container_width=True):
+            if restrict_col.button("Restrict user", key=f"restrict_{username}", use_container_width=True, disabled=is_self):
                 ok, message = restrict_user(username)
                 if ok:
                     st.warning(message)
                     st.rerun()
                 else:
                     st.error(message)
-            confirm_delete = delete_col.checkbox("Confirm delete", key=f"confirm_delete_{username}")
-            if delete_col.button("Delete user", key=f"delete_{username}", use_container_width=True, disabled=not confirm_delete):
+            confirm_delete = delete_col.checkbox("Confirm delete", key=f"confirm_delete_{username}", disabled=is_self)
+            if delete_col.button("Delete user", key=f"delete_{username}", use_container_width=True, disabled=is_self or not confirm_delete):
                 ok, message = delete_user(username)
                 if ok:
                     st.warning(message)
                     st.rerun()
                 else:
                     st.error(message)
+            if is_self:
+                st.info("You cannot restrict or delete your own active admin account.")
 else:
     st.info("No approved users.")
 
