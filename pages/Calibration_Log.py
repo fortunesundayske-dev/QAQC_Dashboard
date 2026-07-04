@@ -1,4 +1,5 @@
 from pathlib import Path
+import importlib
 import json
 import os
 import sys
@@ -24,6 +25,8 @@ BASE_DIR = Path(__file__).parents[1]
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 from scripts import calibration_reminder
+
+calibration_reminder = importlib.reload(calibration_reminder)
 
 
 st.set_page_config(page_title="Calibration Log", layout="wide")
