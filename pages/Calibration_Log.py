@@ -38,31 +38,22 @@ getattr(auth, "render_user_sidebar", lambda: None)()
 
 DATA_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 USERS_FILE = BASE_DIR / "data" / "users.json"
-MANDATORY_CALIBRATION_EMAILS = [
-    "allison.okosun@evomeclimited.com",
-    "fortune.kpakue@evomeclimited.com",
-    "fortunesundayske@outlook.com",
-    "lawrence.esievo@evomeclimited.com",
-    "PMC.QAQC@evomeclimited.com",
-    "theophilus.o@evomeclimited.com",
-]
 data = load_master_data(DATA_FILE)
 log = get_calibration_log(data)
 summary = get_calibration_summary(data)
 
 
 def approved_notification_emails():
-    recipients = set(MANDATORY_CALIBRATION_EMAILS)
     try:
         users = json.loads(USERS_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return sorted(recipients)
-    recipients.update(
+        return []
+    recipients = [
         str(user.get("email", "")).strip()
         for user in users.values()
         if user.get("status") == "approved" and str(user.get("email", "")).strip()
-    )
-    return sorted(recipients)
+    ]
+    return sorted(set(recipients))
 
 
 def smtp_configured():
@@ -120,6 +111,22 @@ with tab_alerts:
     else:
         st.markdown("#### Active reminders")
         st.dataframe(reminders[display_cols], use_container_width=True, hide_index=True)
+
+        pdf_cols = st.columns([1, 2])
+        with pdf_cols[0]:
+            try:
+                pdf_bytes = calibration_reminder.create_due_records_pdf(reminders)
+                st.download_button(
+                    "Create PDF",
+                    data=pdf_bytes,
+                    file_name="calibration_due_report.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+            except Exception as exc:
+                st.error(f"PDF could not be created: {exc}")
+        with pdf_cols[1]:
+            st.caption("Download the due calibration report PDF and attach it to an email when needed.")
 
         st.markdown("#### Acknowledge or snooze")
         action_cols = st.columns([1.4, 1, 1, 1.3])
@@ -239,7 +246,8 @@ with tab_email:
                     records = calibration_reminder.load_due_records()
                     sample = records.head(10) if not records.empty else records
                     message = calibration_reminder.message_from_records(sample, limit=None)
-                    calibration_reminder.send_email(message)
+                    pdf_report = calibration_reminder.create_due_records_pdf(sample) if not sample.empty else None
+                    calibration_reminder.send_email(message, attachment_pdf=pdf_report)
                     st.success(f"Trial email sent to: {', '.join(calibration_reminder.registered_email_recipients())}")
                 except Exception as exc:
                     st.error(f"Trial email failed: {exc}")

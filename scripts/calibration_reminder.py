@@ -5,8 +5,8 @@ import subprocess
 from datetime import date, timedelta
 from email.message import EmailMessage
 from email.utils import formataddr
+from io import BytesIO
 from pathlib import Path
-from urllib import request
 
 import pandas as pd
 
@@ -17,14 +17,6 @@ ACK_FILE = BASE_DIR / "data" / "calibration_acknowledgements.json"
 SMTP_CONFIG_FILE = BASE_DIR / "data" / "smtp_config.json"
 USERS_FILE = BASE_DIR / "data" / "users.json"
 COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
-MANDATORY_RECIPIENTS = [
-    "allison.okosun@evomeclimited.com",
-    "fortune.kpakue@evomeclimited.com",
-    "fortunesundayske@outlook.com",
-    "lawrence.esievo@evomeclimited.com",
-    "PMC.QAQC@evomeclimited.com",
-    "theophilus.o@evomeclimited.com",
-]
 
 
 def read_acknowledgements():
@@ -116,6 +108,8 @@ def load_due_records():
 
 
 def message_from_records(records, limit=8):
+    if records is None or records.empty:
+        return "No active calibration reminders today."
     overdue = int((records["Days_Until_Due"] < 0).sum())
     due_21 = int((records["Days_Until_Due"] == 21).sum())
     due_soon = int(((records["Days_Until_Due"] >= 0) & (records["Days_Until_Due"] < 21)).sum())
@@ -157,6 +151,111 @@ def message_from_records(records, limit=8):
     return "\n".join(lines)
 
 
+def create_due_records_pdf(records):
+    if records is None or records.empty:
+        raise RuntimeError("No due calibration records are available for PDF export.")
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except ImportError as exc:
+        raise RuntimeError("PDF export requires reportlab. Install project requirements and try again.") from exc
+
+    export = records.copy()
+    if "Days_Until_Due" not in export.columns and "Next_Due_Date" in export.columns:
+        today = pd.Timestamp(date.today())
+        export["Next_Due_Date"] = pd.to_datetime(export["Next_Due_Date"], errors="coerce")
+        export["Days_Until_Due"] = (export["Next_Due_Date"].dt.normalize() - today).dt.days
+
+    def due_status(days):
+        try:
+            days = int(days)
+        except (TypeError, ValueError):
+            return ""
+        if days < 0:
+            return f"Overdue by {abs(days)} day(s)"
+        if days == 0:
+            return "Due today"
+        return f"Due in {days} day(s)"
+
+    def date_text(value):
+        timestamp = pd.to_datetime(value, errors="coerce")
+        return "" if pd.isna(timestamp) else timestamp.strftime("%Y-%m-%d")
+
+    report_rows = [
+        [
+            "Calibration ID",
+            "Project",
+            "Equipment",
+            "Model",
+            "Serial No",
+            "Certificate No",
+            "Next Due",
+            "Status",
+        ]
+    ]
+    for _, row in export.sort_values(["Days_Until_Due", "Equipment_Type"], na_position="last").iterrows():
+        report_rows.append(
+            [
+                clean_text(row.get("Calibration_ID", "")),
+                clean_text(row.get("Project", "")),
+                clean_text(row.get("Equipment_Type", "")),
+                clean_text(row.get("Make_Model", "")),
+                clean_text(row.get("Serial_No", "")),
+                clean_text(row.get("Certificate_No", "")),
+                date_text(row.get("Next_Due_Date")),
+                due_status(row.get("Days_Until_Due")),
+            ]
+        )
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=10 * mm,
+        leftMargin=10 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
+        title="Calibration Due Report",
+    )
+    styles = getSampleStyleSheet()
+    story = [
+        Paragraph("Calibration Due Report", styles["Title"]),
+        Paragraph(f"Generated on {date.today().strftime('%Y-%m-%d')} for {len(export)} due record(s).", styles["Normal"]),
+        Spacer(1, 6 * mm),
+    ]
+    cell_style = styles["BodyText"]
+    cell_style.fontSize = 7
+    cell_style.leading = 8
+    wrapped_rows = [report_rows[0]]
+    for row in report_rows[1:]:
+        wrapped_rows.append([Paragraph(str(value), cell_style) for value in row])
+    table = Table(wrapped_rows, repeatRows=1, colWidths=[27 * mm, 38 * mm, 42 * mm, 38 * mm, 30 * mm, 34 * mm, 24 * mm, 32 * mm])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2937")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 7),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1d5db")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9fafb")]),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    story.append(table)
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
 def show_desktop_prompt(message):
     script = (
         "$ws = New-Object -ComObject WScript.Shell; "
@@ -171,13 +270,13 @@ def show_desktop_prompt(message):
 
 
 def registered_email_recipients():
-    recipients = list(MANDATORY_RECIPIENTS)
     if not USERS_FILE.exists():
-        return sorted(set(recipients))
+        return []
     try:
         users = json.loads(USERS_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return sorted(set(recipients))
+        return []
+    recipients = []
     for user in users.values():
         email = str(user.get("email", "")).strip()
         if email and user.get("status") == "approved":
@@ -185,11 +284,8 @@ def registered_email_recipients():
     return sorted(set(recipients))
 
 
-def send_email(message):
-    configured = smtp_setting("CALIBRATION_EMAIL_TO", "")
-    recipients = [item.strip() for item in configured.split(",") if item.strip()]
-    if not recipients:
-        recipients = registered_email_recipients()
+def send_email(message, attachment_pdf=None, attachment_name="calibration_due_report.pdf"):
+    recipients = registered_email_recipients()
     host = smtp_setting("SMTP_HOST")
     if not recipients or not host:
         missing = []
@@ -208,6 +304,13 @@ def send_email(message):
     email["From"] = formataddr((sender_name, sender_address))
     email["To"] = ", ".join(recipients)
     email.set_content(message)
+    if attachment_pdf:
+        email.add_attachment(
+            attachment_pdf,
+            maintype="application",
+            subtype="pdf",
+            filename=attachment_name,
+        )
 
     port = int(smtp_setting("SMTP_PORT", "587"))
     use_ssl = smtp_setting("SMTP_SSL", "0") == "1" or port == 465
@@ -228,16 +331,6 @@ def send_email(message):
         smtp.send_message(email)
 
 
-def send_teams(message):
-    webhook = os.getenv("CALIBRATION_TEAMS_WEBHOOK")
-    if not webhook:
-        return
-    payload = json.dumps({"text": message}).encode("utf-8")
-    req = request.Request(webhook, data=payload, headers={"Content-Type": "application/json"})
-    with request.urlopen(req, timeout=20):
-        pass
-
-
 def mark_notified(records):
     payload = read_acknowledgements()
     today = date.today().isoformat()
@@ -252,9 +345,9 @@ def main():
         return
     popup_message = message_from_records(records, limit=8)
     email_message = message_from_records(records, limit=None)
+    pdf_report = create_due_records_pdf(records)
     show_desktop_prompt(popup_message)
-    send_email(email_message)
-    send_teams(popup_message)
+    send_email(email_message, attachment_pdf=pdf_report)
     mark_notified(records)
 
 
