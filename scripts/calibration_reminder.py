@@ -2,6 +2,7 @@ import json
 import os
 import smtplib
 import subprocess
+import tempfile
 from datetime import date, timedelta
 from email.message import EmailMessage
 from email.utils import formataddr
@@ -16,6 +17,7 @@ EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 ACK_FILE = BASE_DIR / "data" / "calibration_acknowledgements.json"
 SMTP_CONFIG_FILE = BASE_DIR / "data" / "smtp_config.json"
 USERS_FILE = BASE_DIR / "data" / "users.json"
+CLASSIC_OUTLOOK_EXE = Path(r"C:\Program Files\Microsoft Office\root\Office16\OUTLOOK.EXE")
 COMPLETE_TERMS = ("complete", "completed", "closed", "recalibrated", "renewed")
 
 
@@ -407,6 +409,74 @@ def registered_email_recipients():
     return sorted(set(recipients))
 
 
+def send_email_via_classic_outlook(message, recipients, attachment_pdf=None, attachment_name="calibration_due_report.pdf"):
+    if not recipients:
+        raise RuntimeError("Cannot send Outlook email. Missing email recipients.")
+    if not CLASSIC_OUTLOOK_EXE.exists():
+        raise RuntimeError(f"Classic Outlook was not found at {CLASSIC_OUTLOOK_EXE}.")
+
+    sender_name = smtp_setting("CALIBRATION_EMAIL_FROM_NAME", "KPKAUE Fortune QA")
+    subject = "Calibration reminder - equipment due for calibration"
+    with tempfile.TemporaryDirectory(prefix="qaqc_outlook_") as temp_dir:
+        temp_path = Path(temp_dir)
+        body_file = temp_path / "body.txt"
+        recipients_file = temp_path / "recipients.txt"
+        attachment_file = temp_path / attachment_name
+        body_file.write_text(message, encoding="utf-8")
+        recipients_file.write_text(";".join(recipients), encoding="utf-8")
+        attachment_arg = ""
+        if attachment_pdf:
+            attachment_file.write_bytes(attachment_pdf)
+            attachment_arg = str(attachment_file)
+
+        script = r"""
+$ErrorActionPreference = "Stop"
+$outlookPath = $args[0]
+$recipientsPath = $args[1]
+$bodyPath = $args[2]
+$attachmentPath = $args[3]
+$subject = $args[4]
+$senderName = $args[5]
+if (-not (Get-Process OUTLOOK -ErrorAction SilentlyContinue)) {
+    Start-Process -FilePath $outlookPath -WindowStyle Hidden | Out-Null
+    Start-Sleep -Seconds 5
+}
+$outlook = New-Object -ComObject Outlook.Application
+$mail = $outlook.CreateItem(0)
+$mail.To = [System.IO.File]::ReadAllText($recipientsPath)
+$mail.Subject = $subject
+$mail.Body = [System.IO.File]::ReadAllText($bodyPath) + "`r`n`r`nRegards,`r`n" + $senderName
+if ($attachmentPath -and (Test-Path -LiteralPath $attachmentPath)) {
+    $mail.Attachments.Add($attachmentPath) | Out-Null
+}
+$mail.Send()
+"""
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+                str(CLASSIC_OUTLOOK_EXE),
+                str(recipients_file),
+                str(body_file),
+                attachment_arg,
+                subject,
+                sender_name,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            error = (result.stderr or result.stdout or "Unknown Outlook send error.").strip()
+            raise RuntimeError(f"Classic Outlook send failed: {error}")
+    return True
+
+
 def send_email(message, attachment_pdf=None, attachment_name="calibration_due_report.pdf"):
     recipients = registered_email_recipients()
     host = smtp_setting("SMTP_HOST")
@@ -447,6 +517,14 @@ def send_email(message, attachment_pdf=None, attachment_name="calibration_due_re
             try:
                 smtp.login(smtp_user, smtp_password)
             except smtplib.SMTPAuthenticationError as exc:
+                error_text = str(exc)
+                if "SmtpClientAuthentication is disabled" in error_text or "5.7.139" in error_text:
+                    return send_email_via_classic_outlook(
+                        message,
+                        recipients,
+                        attachment_pdf=attachment_pdf,
+                        attachment_name=attachment_name,
+                    )
                 raise RuntimeError(
                     "Outlook rejected the SMTP login. Check the full sender email address, password/app password, "
                     "and confirm SMTP sending is enabled for that mailbox."
