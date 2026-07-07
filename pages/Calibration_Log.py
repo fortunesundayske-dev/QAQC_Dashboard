@@ -23,6 +23,7 @@ from utils import (
     inject_global_ui,
     load_master_data,
     mask_teams_webhook_url,
+    post_to_teams,
     read_teams_notification_log,
     render_navigation,
     render_top_nav,
@@ -631,13 +632,24 @@ def render_teams_settings(records, is_admin=False):
             write_teams_config(webhook_input)
             st.success("Teams webhook settings saved.")
             st.rerun()
+        if st.button("Send Teams Connection Test", disabled=not bool(webhook_url), use_container_width=True):
+            ok, test_result = post_to_teams(
+                webhook_url,
+                "**QAQC Calibration Notification Test**\n\n"
+                "This is a connection test from the Calibration Log app. "
+                "If this card appears in Teams, the saved workflow URL is working.",
+            )
+            if ok:
+                st.success("Power Automate accepted the Teams test card. If the flow still fails, check that the Teams action Adaptive Card field uses triggerBody()?['adaptiveCard'].")
+            else:
+                st.error(f"Teams connection test failed: {test_result}")
 
     result = st.session_state.get("calibration_teams_result")
     if result:
         if not result.get("configured"):
             st.info("Automatic Teams alert check skipped because no webhook is configured.")
         elif result.get("failed"):
-            st.error(f"Teams alert check completed with {result['failed']} failed delivery attempt(s).")
+            st.error(f"Teams alert check completed with {result['failed']} failed alert(s). {result.get('sent', 0)} alert(s) were accepted.")
         elif result.get("sent"):
             st.success(f"Teams alert check sent {result['sent']} alert(s).")
         else:
@@ -653,7 +665,7 @@ def render_teams_settings(records, is_admin=False):
         if not result.get("configured"):
             st.warning("No Teams webhook is configured.")
         elif result.get("failed"):
-            st.error(f"{result['failed']} Teams alert(s) failed. See the notification log below.")
+            st.error(f"{result['failed']} Teams alert(s) failed. {result.get('sent', 0)} alert(s) were accepted. See the notification log below.")
         else:
             st.success(f"{result['sent']} Teams alert(s) sent. {result['skipped']} duplicate or ineligible item(s) skipped.")
 

@@ -28,8 +28,10 @@ st.markdown(
 )
 
 pending_users = getattr(auth, "pending_users", lambda: {})
+all_users = getattr(auth, "all_users", lambda: {})
 approved_users = getattr(auth, "approved_users", lambda: {})
 restricted_users = getattr(auth, "restricted_users", lambda: {})
+rejected_users = getattr(auth, "rejected_users", lambda: {})
 approve_user = getattr(auth, "approve_user", None)
 reject_user = getattr(auth, "reject_user", None)
 restrict_user = getattr(auth, "restrict_user", None)
@@ -41,20 +43,88 @@ if any(action is None for action in [approve_user, reject_user, restrict_user, u
     st.stop()
 
 pending = pending_users()
+all_accounts = all_users()
 approved = approved_users()
 restricted = restricted_users()
+rejected = rejected_users()
 all_user_groups = {
     "pending": pending,
     "approved": approved,
     "restricted": restricted,
+    "rejected": rejected,
 }
 admin_username = st.session_state.get("auth", {}).get("username") or st.session_state.get("username")
 
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Pending approvals", len(pending))
 c2.metric("Approved users", len(approved))
 c3.metric("Restricted users", len(restricted))
-c4.metric("Admin users", sum(1 for user in approved.values() if user.get("role") == "admin"))
+c4.metric("Rejected requests", len(rejected))
+c5.metric("Admin users", sum(1 for user in approved.values() if user.get("role") == "admin"))
+
+st.caption(f"User store: {getattr(auth, 'USERS_FILE', 'data/users.json')}")
+if st.button("Refresh access requests", use_container_width=True):
+    st.rerun()
+
+st.markdown('<div class="section-heading">Pending Registration Requests</div>', unsafe_allow_html=True)
+if not pending:
+    st.info("No pending registration requests are saved in the current user store. Ask the user to confirm they saw the 'Registration submitted' success message.")
+else:
+    st.success(f"{len(pending)} pending request(s) need approval.")
+    for username, user in pending.items():
+        with st.container(border=True):
+            st.subheader(user.get("name", username))
+            st.caption(
+                f"Username: {username} | Email: {user.get('email', '')} | "
+                f"Discipline: {user.get('discipline', 'Not set')} | Requested: {user.get('created_at', '')}"
+            )
+            role = st.selectbox(
+                "Role on approval",
+                ["user", "viewer", "admin"],
+                key=f"top_role_{username}",
+            )
+            c_approve, c_reject, c_delete = st.columns(3)
+            if c_approve.button("Approve access", key=f"top_approve_{username}", use_container_width=True):
+                ok, message = approve_user(username, role)
+                if ok:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+            if c_reject.button("Reject", key=f"top_reject_{username}", use_container_width=True):
+                if reject_user(username):
+                    st.warning("Registration rejected.")
+                    st.rerun()
+            confirm_delete = c_delete.checkbox("Confirm delete", key=f"top_confirm_delete_pending_{username}")
+            if c_delete.button("Delete request", key=f"top_delete_pending_{username}", use_container_width=True, disabled=not confirm_delete):
+                ok, message = delete_user(username)
+                if ok:
+                    st.warning(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+
+st.markdown('<div class="section-heading">All User Account Status</div>', unsafe_allow_html=True)
+if all_accounts:
+    accounts_df = pd.DataFrame(
+        [
+            {
+                "Username": username,
+                "Name": user.get("name"),
+                "Email": user.get("email"),
+                "Role": user.get("role"),
+                "Status": user.get("status"),
+                "Discipline": user.get("discipline"),
+                "Created": user.get("created_at"),
+                "Approved by": user.get("approved_by"),
+                "Rejected at": user.get("rejected_at"),
+            }
+            for username, user in all_accounts.items()
+        ]
+    )
+    st.dataframe(accounts_df, use_container_width=True, hide_index=True)
+else:
+    st.warning("No users were found in the current user store.")
 
 st.markdown('<div class="section-heading">User Access Controls</div>', unsafe_allow_html=True)
 managed_users = {**approved, **restricted}
@@ -187,6 +257,24 @@ with st.container(border=True):
                     st.error(message)
             confirm_delete = delete_col.checkbox("Confirm delete", key=f"control_confirm_delete_restricted_{username}")
             if delete_col.button("Delete", key=f"control_delete_restricted_{username}", use_container_width=True, disabled=not confirm_delete):
+                ok, message = delete_user(username)
+                if ok:
+                    st.warning(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+        elif status == "rejected":
+            role = st.selectbox("Role on approval", ["user", "viewer", "admin"], key=f"control_role_rejected_{username}")
+            approve_col, delete_col = st.columns(2)
+            if approve_col.button("Approve rejected request", key=f"control_approve_rejected_{username}", use_container_width=True):
+                ok, message = approve_user(username, role)
+                if ok:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+            confirm_delete = delete_col.checkbox("Confirm delete", key=f"control_confirm_delete_rejected_{username}")
+            if delete_col.button("Delete rejected request", key=f"control_delete_rejected_{username}", use_container_width=True, disabled=not confirm_delete):
                 ok, message = delete_user(username)
                 if ok:
                     st.warning(message)

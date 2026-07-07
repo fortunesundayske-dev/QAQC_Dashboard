@@ -390,6 +390,9 @@ def build_teams_calibration_message(row):
 
 
 TEAMS_ALERT_CARD_CHUNK_SIZE = 5
+TEAMS_ALERT_POST_RETRIES = 2
+TEAMS_ALERT_RETRY_DELAY_SECONDS = 2
+TEAMS_ALERT_BATCH_DELAY_SECONDS = 1
 
 
 def build_teams_calibration_batch_message(records, batch_number=None, batch_total=None):
@@ -465,24 +468,50 @@ def build_teams_adaptive_card(message):
     }
 
 
-def post_to_teams(webhook_url, message):
+def post_to_teams(webhook_url, message, retries=TEAMS_ALERT_POST_RETRIES, retry_delay_seconds=TEAMS_ALERT_RETRY_DELAY_SECONDS):
     adaptive_card = build_teams_adaptive_card(message)
-    payload = json.dumps({**adaptive_card, "adaptiveCard": json.dumps(adaptive_card)}).encode("utf-8")
-    req = request.Request(
-        webhook_url,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with request.urlopen(req, timeout=20) as response:
-            body = response.read().decode("utf-8", errors="replace").strip()
-            return True, f"Success ({response.status})" + (f": {body}" if body else "")
-    except error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace").strip()
-        return False, f"HTTP {exc.code}: {detail or exc.reason}"
-    except (error.URLError, TimeoutError, OSError) as exc:
-        return False, f"Failed: {exc}"
+    payload_body = {
+        **adaptive_card,
+        "adaptiveCard": json.dumps(adaptive_card, ensure_ascii=False),
+        "card": json.dumps(adaptive_card, ensure_ascii=False),
+        "summary": "QAQC Calibration Notification",
+    }
+    payload = json.dumps(payload_body, ensure_ascii=False).encode("utf-8")
+    attempts = max(1, int(retries or 0) + 1)
+    retryable_http_codes = {408, 425, 429, 500, 502, 503, 504}
+    last_result = ""
+
+    for attempt in range(1, attempts + 1):
+        req = request.Request(
+            webhook_url,
+            data=payload,
+            headers={
+                "Content-Type": "application/json; charset=utf-8",
+                "User-Agent": "QAQC-Calibration-Log/1.0",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=30) as response:
+                body = response.read().decode("utf-8", errors="replace").strip()
+                result = f"Success ({response.status}) - Power Automate accepted request"
+                return True, result + (f": {body}" if body else "")
+        except error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace").strip()
+            last_result = f"HTTP {exc.code}: {detail or exc.reason}"
+            if exc.code not in retryable_http_codes or attempt == attempts:
+                return False, last_result
+        except (error.URLError, TimeoutError, OSError) as exc:
+            last_result = str(exc)
+            if attempt == attempts:
+                return False, (
+                    f"Failed after {attempts} attempt(s): {last_result}. "
+                    "Check internet, proxy, firewall, and access to the Power Automate webhook."
+                )
+
+        time.sleep(retry_delay_seconds * attempt)
+
+    return False, last_result or "Failed to send Teams notification."
 
 
 def append_teams_notification_log(record_id, row, result, sent_at=None):
@@ -563,8 +592,11 @@ def send_calibration_teams_alerts(records, webhook_url=None, force=False):
             ),
         )
         batch_results.append((ok, result, batch_number, batch))
+        if batch_number < len(batches):
+            time.sleep(TEAMS_ALERT_BATCH_DELAY_SECONDS)
 
-    all_ok = all(ok for ok, _, _, _ in batch_results)
+    sent_count = sum(len(batch) for ok, _, _, batch in batch_results if ok)
+    failed_count = sum(len(batch) for ok, _, _, batch in batch_results if not ok)
     results = []
     for ok, result, batch_number, batch in batch_results:
         for _, row in batch.iterrows():
@@ -583,9 +615,9 @@ def send_calibration_teams_alerts(records, webhook_url=None, force=False):
 
     return {
         "configured": True,
-        "sent": int(len(due_records)) if all_ok else 0,
+        "sent": int(sent_count),
         "skipped": skipped,
-        "failed": 0 if all_ok else int(len(due_records)),
+        "failed": int(failed_count),
         "results": results,
     }
 

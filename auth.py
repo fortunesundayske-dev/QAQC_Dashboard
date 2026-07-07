@@ -463,7 +463,13 @@ def current_user():
 def require_role(roles):
     role = get_role()
     if role not in roles:
-        st.error("You do not have access to this module.")
+        allowed = ", ".join(str(item).title() for item in roles)
+        current = str(role or "not signed in").title()
+        st.error(f"This module is restricted to: {allowed}. Your current role is: {current}.")
+        st.info("To approve or manage users, sign out and sign in with an admin account.")
+        if st.button("Sign out and switch account", use_container_width=True, key="role_guard_sign_out"):
+            _set_logged_out()
+            st.rerun()
         st.stop()
 
 
@@ -507,6 +513,15 @@ def update_profile(name, email, discipline, uploaded_photo=None):
 def pending_users():
     users = _load_users()
     return {key: value for key, value in users.items() if value.get("status") == "pending"}
+
+
+def all_users():
+    return _load_users()
+
+
+def rejected_users():
+    users = _load_users()
+    return {key: value for key, value in users.items() if value.get("status") == "rejected"}
 
 
 def approved_users():
