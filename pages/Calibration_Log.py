@@ -15,6 +15,7 @@ import streamlit as st
 import auth
 from utils import (
     acknowledge_calibration,
+    generate_calibration_pdf as shared_generate_calibration_pdf,
     get_calibration_log,
     get_calibration_reminders,
     get_calibration_summary,
@@ -25,6 +26,7 @@ from utils import (
     read_teams_notification_log,
     render_navigation,
     render_top_nav,
+    save_calibration_log_to_excel,
     send_calibration_teams_alerts,
     snooze_calibration,
     write_teams_config,
@@ -298,6 +300,9 @@ CALIBRATION_REPORT_DIR = BASE_DIR / "outputs" / "calibration_reports"
 data = load_master_data(DATA_FILE)
 log = get_calibration_log(data)
 summary = get_calibration_summary(data)
+raw_calibration_log = data.get("Calibration Log", pd.DataFrame()).copy() if isinstance(data, dict) else pd.DataFrame()
+if isinstance(raw_calibration_log, pd.DataFrame) and not raw_calibration_log.empty and "Calibration_ID" not in raw_calibration_log.columns:
+    raw_calibration_log.insert(0, "Calibration_ID", [f"CAL-{index + 1:03d}" for index in range(len(raw_calibration_log))])
 
 
 def registered_account_emails():
@@ -332,89 +337,7 @@ def safe_report_filename(title):
 
 
 def generate_calibration_pdf(records, report_title="Calibration Log Report"):
-    if not isinstance(records, pd.DataFrame) or records.empty:
-        raise RuntimeError("No calibration records are available for PDF export.")
-
-    CALIBRATION_REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
-    pdf_path = CALIBRATION_REPORT_DIR / f"{timestamp}_{safe_report_filename(report_title)}.pdf"
-
-    export = records.copy()
-    columns = [
-        column
-        for column in [
-            "Calibration_ID",
-            "Equipment_Category",
-            "Project",
-            "Equipment_Type",
-            "Make_Model",
-            "Serial_No",
-            "Certificate_No",
-            "Calibration_Date",
-            "Next_Due_Date",
-            "Days_Until_Due",
-            "Alert_Status",
-            "Status",
-        ]
-        if column in export.columns
-    ]
-    export = export[columns or list(export.columns[:10])].copy()
-
-    try:
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.lib.units import mm
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=landscape(A4),
-            rightMargin=9 * mm,
-            leftMargin=9 * mm,
-            topMargin=9 * mm,
-            bottomMargin=9 * mm,
-            title=report_title,
-        )
-        styles = getSampleStyleSheet()
-        cell_style = styles["BodyText"]
-        cell_style.fontSize = 7
-        cell_style.leading = 8
-        table_rows = [[column.replace("_", " ") for column in export.columns]]
-        for _, row in export.iterrows():
-            table_rows.append([Paragraph(clean_pdf_value(row.get(column)), cell_style) for column in export.columns])
-
-        story = [
-            Paragraph(report_title, styles["Title"]),
-            Paragraph(f"Generated on {date.today().strftime('%Y-%m-%d')} for {len(export)} record(s).", styles["Normal"]),
-            Spacer(1, 5 * mm),
-        ]
-        table = Table(table_rows, repeatRows=1)
-        table.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#111827")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 7),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1d5db")),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9fafb")]),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                    ("TOPPADDING", (0, 0), (-1, -1), 3),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-                ]
-            )
-        )
-        story.append(table)
-        doc.build(story)
-        pdf_path.write_bytes(buffer.getvalue())
-    except ImportError as exc:
-        raise RuntimeError("PDF generation needs the reportlab package installed.") from exc
-
-    return pdf_path
+    return shared_generate_calibration_pdf(records, report_title=report_title, output_dir=CALIBRATION_REPORT_DIR)
 
 
 def calibration_email_body(report_title, pdf_name):
@@ -603,6 +526,59 @@ def render_table_toolbar(record_count):
     )
 
 
+def filter_calibration_records(records, key_prefix, include_status=True):
+    if not isinstance(records, pd.DataFrame) or records.empty:
+        return records
+
+    controls = st.columns([1, 1, 2])
+    with controls[0]:
+        category_values = records.get("Equipment_Category", pd.Series(dtype=str)).dropna().astype(str)
+        categories = ["All"] + sorted(category_values.unique().tolist())
+        selected_category = st.selectbox("Category", categories, key=f"{key_prefix}_category")
+    with controls[1]:
+        if include_status:
+            status_values = records.get("Alert_Status", pd.Series(dtype=str)).dropna().astype(str)
+            statuses = ["All"] + sorted(status_values.unique().tolist())
+            selected_status = st.selectbox("Alert status", statuses, key=f"{key_prefix}_status")
+        else:
+            selected_status = "All"
+            st.empty()
+    with controls[2]:
+        search = st.text_input(
+            "Search calibration records",
+            placeholder="Equipment, tag, serial, certificate, model...",
+            key=f"{key_prefix}_search",
+        )
+
+    visible = records.copy()
+    if selected_category != "All" and "Equipment_Category" in visible.columns:
+        visible = visible[visible["Equipment_Category"].astype(str) == selected_category]
+    if selected_status != "All" and "Alert_Status" in visible.columns:
+        visible = visible[visible["Alert_Status"].astype(str) == selected_status]
+    if search:
+        needle = search.strip().lower()
+        search_cols = [
+            "Equipment_Type",
+            "Instrument_Name",
+            "Make_Model",
+            "Serial_No",
+            "Certificate_No",
+            "Calibration_ID",
+            "Tag_Number",
+            "Tag_No",
+            "Tag",
+            "Instrument_ID",
+            "Equipment_ID",
+            "Project",
+        ]
+        mask = pd.Series(False, index=visible.index)
+        for column in search_cols:
+            if column in visible.columns:
+                mask = mask | visible[column].astype(str).str.lower().str.contains(needle, na=False)
+        visible = visible[mask]
+    return visible
+
+
 def run_startup_teams_notifications(records):
     if records.empty:
         return
@@ -645,6 +621,10 @@ def render_teams_settings(records):
             st.success(f"Teams alert check sent {result['sent']} alert(s).")
         else:
             st.info("Teams alert check completed. No new Teams alerts needed sending.")
+        result_rows = result.get("results") or []
+        if result_rows:
+            with st.expander("Teams delivery details", expanded=bool(result.get("failed"))):
+                st.dataframe(pd.DataFrame(result_rows), use_container_width=True, hide_index=True)
 
     if st.button("Send Teams Alerts Now", use_container_width=True):
         result = send_calibration_teams_alerts(records)
@@ -673,6 +653,36 @@ def render_teams_settings(records):
     ]
     visible_columns = [column for column in visible_columns if column in log_df.columns]
     st.dataframe(log_df[visible_columns].sort_values("sent_at", ascending=False), use_container_width=True, hide_index=True)
+
+
+def render_excel_log_editor(records):
+    st.markdown("#### Edit Excel calibration log")
+    if not isinstance(records, pd.DataFrame) or records.empty:
+        st.info("No Excel calibration rows are available to edit.")
+        return
+
+    st.caption("Edits here save directly to the Calibration Log sheet in data/QAQC_Master.xlsx.")
+    edited = st.data_editor(
+        records,
+        use_container_width=True,
+        hide_index=True,
+        num_rows="dynamic",
+        key="calibration_excel_editor",
+    )
+    action_cols = st.columns([1, 1, 2])
+    with action_cols[0]:
+        if st.button("Save to Excel", use_container_width=True, key="save_calibration_excel"):
+            try:
+                save_calibration_log_to_excel(edited, DATA_FILE)
+                st.success("Calibration Log sheet saved to QAQC_Master.xlsx.")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
+    with action_cols[1]:
+        if st.button("Refresh from Excel", use_container_width=True, key="refresh_calibration_excel"):
+            st.rerun()
+    with action_cols[2]:
+        st.markdown('<p class="cal-table-caption">Close the Excel workbook before saving from this page.</p>', unsafe_allow_html=True)
 
 
 if log.empty:
@@ -737,77 +747,61 @@ with tab_alerts:
         st.success("No active calibration reminders today.")
     else:
         render_alert_banner(len(overdue))
-        render_calibration_report_actions(reminders, "Reminder report actions", "due")
+        filtered_reminders = filter_calibration_records(reminders, "due")
+        render_calibration_report_actions(filtered_reminders, "Reminder report actions", "due")
         st.markdown("#### Active reminders")
-        render_table_toolbar(len(reminders))
-        st.dataframe(reminders[display_cols], use_container_width=True, hide_index=True)
+        render_table_toolbar(len(filtered_reminders))
+        st.dataframe(filtered_reminders[display_cols], use_container_width=True, hide_index=True)
 
         st.markdown("#### Acknowledge or snooze")
-        action_cols = st.columns([1.4, 1, 1, 1.3])
-        with action_cols[0]:
-            selected_id = st.selectbox(
-                "Equipment record",
-                reminders["Calibration_ID"].astype(str).tolist(),
-                key="calibration_action_record",
-            )
-        with action_cols[1]:
-            snooze_days = st.number_input("Snooze days", min_value=1, max_value=30, value=1, step=1)
-        with action_cols[2]:
-            st.write("")
-            st.write("")
-            if st.button("Acknowledge", use_container_width=True):
-                acknowledge_calibration(selected_id)
-                st.success("Reminder acknowledged.")
-                st.rerun()
-        with action_cols[3]:
-            st.write("")
-            st.write("")
-            if st.button("Snooze", use_container_width=True):
-                snooze_calibration(selected_id, snooze_days)
-                st.success(f"Reminder snoozed for {snooze_days} day(s).")
-                st.rerun()
+        if filtered_reminders.empty:
+            st.info("No reminder records match the current filters.")
+        else:
+            action_cols = st.columns([1.4, 1, 1, 1.3])
+            with action_cols[0]:
+                selected_id = st.selectbox(
+                    "Equipment record",
+                    filtered_reminders["Calibration_ID"].astype(str).tolist(),
+                    key="calibration_action_record",
+                )
+            with action_cols[1]:
+                snooze_days = st.number_input("Snooze days", min_value=1, max_value=30, value=1, step=1)
+            with action_cols[2]:
+                st.write("")
+                st.write("")
+                if st.button("Acknowledge", use_container_width=True):
+                    acknowledge_calibration(selected_id)
+                    st.success("Reminder acknowledged.")
+                    st.rerun()
+            with action_cols[3]:
+                st.write("")
+                st.write("")
+                if st.button("Snooze", use_container_width=True):
+                    snooze_calibration(selected_id, snooze_days)
+                    st.success(f"Reminder snoozed for {snooze_days} day(s).")
+                    st.rerun()
 
-        selected_row = reminders[reminders["Calibration_ID"].astype(str) == str(selected_id)].head(1)
-        if not selected_row.empty:
-            st.markdown("#### Selected equipment")
-            st.dataframe(selected_row[display_cols], use_container_width=True, hide_index=True)
+            selected_row = filtered_reminders[filtered_reminders["Calibration_ID"].astype(str) == str(selected_id)].head(1)
+            if not selected_row.empty:
+                st.markdown("#### Selected equipment")
+                st.dataframe(selected_row[display_cols], use_container_width=True, hide_index=True)
 
 with tab_overdue:
     if overdue.empty:
         render_alert_banner(0)
     else:
         render_alert_banner(len(overdue))
-        render_calibration_report_actions(overdue, "Overdue report actions", "overdue")
-        render_table_toolbar(len(overdue))
-        st.dataframe(overdue[display_cols], use_container_width=True, hide_index=True)
+        filtered_overdue = filter_calibration_records(overdue, "overdue", include_status=False)
+        render_calibration_report_actions(filtered_overdue, "Overdue report actions", "overdue")
+        render_table_toolbar(len(filtered_overdue))
+        st.dataframe(filtered_overdue[display_cols], use_container_width=True, hide_index=True)
 
 with tab_all:
-    filters = st.columns([1, 1, 1])
-    with filters[0]:
-        categories = ["All"] + sorted(log["Equipment_Category"].dropna().astype(str).unique().tolist())
-        selected_category = st.selectbox("Category", categories)
-    with filters[1]:
-        statuses = ["All"] + sorted(log["Alert_Status"].dropna().astype(str).unique().tolist())
-        selected_status = st.selectbox("Alert status", statuses)
-    with filters[2]:
-        search = st.text_input("Search equipment", placeholder="Equipment, serial number, certificate...")
-
-    visible = log.copy()
-    if selected_category != "All":
-        visible = visible[visible["Equipment_Category"].astype(str) == selected_category]
-    if selected_status != "All":
-        visible = visible[visible["Alert_Status"].astype(str) == selected_status]
-    if search:
-        needle = search.strip().lower()
-        search_cols = ["Equipment_Type", "Make_Model", "Serial_No", "Certificate_No", "Calibration_ID"]
-        mask = pd.Series(False, index=visible.index)
-        for column in search_cols:
-            if column in visible.columns:
-                mask = mask | visible[column].astype(str).str.lower().str.contains(needle, na=False)
-        visible = visible[mask]
+    visible = filter_calibration_records(log, "all")
 
     render_table_toolbar(len(visible))
     st.dataframe(visible[display_cols], use_container_width=True, hide_index=True, height=520)
+    render_excel_log_editor(raw_calibration_log)
 
 with tab_notifications:
     render_teams_settings(reminders)

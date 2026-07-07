@@ -187,6 +187,28 @@ def get_calibration_summary(data):
     }
 
 
+def save_calibration_log_to_excel(records, excel_file=EXCEL_FILE):
+    if not isinstance(records, pd.DataFrame):
+        raise RuntimeError("Calibration records must be a table before saving.")
+
+    excel_file = Path(excel_file)
+    if not excel_file.exists():
+        raise RuntimeError(f"Excel workbook was not found: {excel_file}")
+
+    export = records.copy()
+    for column in export.columns:
+        if "date" in str(column).lower() or str(column) in {"Acknowledged_On", "Snoozed_Until", "Last_Notified_On"}:
+            export[column] = pd.to_datetime(export[column], errors="coerce")
+
+    try:
+        with pd.ExcelWriter(excel_file, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
+            export.to_excel(writer, sheet_name="Calibration Log", index=False)
+    except PermissionError as exc:
+        raise RuntimeError("The Excel workbook is open or locked. Close QAQC_Master.xlsx, then save again.") from exc
+    except Exception as exc:
+        raise RuntimeError(f"Calibration log could not be saved to Excel: {exc}") from exc
+
+
 def acknowledge_calibration(record_id, note=""):
     payload = _read_calibration_acknowledgements()
     record = payload.setdefault(str(record_id), {})
