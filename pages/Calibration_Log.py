@@ -616,6 +616,7 @@ def render_teams_settings(records, is_admin=False):
         st.warning("Microsoft Teams notifications are not configured. Please contact an admin.")
 
     if is_admin:
+        st.info("Power Automate setup: in the Teams 'Post card in a chat or channel' action, set Adaptive Card to the expression triggerBody()?['adaptiveCard'].")
         with st.form("teams_webhook_settings"):
             saved_value = "" if webhook_url and "TEAMS_WEBHOOK_URL" in os.environ else webhook_url
             st.caption("Use the TEAMS_WEBHOOK_URL environment variable, or save a webhook URL to data/teams_config.json.")

@@ -389,7 +389,10 @@ def build_teams_calibration_message(row):
     )
 
 
-def build_teams_calibration_batch_message(records):
+TEAMS_ALERT_CARD_CHUNK_SIZE = 5
+
+
+def build_teams_calibration_batch_message(records, batch_number=None, batch_total=None):
     if records is None or not isinstance(records, pd.DataFrame) or records.empty:
         return "No calibration equipment is due or overdue."
 
@@ -406,6 +409,8 @@ def build_teams_calibration_batch_message(records):
         f"Due soon: {due_soon_count}",
         "",
     ]
+    if batch_number and batch_total:
+        lines.insert(1, f"Batch {batch_number} of {batch_total}")
 
     for index, (_, row) in enumerate(export.iterrows(), start=1):
         status = teams_alert_status(row)
@@ -430,6 +435,11 @@ def build_teams_calibration_batch_message(records):
     return "\n".join(lines)
 
 
+def chunk_dataframe(records, chunk_size=TEAMS_ALERT_CARD_CHUNK_SIZE):
+    for start in range(0, len(records), chunk_size):
+        yield records.iloc[start : start + chunk_size]
+
+
 def build_teams_adaptive_card(message):
     lines = [line.strip() for line in str(message).splitlines() if line.strip()]
     body = [
@@ -450,21 +460,20 @@ def build_teams_adaptive_card(message):
     return {
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
         "type": "AdaptiveCard",
-        "version": "1.4",
+        "version": "1.2",
         "body": body,
     }
 
 
 def post_to_teams(webhook_url, message):
     adaptive_card = build_teams_adaptive_card(message)
-    payload_card = {
-        **adaptive_card,
-        "summary": "QAQC calibration notification",
-        "text": message,
-        "message": message,
-        "adaptiveCard": json.dumps(adaptive_card),
-    }
-    payload = json.dumps(payload_card).encode("utf-8")
+    payload = json.dumps(
+        {
+            "adaptiveCard": json.dumps(adaptive_card),
+            "message": message,
+            "text": message,
+        }
+    ).encode("utf-8")
     req = request.Request(
         webhook_url,
         data=payload,
@@ -518,52 +527,71 @@ def send_calibration_teams_alerts(records, webhook_url=None, force=False):
         }
 
     results = []
-    eligible_rows = []
+    due_rows = []
+    trigger_rows = []
     skipped = 0
     for _, row in records.iterrows():
         if not should_send_teams_alert(row):
             skipped += 1
             continue
+        due_rows.append(row)
         record_id = str(row.get("Calibration_ID") or _calibration_identifier(row)).strip()
         status = teams_alert_status(row)
         if not force and teams_alert_recently_sent(record_id, status, row):
-            skipped += 1
             frequency, interval_days = teams_alert_frequency(row)
             results.append(
                 {
                     "record_id": record_id,
                     "status": status,
                     "frequency": frequency,
-                    "result": f"Skipped until cadence allows another alert ({interval_days} day interval)",
+                    "result": f"Included in full alert card; cadence interval is {interval_days} day(s)",
                 }
             )
             continue
 
-        eligible_rows.append(row)
+        trigger_rows.append(row)
 
-    if not eligible_rows:
+    if not due_rows:
+        return {"configured": True, "sent": 0, "skipped": skipped, "failed": 0, "results": results}
+    if not force and not trigger_rows:
         return {"configured": True, "sent": 0, "skipped": skipped, "failed": 0, "results": results}
 
-    eligible = pd.DataFrame(eligible_rows)
-    ok, result = post_to_teams(webhook_url, build_teams_calibration_batch_message(eligible))
-    for _, row in eligible.iterrows():
-        record_id = str(row.get("Calibration_ID") or _calibration_identifier(row)).strip()
-        append_teams_notification_log(record_id, row, result)
-        frequency, _ = teams_alert_frequency(row)
-        results.append(
-            {
-                "record_id": record_id,
-                "status": teams_alert_status(row),
-                "frequency": frequency,
-                "result": result,
-            }
+    due_records = pd.DataFrame(due_rows)
+    batches = list(chunk_dataframe(due_records))
+    batch_results = []
+    for batch_number, batch in enumerate(batches, start=1):
+        ok, result = post_to_teams(
+            webhook_url,
+            build_teams_calibration_batch_message(
+                batch,
+                batch_number=batch_number,
+                batch_total=len(batches),
+            ),
         )
+        batch_results.append((ok, result, batch_number, batch))
+
+    all_ok = all(ok for ok, _, _, _ in batch_results)
+    results = []
+    for ok, result, batch_number, batch in batch_results:
+        for _, row in batch.iterrows():
+            record_id = str(row.get("Calibration_ID") or _calibration_identifier(row)).strip()
+            append_teams_notification_log(record_id, row, f"Batch {batch_number}/{len(batches)}: {result}")
+            frequency, _ = teams_alert_frequency(row)
+            results.append(
+                {
+                    "record_id": record_id,
+                    "status": teams_alert_status(row),
+                    "frequency": frequency,
+                    "batch": f"{batch_number}/{len(batches)}",
+                    "result": result,
+                }
+            )
 
     return {
         "configured": True,
-        "sent": int(len(eligible)) if ok else 0,
+        "sent": int(len(due_records)) if all_ok else 0,
         "skipped": skipped,
-        "failed": 0 if ok else int(len(eligible)),
+        "failed": 0 if all_ok else int(len(due_records)),
         "results": results,
     }
 
