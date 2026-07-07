@@ -579,6 +579,16 @@ def filter_calibration_records(records, key_prefix, include_status=True):
     return visible
 
 
+def dataframe_for_display(records):
+    if not isinstance(records, pd.DataFrame) or records.empty:
+        return records
+    display = records.copy()
+    for column in display.columns:
+        if pd.api.types.is_object_dtype(display[column]):
+            display[column] = display[column].fillna("").astype(str)
+    return display
+
+
 def run_startup_teams_notifications(records):
     if records.empty:
         return
@@ -624,10 +634,10 @@ def render_teams_settings(records):
         result_rows = result.get("results") or []
         if result_rows:
             with st.expander("Teams delivery details", expanded=bool(result.get("failed"))):
-                st.dataframe(pd.DataFrame(result_rows), use_container_width=True, hide_index=True)
+                st.dataframe(dataframe_for_display(pd.DataFrame(result_rows)), use_container_width=True, hide_index=True)
 
     if st.button("Send Teams Alerts Now", use_container_width=True):
-        result = send_calibration_teams_alerts(records)
+        result = send_calibration_teams_alerts(records, force=True)
         st.session_state["calibration_teams_result"] = result
         if not result.get("configured"):
             st.warning("No Teams webhook is configured.")
@@ -652,7 +662,7 @@ def render_teams_settings(records):
         "record_id",
     ]
     visible_columns = [column for column in visible_columns if column in log_df.columns]
-    st.dataframe(log_df[visible_columns].sort_values("sent_at", ascending=False), use_container_width=True, hide_index=True)
+    st.dataframe(dataframe_for_display(log_df[visible_columns].sort_values("sent_at", ascending=False)), use_container_width=True, hide_index=True)
 
 
 def render_excel_log_editor(records):
@@ -663,7 +673,7 @@ def render_excel_log_editor(records):
 
     st.caption("Edits here save directly to the Calibration Log sheet in data/QAQC_Master.xlsx.")
     edited = st.data_editor(
-        records,
+        dataframe_for_display(records),
         use_container_width=True,
         hide_index=True,
         num_rows="dynamic",
@@ -751,7 +761,7 @@ with tab_alerts:
         render_calibration_report_actions(filtered_reminders, "Reminder report actions", "due")
         st.markdown("#### Active reminders")
         render_table_toolbar(len(filtered_reminders))
-        st.dataframe(filtered_reminders[display_cols], use_container_width=True, hide_index=True)
+        st.dataframe(dataframe_for_display(filtered_reminders[display_cols]), use_container_width=True, hide_index=True)
 
         st.markdown("#### Acknowledge or snooze")
         if filtered_reminders.empty:
@@ -784,7 +794,7 @@ with tab_alerts:
             selected_row = filtered_reminders[filtered_reminders["Calibration_ID"].astype(str) == str(selected_id)].head(1)
             if not selected_row.empty:
                 st.markdown("#### Selected equipment")
-                st.dataframe(selected_row[display_cols], use_container_width=True, hide_index=True)
+                st.dataframe(dataframe_for_display(selected_row[display_cols]), use_container_width=True, hide_index=True)
 
 with tab_overdue:
     if overdue.empty:
@@ -794,13 +804,13 @@ with tab_overdue:
         filtered_overdue = filter_calibration_records(overdue, "overdue", include_status=False)
         render_calibration_report_actions(filtered_overdue, "Overdue report actions", "overdue")
         render_table_toolbar(len(filtered_overdue))
-        st.dataframe(filtered_overdue[display_cols], use_container_width=True, hide_index=True)
+        st.dataframe(dataframe_for_display(filtered_overdue[display_cols]), use_container_width=True, hide_index=True)
 
 with tab_all:
     visible = filter_calibration_records(log, "all")
 
     render_table_toolbar(len(visible))
-    st.dataframe(visible[display_cols], use_container_width=True, hide_index=True, height=520)
+    st.dataframe(dataframe_for_display(visible[display_cols]), use_container_width=True, hide_index=True, height=520)
     render_excel_log_editor(raw_calibration_log)
 
 with tab_notifications:

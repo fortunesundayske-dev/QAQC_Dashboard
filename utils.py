@@ -336,17 +336,37 @@ def should_send_teams_alert(row):
     return days <= 21
 
 
-def teams_alert_duplicate_sent(record_id, status, sent_date=None):
-    sent_date = sent_date or date.today().isoformat()
+def teams_alert_frequency(row):
+    days = int(row.get("Days_Until_Due", 0))
+    if days < 0:
+        return "daily_overdue", 1
+    if days <= 7:
+        return "daily_final_week", 1
+    return "weekly_due_soon", 7
+
+
+def _parse_log_date(value):
+    timestamp = pd.to_datetime(value, errors="coerce")
+    return None if pd.isna(timestamp) else timestamp.date()
+
+
+def teams_alert_recently_sent(record_id, status, row, sent_date=None):
+    sent_date = sent_date or date.today()
+    if isinstance(sent_date, str):
+        sent_date = date.fromisoformat(sent_date)
     record_id = str(record_id)
     status = str(status)
+    frequency, interval_days = teams_alert_frequency(row)
     for entry in read_teams_notification_log():
-        if (
-            str(entry.get("record_id")) == record_id
-            and entry.get("date_sent") == sent_date
-            and str(entry.get("status")) == status
-            and str(entry.get("teams_delivery_result", "")).lower().startswith("success")
-        ):
+        if str(entry.get("record_id")) != record_id or str(entry.get("status")) != status:
+            continue
+        if not str(entry.get("teams_delivery_result", "")).lower().startswith("success"):
+            continue
+        entry_frequency = entry.get("notification_frequency")
+        if entry_frequency and entry_frequency != frequency:
+            continue
+        last_sent = _parse_log_date(entry.get("date_sent"))
+        if last_sent and (sent_date - last_sent).days < interval_days:
             return True
     return False
 
@@ -369,8 +389,74 @@ def build_teams_calibration_message(row):
     )
 
 
+def build_teams_calibration_batch_message(records):
+    if records is None or not isinstance(records, pd.DataFrame) or records.empty:
+        return "No calibration equipment is due or overdue."
+
+    export = records.copy()
+    if "Days_Until_Due" in export.columns:
+        export = export.sort_values(["Days_Until_Due", "Equipment_Type"], na_position="last")
+
+    overdue_count = int((export["Days_Until_Due"] < 0).sum()) if "Days_Until_Due" in export.columns else 0
+    due_soon_count = int((export["Days_Until_Due"] >= 0).sum()) if "Days_Until_Due" in export.columns else len(export)
+    lines = [
+        "**QAQC Calibration Notification**",
+        f"Total equipment requiring attention: {len(export)}",
+        f"Overdue: {overdue_count}",
+        f"Due soon: {due_soon_count}",
+        "",
+    ]
+
+    for index, (_, row) in enumerate(export.iterrows(), start=1):
+        status = teams_alert_status(row)
+        lines.extend(
+            [
+                f"**{index}. {_calibration_equipment_name(row)}**",
+                f"- Tag Number / ID: {_calibration_identifier(row)}",
+                f"- Last Calibration Date: {_calibration_date_text(row.get('Calibration_Date'))}",
+                f"- Next Calibration Due Date: {_calibration_date_text(row.get('Next_Due_Date'))}",
+                f"- Status: {status}",
+                f"- Timing: {teams_alert_days_text(row)}",
+            ]
+        )
+        project = row.get("Project")
+        if pd.notna(project) and str(project).strip():
+            lines.append(f"- Project: {str(project).strip()}")
+        certificate = row.get("Certificate_No")
+        if pd.notna(certificate) and str(certificate).strip():
+            lines.append(f"- Certificate No: {str(certificate).strip()}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def build_teams_adaptive_card(message):
+    lines = [line.strip() for line in str(message).splitlines() if line.strip()]
+    body = [
+        {
+            "type": "TextBlock",
+            "text": "QAQC Calibration Notification",
+            "weight": "Bolder",
+            "size": "Medium",
+            "wrap": True,
+        }
+    ]
+    for line in lines:
+        clean_line = line.replace("**", "")
+        if clean_line.startswith("- "):
+            clean_line = clean_line[2:]
+        body.append({"type": "TextBlock", "text": clean_line, "wrap": True, "spacing": "Small"})
+
+    return {
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "body": body,
+    }
+
+
 def post_to_teams(webhook_url, message):
-    payload = json.dumps({"text": message}).encode("utf-8")
+    payload = json.dumps(build_teams_adaptive_card(message)).encode("utf-8")
     req = request.Request(
         webhook_url,
         data=payload,
@@ -390,6 +476,7 @@ def post_to_teams(webhook_url, message):
 
 def append_teams_notification_log(record_id, row, result, sent_at=None):
     sent_at = sent_at or datetime.now()
+    frequency, interval_days = teams_alert_frequency(row)
     entries = read_teams_notification_log()
     entries.append(
         {
@@ -400,13 +487,15 @@ def append_teams_notification_log(record_id, row, result, sent_at=None):
             "tag_number_or_id": _calibration_identifier(row),
             "status": teams_alert_status(row),
             "days": int(row.get("Days_Until_Due", 0)),
+            "notification_frequency": frequency,
+            "next_allowed_on": (sent_at.date() + timedelta(days=interval_days)).isoformat(),
             "teams_delivery_result": str(result),
         }
     )
     _write_teams_notification_log(entries)
 
 
-def send_calibration_teams_alerts(records, webhook_url=None):
+def send_calibration_teams_alerts(records, webhook_url=None, force=False):
     if records is None or not isinstance(records, pd.DataFrame) or records.empty:
         return {"configured": bool(get_teams_webhook_url()), "sent": 0, "skipped": 0, "failed": 0, "results": []}
 
@@ -421,27 +510,54 @@ def send_calibration_teams_alerts(records, webhook_url=None):
         }
 
     results = []
-    sent = skipped = failed = 0
+    eligible_rows = []
+    skipped = 0
     for _, row in records.iterrows():
         if not should_send_teams_alert(row):
             skipped += 1
             continue
         record_id = str(row.get("Calibration_ID") or _calibration_identifier(row)).strip()
         status = teams_alert_status(row)
-        if teams_alert_duplicate_sent(record_id, status):
+        if not force and teams_alert_recently_sent(record_id, status, row):
             skipped += 1
-            results.append({"record_id": record_id, "status": status, "result": "Skipped duplicate for today"})
+            frequency, interval_days = teams_alert_frequency(row)
+            results.append(
+                {
+                    "record_id": record_id,
+                    "status": status,
+                    "frequency": frequency,
+                    "result": f"Skipped until cadence allows another alert ({interval_days} day interval)",
+                }
+            )
             continue
 
-        ok, result = post_to_teams(webhook_url, build_teams_calibration_message(row))
-        append_teams_notification_log(record_id, row, result)
-        results.append({"record_id": record_id, "status": status, "result": result})
-        if ok:
-            sent += 1
-        else:
-            failed += 1
+        eligible_rows.append(row)
 
-    return {"configured": True, "sent": sent, "skipped": skipped, "failed": failed, "results": results}
+    if not eligible_rows:
+        return {"configured": True, "sent": 0, "skipped": skipped, "failed": 0, "results": results}
+
+    eligible = pd.DataFrame(eligible_rows)
+    ok, result = post_to_teams(webhook_url, build_teams_calibration_batch_message(eligible))
+    for _, row in eligible.iterrows():
+        record_id = str(row.get("Calibration_ID") or _calibration_identifier(row)).strip()
+        append_teams_notification_log(record_id, row, result)
+        frequency, _ = teams_alert_frequency(row)
+        results.append(
+            {
+                "record_id": record_id,
+                "status": teams_alert_status(row),
+                "frequency": frequency,
+                "result": result,
+            }
+        )
+
+    return {
+        "configured": True,
+        "sent": int(len(eligible)) if ok else 0,
+        "skipped": skipped,
+        "failed": 0 if ok else int(len(eligible)),
+        "results": results,
+    }
 
 
 def _clean_report_value(value):
