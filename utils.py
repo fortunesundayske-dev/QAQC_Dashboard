@@ -456,7 +456,15 @@ def build_teams_adaptive_card(message):
 
 
 def post_to_teams(webhook_url, message):
-    payload = json.dumps(build_teams_adaptive_card(message)).encode("utf-8")
+    adaptive_card = build_teams_adaptive_card(message)
+    payload_card = {
+        **adaptive_card,
+        "summary": "QAQC calibration notification",
+        "text": message,
+        "message": message,
+        "adaptiveCard": json.dumps(adaptive_card),
+    }
+    payload = json.dumps(payload_card).encode("utf-8")
     req = request.Request(
         webhook_url,
         data=payload,

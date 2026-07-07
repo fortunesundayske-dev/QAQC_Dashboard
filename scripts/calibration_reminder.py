@@ -1,4 +1,5 @@
 import ctypes
+import argparse
 import sys
 from pathlib import Path
 
@@ -64,12 +65,15 @@ def show_desktop_prompt(message):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Send QAQC calibration reminders.")
+    parser.add_argument("--no-popup", action="store_true", help="Send Teams reminders without showing the desktop popup.")
+    args = parser.parse_args()
+
     data = load_calibration_data()
     records = get_calibration_reminders(data)
     if records.empty:
         return
 
-    show_desktop_prompt(popup_message_from_records(records))
     result = send_calibration_teams_alerts(records)
     if not get_teams_webhook_url():
         print("Microsoft Teams webhook is not configured. Teams alerts were skipped.")
@@ -77,6 +81,8 @@ def main():
         print(f"Teams calibration alerts completed with {result['failed']} failed delivery attempt(s).")
     else:
         print(f"Teams calibration alerts sent: {result['sent']}. Skipped: {result['skipped']}.")
+    if not args.no_popup:
+        show_desktop_prompt(popup_message_from_records(records))
 
 
 if __name__ == "__main__":

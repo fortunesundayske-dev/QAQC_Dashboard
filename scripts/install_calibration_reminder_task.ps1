@@ -17,7 +17,7 @@ if (-not (Test-Path -LiteralPath $ReminderScript)) {
     throw "Reminder script not found: $ReminderScript"
 }
 
-$Action = New-ScheduledTaskAction -Execute $Python -Argument "`"$ReminderScript`"" -WorkingDirectory $ProjectRoot
+$Action = New-ScheduledTaskAction -Execute $Python -Argument "`"$ReminderScript`" --no-popup" -WorkingDirectory $ProjectRoot
 $Trigger = New-ScheduledTaskTrigger -Daily -At 9:00AM
 $Principal = New-ScheduledTaskPrincipal -UserId $CurrentUser -LogonType Interactive -RunLevel Limited
 $Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew

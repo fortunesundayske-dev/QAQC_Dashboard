@@ -589,6 +589,11 @@ def dataframe_for_display(records):
     return display
 
 
+def is_admin_user():
+    role = getattr(auth, "get_role", lambda: None)() or st.session_state.get("role")
+    return str(role or "").strip().lower() == "admin"
+
+
 def run_startup_teams_notifications(records):
     if records.empty:
         return
@@ -599,27 +604,32 @@ def run_startup_teams_notifications(records):
     st.session_state["calibration_teams_result"] = result
 
 
-def render_teams_settings(records):
+def render_teams_settings(records, is_admin=False):
     webhook_url = get_teams_webhook_url()
-    if webhook_url:
+    if is_admin and webhook_url:
         st.success(f"Microsoft Teams Incoming Webhook configured: {mask_teams_webhook_url(webhook_url)}")
-    else:
+    elif is_admin:
         st.warning("Microsoft Teams webhook is not configured. Calibration Teams alerts will be skipped, but the app will keep running.")
+    elif webhook_url:
+        st.success("Microsoft Teams notifications are configured.")
+    else:
+        st.warning("Microsoft Teams notifications are not configured. Please contact an admin.")
 
-    with st.form("teams_webhook_settings"):
-        saved_value = "" if webhook_url and "TEAMS_WEBHOOK_URL" in os.environ else webhook_url
-        st.caption("Use the TEAMS_WEBHOOK_URL environment variable, or save a webhook URL to data/teams_config.json.")
-        webhook_input = st.text_input(
-            "Microsoft Teams Incoming Webhook URL",
-            value=saved_value,
-            type="password",
-            placeholder="https://...",
-        )
-        save_clicked = st.form_submit_button("Save Teams Webhook", use_container_width=True)
-    if save_clicked:
-        write_teams_config(webhook_input)
-        st.success("Teams webhook settings saved.")
-        st.rerun()
+    if is_admin:
+        with st.form("teams_webhook_settings"):
+            saved_value = "" if webhook_url and "TEAMS_WEBHOOK_URL" in os.environ else webhook_url
+            st.caption("Use the TEAMS_WEBHOOK_URL environment variable, or save a webhook URL to data/teams_config.json.")
+            webhook_input = st.text_input(
+                "Microsoft Teams Incoming Webhook URL",
+                value=saved_value,
+                type="password",
+                placeholder="https://...",
+            )
+            save_clicked = st.form_submit_button("Save Teams Webhook", use_container_width=True)
+        if save_clicked:
+            write_teams_config(webhook_input)
+            st.success("Teams webhook settings saved.")
+            st.rerun()
 
     result = st.session_state.get("calibration_teams_result")
     if result:
@@ -632,7 +642,7 @@ def render_teams_settings(records):
         else:
             st.info("Teams alert check completed. No new Teams alerts needed sending.")
         result_rows = result.get("results") or []
-        if result_rows:
+        if is_admin and result_rows:
             with st.expander("Teams delivery details", expanded=bool(result.get("failed"))):
                 st.dataframe(dataframe_for_display(pd.DataFrame(result_rows)), use_container_width=True, hide_index=True)
 
@@ -645,6 +655,9 @@ def render_teams_settings(records):
             st.error(f"{result['failed']} Teams alert(s) failed. See the notification log below.")
         else:
             st.success(f"{result['sent']} Teams alert(s) sent. {result['skipped']} duplicate or ineligible item(s) skipped.")
+
+    if not is_admin:
+        return
 
     st.markdown("#### Notification log")
     log_entries = read_teams_notification_log()
@@ -703,6 +716,7 @@ reminders = get_calibration_reminders(data)
 overdue = reminders[reminders["Days_Until_Due"] < 0]
 due_21 = reminders[reminders["Days_Until_Due"] == 21]
 due_soon = reminders[(reminders["Days_Until_Due"] >= 0) & (reminders["Days_Until_Due"] < 21)]
+is_admin = is_admin_user()
 run_startup_teams_notifications(reminders)
 
 display_cols = [
@@ -740,17 +754,13 @@ st.markdown(
 
 render_metric_grid(summary, len(overdue), len(due_21))
 
-if not reminders.empty and not get_teams_webhook_url():
+if is_admin and not reminders.empty and not get_teams_webhook_url():
     st.warning("Microsoft Teams webhook is not configured. Teams calibration alerts are skipped until a webhook URL is saved in Teams Notifications.")
 
-tab_alerts, tab_overdue, tab_all, tab_notifications = st.tabs(
-    [
-        "Reminder Actions",
-        f"Overdue Equipment ({len(overdue)})",
-        "All Calibration Records",
-        "Teams Notifications",
-    ]
-)
+tab_labels = ["Reminder Actions", f"Overdue Equipment ({len(overdue)})", "All Calibration Records", "Teams Notifications"]
+
+tabs = st.tabs(tab_labels)
+tab_alerts, tab_overdue, tab_all, tab_notifications = tabs
 
 with tab_alerts:
     if reminders.empty:
@@ -814,6 +824,6 @@ with tab_all:
     render_excel_log_editor(raw_calibration_log)
 
 with tab_notifications:
-    render_teams_settings(reminders)
+    render_teams_settings(reminders, is_admin=is_admin)
 
 st.markdown("</div>", unsafe_allow_html=True)
