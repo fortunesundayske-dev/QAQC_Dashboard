@@ -5,6 +5,7 @@ from email.utils import formataddr
 from io import BytesIO
 import html
 import json
+import os
 import sys
 from urllib.parse import quote, urlencode
 
@@ -17,11 +18,16 @@ from utils import (
     get_calibration_log,
     get_calibration_reminders,
     get_calibration_summary,
+    get_teams_webhook_url,
     inject_global_ui,
     load_master_data,
+    mask_teams_webhook_url,
+    read_teams_notification_log,
     render_navigation,
     render_top_nav,
+    send_calibration_teams_alerts,
     snooze_calibration,
+    write_teams_config,
 )
 
 
@@ -597,6 +603,78 @@ def render_table_toolbar(record_count):
     )
 
 
+def run_startup_teams_notifications(records):
+    if records.empty:
+        return
+    if st.session_state.get("calibration_teams_checked"):
+        return
+    st.session_state["calibration_teams_checked"] = True
+    result = send_calibration_teams_alerts(records)
+    st.session_state["calibration_teams_result"] = result
+
+
+def render_teams_settings(records):
+    webhook_url = get_teams_webhook_url()
+    if webhook_url:
+        st.success(f"Microsoft Teams Incoming Webhook configured: {mask_teams_webhook_url(webhook_url)}")
+    else:
+        st.warning("Microsoft Teams webhook is not configured. Calibration Teams alerts will be skipped, but the app will keep running.")
+
+    with st.form("teams_webhook_settings"):
+        saved_value = "" if webhook_url and "TEAMS_WEBHOOK_URL" in os.environ else webhook_url
+        st.caption("Use the TEAMS_WEBHOOK_URL environment variable, or save a webhook URL to data/teams_config.json.")
+        webhook_input = st.text_input(
+            "Microsoft Teams Incoming Webhook URL",
+            value=saved_value,
+            type="password",
+            placeholder="https://...",
+        )
+        save_clicked = st.form_submit_button("Save Teams Webhook", use_container_width=True)
+    if save_clicked:
+        write_teams_config(webhook_input)
+        st.success("Teams webhook settings saved.")
+        st.rerun()
+
+    result = st.session_state.get("calibration_teams_result")
+    if result:
+        if not result.get("configured"):
+            st.info("Automatic Teams alert check skipped because no webhook is configured.")
+        elif result.get("failed"):
+            st.error(f"Teams alert check completed with {result['failed']} failed delivery attempt(s).")
+        elif result.get("sent"):
+            st.success(f"Teams alert check sent {result['sent']} alert(s).")
+        else:
+            st.info("Teams alert check completed. No new Teams alerts needed sending.")
+
+    if st.button("Send Teams Alerts Now", use_container_width=True):
+        result = send_calibration_teams_alerts(records)
+        st.session_state["calibration_teams_result"] = result
+        if not result.get("configured"):
+            st.warning("No Teams webhook is configured.")
+        elif result.get("failed"):
+            st.error(f"{result['failed']} Teams alert(s) failed. See the notification log below.")
+        else:
+            st.success(f"{result['sent']} Teams alert(s) sent. {result['skipped']} duplicate or ineligible item(s) skipped.")
+
+    st.markdown("#### Notification log")
+    log_entries = read_teams_notification_log()
+    if not log_entries:
+        st.info("No Teams notifications have been logged yet.")
+        return
+    log_df = pd.DataFrame(log_entries)
+    visible_columns = [
+        "sent_at",
+        "date_sent",
+        "equipment",
+        "status",
+        "teams_delivery_result",
+        "tag_number_or_id",
+        "record_id",
+    ]
+    visible_columns = [column for column in visible_columns if column in log_df.columns]
+    st.dataframe(log_df[visible_columns].sort_values("sent_at", ascending=False), use_container_width=True, hide_index=True)
+
+
 if log.empty:
     st.warning("No calibration records are available in the master workbook.")
     st.stop()
@@ -605,6 +683,7 @@ reminders = get_calibration_reminders(data)
 overdue = reminders[reminders["Days_Until_Due"] < 0]
 due_21 = reminders[reminders["Days_Until_Due"] == 21]
 due_soon = reminders[(reminders["Days_Until_Due"] >= 0) & (reminders["Days_Until_Due"] < 21)]
+run_startup_teams_notifications(reminders)
 
 display_cols = [
     "Calibration_ID",
@@ -641,11 +720,15 @@ st.markdown(
 
 render_metric_grid(summary, len(overdue), len(due_21))
 
-tab_alerts, tab_overdue, tab_all = st.tabs(
+if not reminders.empty and not get_teams_webhook_url():
+    st.warning("Microsoft Teams webhook is not configured. Teams calibration alerts are skipped until a webhook URL is saved in Teams Notifications.")
+
+tab_alerts, tab_overdue, tab_all, tab_notifications = st.tabs(
     [
         "Reminder Actions",
         f"Overdue Equipment ({len(overdue)})",
         "All Calibration Records",
+        "Teams Notifications",
     ]
 )
 
@@ -725,5 +808,8 @@ with tab_all:
 
     render_table_toolbar(len(visible))
     st.dataframe(visible[display_cols], use_container_width=True, hide_index=True, height=520)
+
+with tab_notifications:
+    render_teams_settings(reminders)
 
 st.markdown("</div>", unsafe_allow_html=True)

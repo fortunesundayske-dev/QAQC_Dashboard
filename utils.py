@@ -4,11 +4,13 @@ import plotly.express as px
 import time
 import base64
 import json
+import os
 from click import style
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 import uuid
 import html
+from urllib import request, error
 from urllib.parse import quote
 from io import BytesIO
 
@@ -17,6 +19,8 @@ BASE_DIR = Path(__file__).resolve().parent
 EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 CALIBRATION_ACK_FILE = BASE_DIR / "data" / "calibration_acknowledgements.json"
 CALIBRATION_REPORT_DIR = BASE_DIR / "outputs" / "calibration_reports"
+TEAMS_CONFIG_FILE = BASE_DIR / "data" / "teams_config.json"
+TEAMS_NOTIFICATION_LOG_FILE = BASE_DIR / "data" / "teams_notification_log.json"
 ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
@@ -207,6 +211,215 @@ def mark_calibration_notified(record_ids):
     for record_id in record_ids:
         payload.setdefault(str(record_id), {})["last_notified_on"] = today_value
     _write_calibration_acknowledgements(payload)
+
+
+# =========================
+# MICROSOFT TEAMS NOTIFICATIONS
+# =========================
+
+def read_teams_config():
+    if not TEAMS_CONFIG_FILE.exists():
+        return {}
+    try:
+        with TEAMS_CONFIG_FILE.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        return payload if isinstance(payload, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def write_teams_config(webhook_url):
+    TEAMS_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"webhook_url": str(webhook_url or "").strip(), "updated_at": datetime.now().isoformat(timespec="seconds")}
+    with TEAMS_CONFIG_FILE.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+
+
+def get_teams_webhook_url():
+    env_url = os.getenv("TEAMS_WEBHOOK_URL", "").strip()
+    if env_url:
+        return env_url
+    return str(read_teams_config().get("webhook_url", "")).strip()
+
+
+def mask_teams_webhook_url(webhook_url):
+    value = str(webhook_url or "").strip()
+    if not value:
+        return ""
+    if len(value) <= 18:
+        return "*" * len(value)
+    return f"{value[:10]}...{value[-8:]}"
+
+
+def read_teams_notification_log():
+    if not TEAMS_NOTIFICATION_LOG_FILE.exists():
+        return []
+    try:
+        with TEAMS_NOTIFICATION_LOG_FILE.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        return payload if isinstance(payload, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def _write_teams_notification_log(entries):
+    TEAMS_NOTIFICATION_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with TEAMS_NOTIFICATION_LOG_FILE.open("w", encoding="utf-8") as handle:
+        json.dump(entries[-1000:], handle, indent=2, sort_keys=True)
+
+
+def _calibration_identifier(row):
+    for column in ("Tag_Number", "Tag_No", "Tag", "Instrument_ID", "Equipment_ID", "Serial_No", "Calibration_ID"):
+        value = row.get(column)
+        if pd.notna(value) and str(value).strip():
+            return str(value).strip()
+    return "N/A"
+
+
+def _calibration_equipment_name(row):
+    parts = []
+    for column in ("Equipment_Type", "Instrument_Name", "Make_Model"):
+        value = row.get(column)
+        if pd.notna(value) and str(value).strip():
+            parts.append(str(value).strip())
+    return " - ".join(dict.fromkeys(parts)) or "Equipment"
+
+
+def _calibration_date_text(value):
+    timestamp = pd.to_datetime(value, errors="coerce")
+    return "N/A" if pd.isna(timestamp) else timestamp.strftime("%Y-%m-%d")
+
+
+def teams_alert_status(row):
+    days = int(row.get("Days_Until_Due", 0))
+    return "Overdue" if days < 0 else "Due Soon"
+
+
+def teams_alert_days_text(row):
+    days = int(row.get("Days_Until_Due", 0))
+    if days < 0:
+        return f"{abs(days)} day(s) overdue"
+    if days == 0:
+        return "Due today"
+    return f"{days} day(s) remaining"
+
+
+def should_send_teams_alert(row):
+    if calibration_record_completed(row.get("Status")):
+        return False
+    due_date = pd.to_datetime(row.get("Next_Due_Date"), errors="coerce")
+    if pd.isna(due_date):
+        return False
+    days = int(row.get("Days_Until_Due", (due_date.normalize() - _today()).days))
+    return days <= 21
+
+
+def teams_alert_duplicate_sent(record_id, status, sent_date=None):
+    sent_date = sent_date or date.today().isoformat()
+    record_id = str(record_id)
+    status = str(status)
+    for entry in read_teams_notification_log():
+        if (
+            str(entry.get("record_id")) == record_id
+            and entry.get("date_sent") == sent_date
+            and str(entry.get("status")) == status
+            and str(entry.get("teams_delivery_result", "")).lower().startswith("success")
+        ):
+            return True
+    return False
+
+
+def build_teams_calibration_message(row):
+    equipment = _calibration_equipment_name(row)
+    identifier = _calibration_identifier(row)
+    status = teams_alert_status(row)
+    days_text = teams_alert_days_text(row)
+    last_date = _calibration_date_text(row.get("Calibration_Date"))
+    next_date = _calibration_date_text(row.get("Next_Due_Date"))
+    return (
+        f"**Calibration Alert: {status}**\n\n"
+        f"- **Equipment/Instrument Name:** {equipment}\n"
+        f"- **Tag Number / ID:** {identifier}\n"
+        f"- **Last Calibration Date:** {last_date}\n"
+        f"- **Next Calibration Due Date:** {next_date}\n"
+        f"- **Status:** {status}\n"
+        f"- **Timing:** {days_text}"
+    )
+
+
+def post_to_teams(webhook_url, message):
+    payload = json.dumps({"text": message}).encode("utf-8")
+    req = request.Request(
+        webhook_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with request.urlopen(req, timeout=20) as response:
+            body = response.read().decode("utf-8", errors="replace").strip()
+            return True, f"Success ({response.status})" + (f": {body}" if body else "")
+    except error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace").strip()
+        return False, f"HTTP {exc.code}: {detail or exc.reason}"
+    except (error.URLError, TimeoutError, OSError) as exc:
+        return False, f"Failed: {exc}"
+
+
+def append_teams_notification_log(record_id, row, result, sent_at=None):
+    sent_at = sent_at or datetime.now()
+    entries = read_teams_notification_log()
+    entries.append(
+        {
+            "sent_at": sent_at.isoformat(timespec="seconds"),
+            "date_sent": sent_at.date().isoformat(),
+            "record_id": str(record_id),
+            "equipment": _calibration_equipment_name(row),
+            "tag_number_or_id": _calibration_identifier(row),
+            "status": teams_alert_status(row),
+            "days": int(row.get("Days_Until_Due", 0)),
+            "teams_delivery_result": str(result),
+        }
+    )
+    _write_teams_notification_log(entries)
+
+
+def send_calibration_teams_alerts(records, webhook_url=None):
+    if records is None or not isinstance(records, pd.DataFrame) or records.empty:
+        return {"configured": bool(get_teams_webhook_url()), "sent": 0, "skipped": 0, "failed": 0, "results": []}
+
+    webhook_url = (webhook_url or get_teams_webhook_url()).strip()
+    if not webhook_url:
+        return {
+            "configured": False,
+            "sent": 0,
+            "skipped": 0,
+            "failed": 0,
+            "results": [{"result": "Microsoft Teams webhook is not configured."}],
+        }
+
+    results = []
+    sent = skipped = failed = 0
+    for _, row in records.iterrows():
+        if not should_send_teams_alert(row):
+            skipped += 1
+            continue
+        record_id = str(row.get("Calibration_ID") or _calibration_identifier(row)).strip()
+        status = teams_alert_status(row)
+        if teams_alert_duplicate_sent(record_id, status):
+            skipped += 1
+            results.append({"record_id": record_id, "status": status, "result": "Skipped duplicate for today"})
+            continue
+
+        ok, result = post_to_teams(webhook_url, build_teams_calibration_message(row))
+        append_teams_notification_log(record_id, row, result)
+        results.append({"record_id": record_id, "status": status, "result": result})
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+
+    return {"configured": True, "sent": sent, "skipped": skipped, "failed": failed, "results": results}
 
 
 def _clean_report_value(value):

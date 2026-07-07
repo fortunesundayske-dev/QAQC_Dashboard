@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+.venv/
+
+# Streamlit
+.streamlit/
+
+# Local notification settings
+data/smtp_config.json
+data/teams_config.json
+data/teams_notification_log.json
+
+# Excel temp files
+~$*
+
+# OS files
+.DS_Store
+Thumbs.db
