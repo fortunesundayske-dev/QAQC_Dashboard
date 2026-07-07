@@ -467,13 +467,7 @@ def build_teams_adaptive_card(message):
 
 def post_to_teams(webhook_url, message):
     adaptive_card = build_teams_adaptive_card(message)
-    payload = json.dumps(
-        {
-            "adaptiveCard": json.dumps(adaptive_card),
-            "message": message,
-            "text": message,
-        }
-    ).encode("utf-8")
+    payload = json.dumps({**adaptive_card, "adaptiveCard": json.dumps(adaptive_card)}).encode("utf-8")
     req = request.Request(
         webhook_url,
         data=payload,
