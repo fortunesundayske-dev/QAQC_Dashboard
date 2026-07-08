@@ -617,7 +617,7 @@ def render_teams_settings(records, is_admin=False):
         st.warning("Microsoft Teams notifications are not configured. Please contact an admin.")
 
     if is_admin:
-        st.info("Power Automate setup: in the Teams 'Post card in a chat or channel' action, set Adaptive Card to the expression triggerBody()?['adaptiveCard'].")
+        st.info("Power Automate setup: if your workflow has an Attachments check, set the Teams action Adaptive Card field to triggerBody()?['attachments']?[0]?['content']. If you are not using attachments, use triggerBody()?['adaptiveCard'].")
         with st.form("teams_webhook_settings"):
             saved_value = "" if webhook_url and "TEAMS_WEBHOOK_URL" in os.environ else webhook_url
             st.caption("Use the TEAMS_WEBHOOK_URL environment variable, or save a webhook URL to data/teams_config.json.")
@@ -640,7 +640,7 @@ def render_teams_settings(records, is_admin=False):
                 "If this card appears in Teams, the saved workflow URL is working.",
             )
             if ok:
-                st.success("Power Automate accepted the Teams test card. If the flow still fails, check that the Teams action Adaptive Card field uses triggerBody()?['adaptiveCard'].")
+                st.success("Power Automate accepted the Teams test card. If the flow still fails, set the Teams action Adaptive Card field to triggerBody()?['attachments']?[0]?['content'] or triggerBody()?['adaptiveCard'].")
             else:
                 st.error(f"Teams connection test failed: {test_result}")
 

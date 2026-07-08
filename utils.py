@@ -468,15 +468,39 @@ def build_teams_adaptive_card(message):
     }
 
 
-def post_to_teams(webhook_url, message, retries=TEAMS_ALERT_POST_RETRIES, retry_delay_seconds=TEAMS_ALERT_RETRY_DELAY_SECONDS):
+def build_teams_webhook_payload(message):
     adaptive_card = build_teams_adaptive_card(message)
-    payload_body = {
-        **adaptive_card,
-        "adaptiveCard": json.dumps(adaptive_card, ensure_ascii=False),
-        "card": json.dumps(adaptive_card, ensure_ascii=False),
-        "summary": "QAQC Calibration Notification",
+    plain_message = str(message or "").replace("**", "").strip()
+    message_html = "<br>".join(html.escape(line) for line in plain_message.splitlines())
+    adaptive_card_json = json.dumps(adaptive_card, ensure_ascii=False)
+    attachment = {
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": None,
+        "content": adaptive_card,
+        "contentJson": adaptive_card_json,
+        "name": "QAQC Calibration Notification",
     }
-    payload = json.dumps(payload_body, ensure_ascii=False).encode("utf-8")
+    return {
+        **adaptive_card,
+        "summary": "QAQC Calibration Notification",
+        "notificationType": "QAQCCalibrationNotification",
+        "adaptiveCard": adaptive_card,
+        "adaptiveCardJson": adaptive_card_json,
+        "card": adaptive_card,
+        "cardJson": adaptive_card_json,
+        "attachments": [attachment],
+        "teamsMessage": {
+            "type": "message",
+            "attachments": [attachment],
+        },
+        "message": plain_message,
+        "messageHtml": message_html,
+        "text": plain_message,
+    }
+
+
+def post_to_teams(webhook_url, message, retries=TEAMS_ALERT_POST_RETRIES, retry_delay_seconds=TEAMS_ALERT_RETRY_DELAY_SECONDS):
+    payload = json.dumps(build_teams_webhook_payload(message), ensure_ascii=False).encode("utf-8")
     attempts = max(1, int(retries or 0) + 1)
     retryable_http_codes = {408, 425, 429, 500, 502, 503, 504}
     last_result = ""
