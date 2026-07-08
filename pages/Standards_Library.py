@@ -10,6 +10,7 @@ from utils import inject_global_ui, render_navigation, render_top_nav
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 STANDARDS_DIR = BASE_DIR / "assets" / "standards"
+DEP_INDEX_FILE = BASE_DIR / "data" / "dep_standards_index.csv"
 PDF_EMBED_LIMIT_MB = 35
 
 
@@ -78,6 +79,20 @@ def discover_pdf_library():
             }
         )
     return records
+
+
+def load_dep_standard_index():
+    columns = ["Standard ID", "Title", "Discipline", "Source", "Local File", "Status"]
+    if not DEP_INDEX_FILE.exists():
+        return pd.DataFrame(columns=columns)
+    try:
+        dep_df = pd.read_csv(DEP_INDEX_FILE).fillna("")
+    except Exception:
+        return pd.DataFrame(columns=columns)
+    for column in columns:
+        if column not in dep_df.columns:
+            dep_df[column] = ""
+    return dep_df[columns].sort_values(["Discipline", "Standard ID"])
 
 
 st.set_page_config(page_title="Standards Library", layout="wide")
@@ -191,6 +206,68 @@ else:
         with st.expander("Show matching PDF table"):
             table_df = visible_pdf_df.drop(columns=["Path", "Display"])
             st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+dep_index_df = load_dep_standard_index()
+st.markdown('<div class="section-heading">DEP Standards Index</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-caption">DEP-only references extracted from the supplied PDO engineering standards guide. Local downloads are shown only where an authorised PDF already exists in the Standards Library folder.</div>',
+    unsafe_allow_html=True,
+)
+
+if dep_index_df.empty:
+    st.info("No DEP standards index has been loaded yet.")
+else:
+    dep_available = dep_index_df[dep_index_df["Local File"].astype(str).str.strip() != ""].copy()
+    d1, d2, d3 = st.columns(3)
+    d1.metric("DEP references", len(dep_index_df))
+    d2.metric("Local DEP PDFs", len(dep_available))
+    d3.metric("Official copy needed", len(dep_index_df) - len(dep_available))
+
+    dep_col1, dep_col2, dep_col3 = st.columns([1.35, 1, 1])
+    with dep_col1:
+        dep_search = st.text_input("Search DEP index", placeholder="Try concrete, road, welding, pressure testing...", key="dep_index_search")
+    with dep_col2:
+        dep_status = st.selectbox("DEP file status", ["All"] + sorted(dep_index_df["Status"].unique().tolist()), key="dep_index_status")
+    with dep_col3:
+        dep_discipline = st.selectbox("DEP discipline", ["All"] + sorted(dep_index_df["Discipline"].unique().tolist()), key="dep_index_discipline")
+
+    visible_dep_df = dep_index_df.copy()
+    if dep_search:
+        needle = dep_search.lower()
+        visible_dep_df = visible_dep_df[
+            visible_dep_df.apply(
+                lambda row: needle in " ".join(str(row[column]).lower() for column in ["Standard ID", "Title", "Discipline", "Status"]),
+                axis=1,
+            )
+        ]
+    if dep_status != "All":
+        visible_dep_df = visible_dep_df[visible_dep_df["Status"] == dep_status]
+    if dep_discipline != "All":
+        visible_dep_df = visible_dep_df[visible_dep_df["Discipline"] == dep_discipline]
+
+    st.caption(f"{len(visible_dep_df)} DEP reference(s) match the current filters.")
+    st.dataframe(visible_dep_df, use_container_width=True, hide_index=True)
+
+    if not dep_available.empty:
+        available_options = [
+            f"{row['Standard ID']} - {row['Title']}"
+            for _, row in dep_available.sort_values("Standard ID").iterrows()
+        ]
+        selected_dep = st.selectbox("Download available DEP PDF", available_options, key="dep_available_download")
+        selected_index = available_options.index(selected_dep)
+        selected_row = dep_available.sort_values("Standard ID").iloc[selected_index]
+        selected_path = BASE_DIR / selected_row["Local File"]
+        if selected_path.exists():
+            st.download_button(
+                "Download selected DEP PDF",
+                data=selected_path.read_bytes(),
+                file_name=selected_path.name,
+                mime="application/pdf",
+                use_container_width=True,
+                key="download_selected_dep_pdf",
+            )
+        else:
+            st.warning("The selected DEP file is listed in the index but is missing from the library folder.")
 
 standards = [
     {
