@@ -1208,13 +1208,20 @@ def render_header():
     <div class="app-brand-lockup">
         <div class="app-logo-img app-logo-img--nlng">{nlng_logo}</div>
         <div>
-            <div class="app-bar__welcome">Welcome back, <span>{html.escape(str(user.get("name", "System Administrator")))}</span></div>
-            <div class="app-bar__eyebrow">NLNG Project</div>
-            <div class="app-bar__title">QA/QC Executive Dashboard</div>
-            <div class="app-bar__project">Quality Control Management System</div>
+            <div class="app-bar__eyebrow">All pages redesigned with enterprise QA/QC standards</div>
+            <div class="app-bar__title">QAQC Dashboard - Global UI/UX Design System</div>
+            <div class="app-bar__project">Desktop, tablet, and mobile quality command centre</div>
         </div>
     </div>
     <div class="app-bar__right">
+        <div class="app-capability-strip">
+            <span>Modern</span>
+            <span>Professional</span>
+            <span>Responsive</span>
+            <span>Accessible</span>
+            <span>Data Driven</span>
+            <span>Secure</span>
+        </div>
         {profile_html}
         <div class="app-logo-img app-logo-img--evomec">{evomec_logo}</div>
     </div>
@@ -4895,6 +4902,27 @@ def inject_global_ui():
         border-color: rgba(209, 233, 255, 0.18) !important;
     }}
 
+    .app-capability-strip {{
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.38rem;
+        justify-content: flex-end;
+        max-width: 34rem;
+    }}
+
+    .app-capability-strip span {{
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(209, 233, 255, 0.16);
+        border-radius: 999px;
+        color: #eaf2ff !important;
+        font-size: 0.72rem;
+        font-weight: 800;
+        min-height: 1.75rem;
+        padding: 0.34rem 0.56rem;
+        white-space: nowrap;
+    }}
+
     .page-header,
     .dashboard-hero,
     .kpi-card,
@@ -4914,7 +4942,21 @@ def inject_global_ui():
     .page-header,
     .dashboard-hero {{
         margin-top: 0 !important;
-        padding: 0.95rem 1.15rem !important;
+        padding: 0.95rem 1.15rem 0.95rem 1.45rem !important;
+        position: relative !important;
+    }}
+
+    .page-header::before,
+    .dashboard-hero::before {{
+        background: linear-gradient(180deg, var(--qaqc-blue), var(--qaqc-blue-2));
+        border-radius: 999px;
+        content: "";
+        display: block;
+        height: calc(100% - 1.4rem);
+        left: 0.72rem;
+        position: absolute;
+        top: 0.7rem;
+        width: 0.32rem;
     }}
 
     .page-header h1,
@@ -4927,6 +4969,17 @@ def inject_global_ui():
         min-height: 96px !important;
     }}
 
+    .kpi-card:hover,
+    div[data-testid="stMetric"]:hover,
+    .exec-panel:hover,
+    .tool-card:hover,
+    .standard-card:hover,
+    .learning-card:hover {{
+        border-color: color-mix(in srgb, var(--qaqc-blue) 34%, var(--qaqc-line)) !important;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, 0.14) !important;
+        transform: translateY(-1px) !important;
+    }}
+
     div[data-testid="stDataFrame"] {{
         border-radius: 8px !important;
         box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08) !important;
@@ -4935,6 +4988,12 @@ def inject_global_ui():
     div[data-testid="stDataFrame"] [role="gridcell"],
     div[data-testid="stDataFrame"] [role="columnheader"] {{
         min-height: 2.25rem !important;
+    }}
+
+    div[data-testid="stDataFrame"] [role="columnheader"] {{
+        background: color-mix(in srgb, var(--qaqc-blue) 7%, var(--qaqc-surface)) !important;
+        color: var(--qaqc-navy) !important;
+        font-weight: 850 !important;
     }}
 
     section[data-testid="stSidebar"] {{
@@ -5038,6 +5097,15 @@ def inject_global_ui():
     }}
 
     @media (max-width: 768px) {{
+        .app-capability-strip {{
+            justify-content: flex-start;
+            max-width: 100%;
+        }}
+
+        .app-capability-strip span {{
+            font-size: 0.68rem;
+        }}
+
         section[data-testid="stSidebar"] {{
             width: min(88vw, 22rem) !important;
         }}
