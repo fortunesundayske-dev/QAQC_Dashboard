@@ -1456,10 +1456,12 @@ def sanitize_display_dataframe(df, columns=None, include_internal=False):
     if not isinstance(df, pd.DataFrame):
         return pd.DataFrame()
     display_df = df.copy()
+    display_df = display_df.loc[:, ~display_df.columns.astype(str).duplicated()]
     if columns:
         valid_cols = [col for col in columns if col in display_df.columns]
         if valid_cols:
             display_df = display_df[valid_cols]
+            display_df = display_df.loc[:, ~display_df.columns.astype(str).duplicated()]
     if not include_internal:
         keep_cols = []
         for col in display_df.columns:
@@ -1472,9 +1474,14 @@ def sanitize_display_dataframe(df, columns=None, include_internal=False):
         display_df = display_df[keep_cols]
     for col in display_df.columns:
         if "date" in str(col).lower() or str(col).lower().endswith("_on"):
-            converted = pd.to_datetime(display_df[col], errors="coerce")
-            if converted.notna().any():
-                display_df[col] = converted.dt.strftime("%d %b %Y").fillna("")
+            try:
+                series = display_df[col]
+                if isinstance(series, pd.Series):
+                    converted = pd.to_datetime(series, errors="coerce")
+                    if converted.notna().any():
+                        display_df[col] = converted.dt.strftime("%d %b %Y").fillna("")
+            except (TypeError, ValueError, AttributeError):
+                continue
     return display_df
 
 
@@ -1538,10 +1545,25 @@ def render_theme_selector():
     )
 
 
+def render_dataframe(display_df, height="auto", use_container_width=True):
+    kwargs = {"height": height, "hide_index": True}
+    try:
+        kwargs["width"] = "stretch" if use_container_width else "content"
+        return st.dataframe(display_df, **kwargs)
+    except TypeError:
+        kwargs.pop("width", None)
+        kwargs["use_container_width"] = use_container_width
+        try:
+            return st.dataframe(display_df, **kwargs)
+        except TypeError:
+            kwargs.pop("hide_index", None)
+            return st.dataframe(display_df, **kwargs)
+
+
 def render_table(df, height=300, columns=None, empty_message="No records found", include_internal=False):
     display_df = sanitize_display_dataframe(df, columns=columns, include_internal=include_internal)
     if isinstance(display_df, pd.DataFrame) and not display_df.empty:
-        st.dataframe(display_df, height=height, use_container_width=True, hide_index=True)
+        render_dataframe(display_df, height=height)
     else:
         render_empty_state("No records found", empty_message)
 
@@ -1558,7 +1580,7 @@ def render_table_with_details(
     display_df = sanitize_display_dataframe(df, columns=table_columns, include_internal=can_administer())
 
     st.subheader(detail_label)
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    render_dataframe(display_df)
 
     if id_col and id_col in df.columns:
         selected_id = st.selectbox(
@@ -1569,7 +1591,7 @@ def render_table_with_details(
         selected_row = df[df[id_col].astype(str) == selected_id]
 
         st.write("Selected Record")
-        st.dataframe(sanitize_display_dataframe(selected_row, include_internal=can_administer()), use_container_width=True, hide_index=True)
+        render_dataframe(sanitize_display_dataframe(selected_row, include_internal=can_administer()))
 
         return selected_row
 
