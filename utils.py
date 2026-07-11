@@ -1475,6 +1475,28 @@ def render_alert(message, kind="info"):
     )
 
 
+def get_theme_mode():
+    mode = st.session_state.get("qaqc_theme_mode", "System")
+    if mode not in {"System", "Light", "Dark"}:
+        mode = "System"
+    return mode
+
+
+def render_theme_selector():
+    current = get_theme_mode()
+    options = ["System", "Light", "Dark"]
+    selected = st.sidebar.selectbox(
+        "Appearance",
+        options,
+        index=options.index(current),
+        key="qaqc_theme_mode",
+        help="System follows your device or browser light/dark setting.",
+    )
+    st.sidebar.caption(
+        "System follows this device" if selected == "System" else f"{selected} mode is active"
+    )
+
+
 def render_table(df, height=300, columns=None, empty_message="No records found", include_internal=False):
     display_df = sanitize_display_dataframe(df, columns=columns, include_internal=include_internal)
     if isinstance(display_df, pd.DataFrame) and not display_df.empty:
@@ -1639,6 +1661,8 @@ def render_top_nav():
                 pass
             st.rerun()
 
+    st.sidebar.markdown('<div class="side-menu-title">Appearance</div>', unsafe_allow_html=True)
+    render_theme_selector()
     st.sidebar.markdown('<div class="side-menu-title">Menu</div>', unsafe_allow_html=True)
 
     for label, page in pages.items():
@@ -1728,7 +1752,7 @@ def project_filter_sidebar(projects, page="main"):
 def inject_global_ui():
     try:
         import plotly.io as pio
-        pio.templates.default = "plotly_white"
+        pio.templates.default = "plotly_dark" if get_theme_mode() == "Dark" else "plotly_white"
     except Exception:
         pass
     st.markdown(
@@ -4628,6 +4652,209 @@ def inject_global_ui():
     }
     </style>
     """, unsafe_allow_html=True)
+    mode = get_theme_mode()
+    dark_vars = """
+        --qaqc-bg: #07111f;
+        --qaqc-surface: #111827;
+        --qaqc-surface-2: #172033;
+        --qaqc-navy: #f8fafc;
+        --qaqc-blue: #60a5fa;
+        --qaqc-blue-2: #38bdf8;
+        --qaqc-text: #e5edf8;
+        --qaqc-muted: #aab8ca;
+        --qaqc-line: rgba(148, 163, 184, 0.26);
+        --qaqc-success: #4ade80;
+        --qaqc-warning: #fbbf24;
+        --qaqc-danger: #f87171;
+        --qaqc-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+        --qaqc-input-bg: #0b1220;
+        --qaqc-sidebar-bg: #050b14;
+        --qaqc-sidebar-text: #e5edf8;
+    """
+    light_vars = """
+        --qaqc-bg: #f4f7fb;
+        --qaqc-surface: #ffffff;
+        --qaqc-surface-2: #f8fafc;
+        --qaqc-navy: #0f172a;
+        --qaqc-blue: #2563eb;
+        --qaqc-blue-2: #0ea5e9;
+        --qaqc-text: #111827;
+        --qaqc-muted: #64748b;
+        --qaqc-line: #dbe4ef;
+        --qaqc-success: #15803d;
+        --qaqc-warning: #b45309;
+        --qaqc-danger: #b91c1c;
+        --qaqc-shadow: 0 14px 32px rgba(15, 23, 42, 0.10);
+        --qaqc-input-bg: #ffffff;
+        --qaqc-sidebar-bg: #0f172a;
+        --qaqc-sidebar-text: #e5edf8;
+    """
+    system_dark = f"@media (prefers-color-scheme: dark) {{ :root {{ {dark_vars} }} }}" if mode == "System" else ""
+    selected_vars = dark_vars if mode == "Dark" else light_vars
+    st.markdown(
+        f"""
+    <style>
+    :root {{
+        {selected_vars}
+        --qaqc-radius: 8px;
+    }}
+
+    {system_dark}
+
+    .stApp {{
+        background:
+            linear-gradient(180deg, color-mix(in srgb, var(--qaqc-blue) 8%, transparent), transparent 18rem),
+            var(--qaqc-bg) !important;
+        color: var(--qaqc-text) !important;
+    }}
+
+    h1, h2, h3, h4, h5, h6,
+    p, label, span, div,
+    .stMarkdown, .stCaptionContainer {{
+        color: inherit;
+    }}
+
+    h1, h2, h3,
+    .app-bar__title,
+    .header-profile__name,
+    .page-header h1,
+    .dashboard-hero h1,
+    .kpi-value,
+    div[data-testid="stMetricValue"] {{
+        color: var(--qaqc-navy) !important;
+    }}
+
+    .app-bar,
+    .page-header,
+    .dashboard-hero,
+    .kpi-card,
+    div[data-testid="stMetric"],
+    .exec-panel,
+    .tool-card,
+    .standard-card,
+    .learning-card,
+    .security-card,
+    div[data-testid="stExpander"] details,
+    .empty-state,
+    .app-alert {{
+        background: var(--qaqc-surface) !important;
+        border-color: var(--qaqc-line) !important;
+        box-shadow: var(--qaqc-shadow) !important;
+        color: var(--qaqc-text) !important;
+    }}
+
+    .header-profile,
+    .side-status,
+    .module-card__stat,
+    div[data-testid="stDataFrame"],
+    .stDataFrame {{
+        background: var(--qaqc-surface-2) !important;
+        border-color: var(--qaqc-line) !important;
+        color: var(--qaqc-text) !important;
+    }}
+
+    .app-bar__project,
+    .header-profile__meta,
+    .page-header p,
+    .dashboard-hero p,
+    .section-caption,
+    .kpi-title,
+    .kpi-detail,
+    div[data-testid="stMetricLabel"],
+    .empty-state p {{
+        color: var(--qaqc-muted) !important;
+    }}
+
+    .app-bar__welcome,
+    .app-bar__eyebrow,
+    .page-header__eyebrow,
+    .hero-eyebrow,
+    .side-menu-title {{
+        color: var(--qaqc-blue) !important;
+    }}
+
+    section[data-testid="stSidebar"] {{
+        background: var(--qaqc-sidebar-bg) !important;
+        border-right-color: rgba(148, 163, 184, 0.22) !important;
+    }}
+
+    section[data-testid="stSidebar"],
+    section[data-testid="stSidebar"] * {{
+        color: var(--qaqc-sidebar-text) !important;
+    }}
+
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="select"] > div,
+    textarea {{
+        background: var(--qaqc-input-bg) !important;
+        border-color: var(--qaqc-line) !important;
+        color: var(--qaqc-text) !important;
+    }}
+
+    input,
+    textarea,
+    div[data-baseweb="select"] span {{
+        color: var(--qaqc-text) !important;
+    }}
+
+    input::placeholder,
+    textarea::placeholder {{
+        color: var(--qaqc-muted) !important;
+        opacity: 0.78;
+    }}
+
+    .stButton button,
+    div[data-testid="stPopover"] button,
+    .stDownloadButton button {{
+        background: var(--qaqc-blue) !important;
+        border-color: color-mix(in srgb, var(--qaqc-blue) 72%, #0f172a) !important;
+        color: #ffffff !important;
+    }}
+
+    .status-badge--open,
+    .status-badge--warning {{
+        background: color-mix(in srgb, var(--qaqc-warning) 14%, var(--qaqc-surface)) !important;
+        border-color: color-mix(in srgb, var(--qaqc-warning) 36%, var(--qaqc-line)) !important;
+        color: var(--qaqc-warning) !important;
+    }}
+
+    .status-badge--closed,
+    .status-badge--success {{
+        background: color-mix(in srgb, var(--qaqc-success) 14%, var(--qaqc-surface)) !important;
+        border-color: color-mix(in srgb, var(--qaqc-success) 36%, var(--qaqc-line)) !important;
+        color: var(--qaqc-success) !important;
+    }}
+
+    .status-badge--critical,
+    .status-badge--danger {{
+        background: color-mix(in srgb, var(--qaqc-danger) 14%, var(--qaqc-surface)) !important;
+        border-color: color-mix(in srgb, var(--qaqc-danger) 36%, var(--qaqc-line)) !important;
+        color: var(--qaqc-danger) !important;
+    }}
+
+    .status-badge--neutral {{
+        background: var(--qaqc-surface-2) !important;
+        border-color: var(--qaqc-line) !important;
+        color: var(--qaqc-muted) !important;
+    }}
+
+    .js-plotly-plot,
+    .js-plotly-plot .plotly,
+    .js-plotly-plot .main-svg {{
+        background: transparent !important;
+    }}
+
+    .js-plotly-plot .bg {{
+        fill: var(--qaqc-surface-2) !important;
+    }}
+
+    .js-plotly-plot text {{
+        fill: var(--qaqc-text) !important;
+    }}
+    </style>
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 # =========================
@@ -4636,27 +4863,28 @@ def inject_global_ui():
 
 
 def style_chart(fig):
+    dark = get_theme_mode() == "Dark"
     fig.update_layout(
-        template="plotly_white",
-        paper_bgcolor="rgba(255, 255, 255, 0)",
-        plot_bgcolor="rgba(248, 250, 252, 0.72)",
-        colorway=["#2563eb", "#16a34a", "#d97706", "#dc2626", "#0f766e", "#7c3aed", "#475569"],
-        font=dict(color="#111827", family="Inter, Segoe UI, Arial, sans-serif", size=12),
-        title=dict(font=dict(size=16, color="#0f172a"), x=0.02, xanchor="left"),
+        template="plotly_dark" if dark else "plotly_white",
+        paper_bgcolor="rgba(255, 255, 255, 0)" if not dark else "rgba(17, 24, 39, 0)",
+        plot_bgcolor="rgba(248, 250, 252, 0.72)" if not dark else "rgba(15, 23, 42, 0.72)",
+        colorway=(["#60a5fa", "#4ade80", "#fbbf24", "#f87171", "#2dd4bf", "#a78bfa", "#cbd5e1"] if dark else ["#2563eb", "#16a34a", "#d97706", "#dc2626", "#0f766e", "#7c3aed", "#475569"]),
+        font=dict(color="#e5edf8" if dark else "#111827", family="Inter, Segoe UI, Arial, sans-serif", size=12),
+        title=dict(font=dict(size=16, color="#f8fafc" if dark else "#0f172a"), x=0.02, xanchor="left"),
         margin=dict(l=34, r=24, t=56, b=38),
-        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#475569"), orientation="h", yanchor="bottom", y=1.02),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1" if dark else "#475569"), orientation="h", yanchor="bottom", y=1.02),
     )
     fig.update_xaxes(
-        gridcolor="rgba(148, 163, 184, 0.22)",
-        linecolor="rgba(148, 163, 184, 0.35)",
-        zerolinecolor="rgba(148, 163, 184, 0.25)",
-        title_font=dict(color="#475569"),
+        gridcolor="rgba(148, 163, 184, 0.18)" if dark else "rgba(148, 163, 184, 0.22)",
+        linecolor="rgba(148, 163, 184, 0.28)" if dark else "rgba(148, 163, 184, 0.35)",
+        zerolinecolor="rgba(148, 163, 184, 0.22)" if dark else "rgba(148, 163, 184, 0.25)",
+        title_font=dict(color="#cbd5e1" if dark else "#475569"),
     )
     fig.update_yaxes(
-        gridcolor="rgba(148, 163, 184, 0.22)",
-        linecolor="rgba(148, 163, 184, 0.35)",
-        zerolinecolor="rgba(148, 163, 184, 0.25)",
-        title_font=dict(color="#475569"),
+        gridcolor="rgba(148, 163, 184, 0.18)" if dark else "rgba(148, 163, 184, 0.22)",
+        linecolor="rgba(148, 163, 184, 0.28)" if dark else "rgba(148, 163, 184, 0.35)",
+        zerolinecolor="rgba(148, 163, 184, 0.22)" if dark else "rgba(148, 163, 184, 0.25)",
+        title_font=dict(color="#cbd5e1" if dark else "#475569"),
     )
     return fig
 
