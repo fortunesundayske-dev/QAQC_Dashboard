@@ -14,6 +14,14 @@ from urllib import request, error
 from urllib.parse import quote
 from io import BytesIO
 
+from ui_theme import (
+    CHART_COLORS_DARK,
+    CHART_COLORS_LIGHT,
+    DARK_THEME,
+    LIGHT_THEME,
+    css_variables,
+)
+
 BASE_DIR = Path(__file__).resolve().parent
 
 EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
@@ -1312,6 +1320,32 @@ def _auth_query_suffix():
         token = token[0] if token else None
     return f"?auth_token={quote(str(token))}" if token else ""
 
+
+NAVIGATION_GROUPS = {
+    "Overview": ["Executive Home", "Executive Analytics", "Management Summary", "KPI KRA Register"],
+    "Quality Records": ["NCR Tracker", "OBS Tracker", "ITR Tracker", "Defect & Rework"],
+    "Engineering": ["CTQ Dashboard", "Document Status"],
+    "Materials and Equipment": ["Concrete Tracker", "Calibration Log"],
+    "Audits and Reports": ["Audit & Surveillance", "Daily Reports", "Lessons Learned"],
+    "Knowledge and Tools": ["Standards Library", "Learning Academy", "Quality Tools"],
+    "Account and Administration": ["User Profile", "Access Admin"],
+}
+
+
+def grouped_navigation_pages():
+    pages = get_navigation_pages()
+    grouped = []
+    used = set()
+    for group, labels in NAVIGATION_GROUPS.items():
+        items = [(label, pages[label]) for label in labels if label in pages]
+        if items:
+            grouped.append((group, items))
+            used.update(label for label, _ in items)
+    leftovers = [(label, path) for label, path in pages.items() if label not in used]
+    if leftovers:
+        grouped.append(("Other", leftovers))
+    return grouped
+
 # =========================
 # KPI CARDS
 # =========================
@@ -1559,16 +1593,18 @@ def extract_projects(data):
 # =========================
 
 def render_navigation():
-    pages = get_navigation_pages()
+    grouped_pages = grouped_navigation_pages()
 
     nav_col, tool_col = st.columns([0.18, 0.82], gap="small")
     with nav_col:
         with st.popover("›  Page Navigation", use_container_width=False):
             suffix = _auth_query_suffix()
             links = []
-            for label, page in pages.items():
-                href = "/" + suffix if page == "app.py" else "/" + quote(Path(page).stem) + suffix
-                links.append(f'<a class="nav-popover-link" href="{href}" target="_self">{html.escape(label)}</a>')
+            for group, items in grouped_pages:
+                links.append(f'<div class="nav-popover-group">{html.escape(group)}</div>')
+                for label, page in items:
+                    href = "/" + suffix if page == "app.py" else "/" + quote(Path(page).stem) + suffix
+                    links.append(f'<a class="nav-popover-link" href="{href}" target="_self">{html.escape(label)}</a>')
             st.markdown('<div class="nav-popover-menu">' + "".join(links) + "</div>", unsafe_allow_html=True)
     with tool_col:
         st.markdown(
@@ -1604,6 +1640,7 @@ def render_top_nav():
     render_header()
 
     pages = get_navigation_pages()
+    grouped_pages = grouped_navigation_pages()
     user = st.session_state.get("auth")
     nlng_src = _image_data_uri(NLNG_LOGO)
     nlng_brand = f'<img class="side-brand__logo" src="{nlng_src}" alt="NLNG">' if nlng_src else '<div class="side-brand__name">NLNG</div>'
@@ -1665,16 +1702,18 @@ def render_top_nav():
     render_theme_selector()
     st.sidebar.markdown('<div class="side-menu-title">Menu</div>', unsafe_allow_html=True)
 
-    for label, page in pages.items():
-        suffix = _auth_query_suffix()
-        if page == "app.py":
-            href = "/" + suffix
-        else:
-            href = "/" + quote(Path(page).stem) + suffix
-        st.sidebar.markdown(
-            f'<a class="side-nav-link" href="{href}" target="_self">{html.escape(label)}</a>',
-            unsafe_allow_html=True,
-        )
+    suffix = _auth_query_suffix()
+    for group, items in grouped_pages:
+        st.sidebar.markdown(f'<div class="side-nav-group">{html.escape(group)}</div>', unsafe_allow_html=True)
+        for label, page in items:
+            if page == "app.py":
+                href = "/" + suffix
+            else:
+                href = "/" + quote(Path(page).stem) + suffix
+            st.sidebar.markdown(
+                f'<a class="side-nav-link" href="{href}" target="_self">{html.escape(label)}</a>',
+                unsafe_allow_html=True,
+            )
 
     st.sidebar.markdown(
         f"""
@@ -4653,42 +4692,8 @@ def inject_global_ui():
     </style>
     """, unsafe_allow_html=True)
     mode = get_theme_mode()
-    dark_vars = """
-        --qaqc-bg: #07111f;
-        --qaqc-surface: #111827;
-        --qaqc-surface-2: #172033;
-        --qaqc-navy: #f8fafc;
-        --qaqc-blue: #60a5fa;
-        --qaqc-blue-2: #38bdf8;
-        --qaqc-text: #e5edf8;
-        --qaqc-muted: #aab8ca;
-        --qaqc-line: rgba(148, 163, 184, 0.26);
-        --qaqc-success: #4ade80;
-        --qaqc-warning: #fbbf24;
-        --qaqc-danger: #f87171;
-        --qaqc-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
-        --qaqc-input-bg: #0b1220;
-        --qaqc-sidebar-bg: #050b14;
-        --qaqc-sidebar-text: #e5edf8;
-    """
-    light_vars = """
-        --qaqc-bg: #f4f7fb;
-        --qaqc-surface: #ffffff;
-        --qaqc-surface-2: #f8fafc;
-        --qaqc-navy: #0f172a;
-        --qaqc-blue: #2563eb;
-        --qaqc-blue-2: #0ea5e9;
-        --qaqc-text: #111827;
-        --qaqc-muted: #64748b;
-        --qaqc-line: #dbe4ef;
-        --qaqc-success: #15803d;
-        --qaqc-warning: #b45309;
-        --qaqc-danger: #b91c1c;
-        --qaqc-shadow: 0 14px 32px rgba(15, 23, 42, 0.10);
-        --qaqc-input-bg: #ffffff;
-        --qaqc-sidebar-bg: #0f172a;
-        --qaqc-sidebar-text: #e5edf8;
-    """
+    dark_vars = css_variables(DARK_THEME)
+    light_vars = css_variables(LIGHT_THEME)
     system_dark = f"@media (prefers-color-scheme: dark) {{ :root {{ {dark_vars} }} }}" if mode == "System" else ""
     selected_vars = dark_vars if mode == "Dark" else light_vars
     st.markdown(
@@ -4851,6 +4856,77 @@ def inject_global_ui():
     .js-plotly-plot text {{
         fill: var(--qaqc-text) !important;
     }}
+
+    .side-nav-group,
+    .nav-popover-group {{
+        color: color-mix(in srgb, var(--qaqc-sidebar-text) 72%, var(--qaqc-blue)) !important;
+        font-size: 0.68rem !important;
+        font-weight: 850 !important;
+        letter-spacing: 0.04em !important;
+        margin: 0.85rem 0 0.28rem !important;
+        text-transform: uppercase !important;
+    }}
+
+    .nav-popover-group {{
+        color: var(--qaqc-muted) !important;
+        margin-top: 0.7rem !important;
+    }}
+
+    .nav-popover-link {{
+        align-items: center;
+        border: 1px solid var(--qaqc-line);
+        border-radius: 7px;
+        color: var(--qaqc-text) !important;
+        display: flex;
+        font-size: 0.84rem;
+        font-weight: 700;
+        margin: 0.18rem 0;
+        min-height: 2.35rem;
+        padding: 0.45rem 0.65rem;
+        text-decoration: none !important;
+    }}
+
+    .nav-popover-link:hover,
+    .nav-popover-link:focus-visible {{
+        background: color-mix(in srgb, var(--qaqc-blue) 12%, var(--qaqc-surface));
+        border-color: color-mix(in srgb, var(--qaqc-blue) 36%, var(--qaqc-line));
+    }}
+
+    section[data-testid="stSidebar"] div[data-testid="stSelectbox"] {{
+        margin-bottom: 0.4rem;
+    }}
+
+    div[data-testid="stDataFrame"] * {{
+        font-size: 0.82rem !important;
+    }}
+
+    .stButton button:focus-visible,
+    .stDownloadButton button:focus-visible,
+    a:focus-visible,
+    input:focus,
+    textarea:focus {{
+        outline: 3px solid color-mix(in srgb, var(--qaqc-blue) 48%, transparent) !important;
+        outline-offset: 2px !important;
+    }}
+
+    @media (max-width: 768px) {{
+        section[data-testid="stSidebar"] {{
+            width: min(88vw, 22rem) !important;
+        }}
+
+        .side-nav-link {{
+            min-height: 2.9rem !important;
+        }}
+
+        div[data-testid="stDataFrame"] {{
+            max-width: calc(100vw - 1.4rem) !important;
+        }}
+
+        .app-logo-img--evomec img,
+        .app-logo-img--nlng img {{
+            max-height: 2.15rem !important;
+        }}
+    }}
     </style>
     """,
         unsafe_allow_html=True,
@@ -4868,7 +4944,7 @@ def style_chart(fig):
         template="plotly_dark" if dark else "plotly_white",
         paper_bgcolor="rgba(255, 255, 255, 0)" if not dark else "rgba(17, 24, 39, 0)",
         plot_bgcolor="rgba(248, 250, 252, 0.72)" if not dark else "rgba(15, 23, 42, 0.72)",
-        colorway=(["#60a5fa", "#4ade80", "#fbbf24", "#f87171", "#2dd4bf", "#a78bfa", "#cbd5e1"] if dark else ["#2563eb", "#16a34a", "#d97706", "#dc2626", "#0f766e", "#7c3aed", "#475569"]),
+        colorway=(CHART_COLORS_DARK if dark else CHART_COLORS_LIGHT),
         font=dict(color="#e5edf8" if dark else "#111827", family="Inter, Segoe UI, Arial, sans-serif", size=12),
         title=dict(font=dict(size=16, color="#f8fafc" if dark else "#0f172a"), x=0.02, xanchor="left"),
         margin=dict(l=34, r=24, t=56, b=38),
