@@ -4857,6 +4857,134 @@ def inject_global_ui():
         fill: var(--qaqc-text) !important;
     }}
 
+    /* Reference mockup alignment: dark enterprise shell with crisp data canvases. */
+    .stApp {{
+        background:
+            radial-gradient(circle at 16% 0%, rgba(41, 112, 255, 0.22), transparent 30rem),
+            radial-gradient(circle at 88% 6%, rgba(14, 165, 233, 0.12), transparent 26rem),
+            linear-gradient(135deg, #071426 0%, #0b1f36 52%, #04101f 100%) !important;
+    }}
+
+    .block-container {{
+        max-width: 1560px !important;
+        padding: 0.85rem 1rem 1.35rem !important;
+    }}
+
+    .app-bar {{
+        background:
+            linear-gradient(135deg, rgba(7, 20, 38, 0.98), rgba(11, 31, 54, 0.96)) !important;
+        border: 1px solid rgba(209, 233, 255, 0.16) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28) !important;
+        color: #ffffff !important;
+        min-height: 4.25rem !important;
+    }}
+
+    .app-bar *,
+    .app-bar__title,
+    .app-bar__welcome,
+    .app-bar__eyebrow,
+    .app-bar__project,
+    .header-profile__name,
+    .header-profile__meta {{
+        color: #ffffff !important;
+    }}
+
+    .header-profile {{
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: rgba(209, 233, 255, 0.18) !important;
+    }}
+
+    .page-header,
+    .dashboard-hero,
+    .kpi-card,
+    div[data-testid="stMetric"],
+    .exec-panel,
+    .tool-card,
+    .standard-card,
+    .learning-card,
+    .security-card,
+    .empty-state,
+    .app-alert,
+    div[data-testid="stExpander"] details {{
+        border-radius: 8px !important;
+        outline: 1px solid rgba(23, 43, 77, 0.02);
+    }}
+
+    .page-header,
+    .dashboard-hero {{
+        margin-top: 0 !important;
+        padding: 0.95rem 1.15rem !important;
+    }}
+
+    .page-header h1,
+    .dashboard-hero h1 {{
+        font-size: clamp(1.35rem, 2vw, 1.85rem) !important;
+    }}
+
+    .kpi-card,
+    div[data-testid="stMetric"] {{
+        min-height: 96px !important;
+    }}
+
+    div[data-testid="stDataFrame"] {{
+        border-radius: 8px !important;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08) !important;
+    }}
+
+    div[data-testid="stDataFrame"] [role="gridcell"],
+    div[data-testid="stDataFrame"] [role="columnheader"] {{
+        min-height: 2.25rem !important;
+    }}
+
+    section[data-testid="stSidebar"] {{
+        background:
+            radial-gradient(circle at 12% 0%, rgba(41, 112, 255, 0.22), transparent 16rem),
+            linear-gradient(180deg, #071426 0%, #061120 100%) !important;
+    }}
+
+    .side-brand {{
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(209, 233, 255, 0.12) !important;
+        border-radius: 8px;
+        margin: 0.45rem 0 0.65rem;
+        padding: 0.75rem !important;
+    }}
+
+    .side-nav-link {{
+        background: rgba(255, 255, 255, 0.02) !important;
+        border-color: rgba(209, 233, 255, 0.08) !important;
+    }}
+
+    .side-nav-link:hover,
+    .side-nav-link:focus-visible {{
+        background: #155eef !important;
+        border-color: #2970ff !important;
+        color: #ffffff !important;
+    }}
+
+    .side-nav-group {{
+        border-top: 1px solid rgba(209, 233, 255, 0.10);
+        padding-top: 0.55rem;
+    }}
+
+    div[data-testid="stTabs"] div[role="tablist"] {{
+        background: var(--qaqc-surface) !important;
+        border: 1px solid var(--qaqc-line) !important;
+        border-radius: 8px !important;
+        padding: 0.22rem !important;
+    }}
+
+    div[data-testid="stTabs"] button[role="tab"] {{
+        border-radius: 6px !important;
+        min-height: 2.35rem !important;
+    }}
+
+    div[data-testid="stTabs"] button[aria-selected="true"] {{
+        background: color-mix(in srgb, var(--qaqc-blue) 12%, var(--qaqc-surface)) !important;
+        color: var(--qaqc-blue) !important;
+    }}
+
     .side-nav-group,
     .nav-popover-group {{
         color: color-mix(in srgb, var(--qaqc-sidebar-text) 72%, var(--qaqc-blue)) !important;

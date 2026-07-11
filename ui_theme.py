@@ -34,7 +34,7 @@ COLORS = {
 }
 
 LIGHT_THEME = {
-    "bg": COLORS["page"],
+    "bg": COLORS["navy_950"],
     "surface": COLORS["surface"],
     "surface_2": COLORS["surface_alt"],
     "text": COLORS["text_primary"],
@@ -54,7 +54,7 @@ LIGHT_THEME = {
 }
 
 DARK_THEME = {
-    "bg": "#07111F",
+    "bg": "#050B14",
     "surface": "#111827",
     "surface_2": "#172033",
     "text": "#E5EDF8",
