@@ -11,7 +11,9 @@ from utils import (
     inject_global_ui,
     render_table_with_details,
     render_navigation,
-    render_top_nav
+    render_top_nav,
+    render_page_header,
+    style_chart,
 )
 from auth import login
 
@@ -24,8 +26,11 @@ if not login():
 render_navigation()
 render_top_nav()
 
-st.title("ITR Tracker")
-st.markdown("Inspection and Test Records with completion status and trend analytics.")
+render_page_header(
+    "ITR Tracker",
+    "Inspection and Test Records with completion status and trend analytics.",
+    "Quality Records",
+)
 
 filters = global_filter_sidebar(load_master_data(DATA_FILE))
 data = load_master_data(DATA_FILE)
@@ -67,8 +72,7 @@ if discipline_filter != "All":
 if status_filter != "All":
     filtered_df = filtered_df[filtered_df["Status"] == status_filter]
 
-# Display filtered data
-st.dataframe(filtered_df, use_container_width=True)
+render_table(filtered_df, height=320, empty_message="No ITR records match the selected filters.")
 
 if itr.empty:
     st.warning("No ITR records found.")
@@ -78,19 +82,8 @@ c1, c2, c3, c4 = st.columns(4)
 c1.metric("Total ITRs", len(itr))
 c2.metric("Open ITRs", int((itr["Status"].str.lower() == "open").sum()))
 c3.metric("Closed ITRs", int((itr["Status"].str.lower() == "closed").sum()))
-c4.metric("Completion %", f"{int((itr["Status"].str.lower() == "closed").sum() / max(1, len(itr)) * 100)}%")
-
-st.markdown("""
-<style>
-div[data-testid="stHorizontalBlock"] {
-    position: sticky;
-    top: 0;
-    background-color: white;
-    z-index: 999;
-    padding-top: 5px;
-}
-</style>
-""", unsafe_allow_html=True)
+closed_itr = int((itr["Status"].str.lower() == "closed").sum())
+c4.metric("Completion %", f"{int(closed_itr / max(1, len(itr)) * 100)}%")
 st.markdown("---")
 st.subheader("ITR Records")
 table_cols = [col for col in ["ITR_ID", "Project", "Discipline", "Activity", "Status"] if col in itr.columns]
@@ -101,10 +94,10 @@ st.markdown("---")
 status_counts = itr["Status"].str.title().value_counts().reset_index()
 status_counts.columns = ["Status", "Count"]
 col1, col2 = st.columns(2)
-col1.plotly_chart(px.pie(status_counts, values="Count", names="Status", title="ITR Pass vs Fail / Completion"), use_container_width=True)
+col1.plotly_chart(style_chart(px.pie(status_counts, values="Count", names="Status", title="ITR Pass vs Fail / Completion")), use_container_width=True)
 
 trend = itr.copy()
 if "Date" in trend.columns:
     trend["Month"] = trend["Date"].dt.to_period("M").dt.to_timestamp()
     trend = trend.groupby(["Month", "Status"]).size().reset_index(name="Count")
-    col2.plotly_chart(px.line(trend, x="Month", y="Count", color="Status", title="ITR Monthly Trend"), use_container_width=True)
+    col2.plotly_chart(style_chart(px.line(trend, x="Month", y="Count", color="Status", title="ITR Monthly Trend")), use_container_width=True)

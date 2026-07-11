@@ -6,7 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 import auth
-from utils import inject_global_ui, render_navigation, render_top_nav
+from utils import inject_global_ui, render_navigation, render_top_nav, render_page_header, render_table
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 STANDARDS_DIR = BASE_DIR / "assets" / "standards"
@@ -105,15 +105,10 @@ render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
-st.markdown(
-    """
-<div class="dashboard-hero">
-    <div class="hero-eyebrow">Controlled reference map</div>
-    <h1>ASTM, DEP, and BS Standards by Discipline</h1>
-    <p>A discipline-based guide for common construction QA/QC references. Use this page as a navigation and awareness tool; always verify the latest project contract, client specification, and licensed standard before acceptance decisions.</p>
-</div>
-""",
-    unsafe_allow_html=True,
+render_page_header(
+    "ASTM, DEP, and BS Standards by Discipline",
+    "A discipline-based guide for common construction QA/QC references. Use this page as a navigation and awareness tool; always verify the latest project contract, client specification, and licensed standard before acceptance decisions.",
+    "Standards Library",
 )
 
 st.markdown('<div class="section-heading">Standards PDF Library</div>', unsafe_allow_html=True)
@@ -201,11 +196,11 @@ else:
                     f"This PDF is larger than {PDF_EMBED_LIMIT_MB} MB, so it is available for download instead of inline preview to keep the dashboard responsive."
                 )
         else:
-            st.error(f"PDF not found: {pdf_path}")
+            st.error("The selected PDF is listed but is not available in the controlled library.")
 
         with st.expander("Show matching PDF table"):
             table_df = visible_pdf_df.drop(columns=["Path", "Display"])
-            st.dataframe(table_df, use_container_width=True, hide_index=True)
+            render_table(table_df)
 
 dep_index_df = load_dep_standard_index()
 st.markdown('<div class="section-heading">DEP Standards Index</div>', unsafe_allow_html=True)
@@ -246,7 +241,7 @@ else:
         visible_dep_df = visible_dep_df[visible_dep_df["Discipline"] == dep_discipline]
 
     st.caption(f"{len(visible_dep_df)} DEP reference(s) match the current filters.")
-    st.dataframe(visible_dep_df, use_container_width=True, hide_index=True)
+    render_table(visible_dep_df, include_internal=False)
 
     if not dep_available.empty:
         available_options = [
@@ -397,10 +392,10 @@ elif view_mode == "Cards":
             unsafe_allow_html=True,
         )
 else:
-    st.dataframe(pd.DataFrame(filtered), use_container_width=True, hide_index=True)
+    render_table(pd.DataFrame(filtered))
 
 st.markdown('<div class="section-heading">Standards Matrix</div>', unsafe_allow_html=True)
-st.dataframe(pd.DataFrame(standards), use_container_width=True, hide_index=True)
+render_table(pd.DataFrame(standards))
 
 st.markdown('<div class="section-heading">Controlled Use Rules</div>', unsafe_allow_html=True)
 st.markdown(

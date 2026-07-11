@@ -3,7 +3,7 @@ from pathlib import Path
 import streamlit as st
 
 import auth
-from utils import inject_global_ui, render_navigation, render_top_nav
+from utils import inject_global_ui, render_navigation, render_top_nav, render_page_header
 
 
 st.set_page_config(page_title="User Profile", layout="wide")
@@ -33,15 +33,10 @@ def render_profile_avatar(user_record):
         unsafe_allow_html=True,
     )
 
-st.markdown(
-    """
-<div class="dashboard-hero">
-    <div class="hero-eyebrow">Personal workspace</div>
-    <h1>User Profile</h1>
-    <p>Maintain user identity, discipline, and profile photo for a more accountable QA/QC workflow.</p>
-</div>
-""",
-    unsafe_allow_html=True,
+render_page_header(
+    "User Profile",
+    "Maintain user identity, discipline, and profile photo for a more accountable QA/QC workflow.",
+    "Personal Workspace",
 )
 
 if not user:

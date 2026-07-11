@@ -11,7 +11,9 @@ from utils import (
     inject_global_ui,
     render_table_with_details,
     render_navigation,
-    render_top_nav
+    render_top_nav,
+    render_page_header,
+    style_chart,
 )
 from auth import login
 
@@ -24,8 +26,7 @@ if not login():
 render_navigation()
 render_top_nav()
 
-st.title("Daily Reports")
-st.markdown("Track daily site reports and progress summaries across all projects.")
+render_page_header("Daily Reports", "Track daily site reports and progress summaries across all projects.", "Reports")
 
 filters = global_filter_sidebar(load_master_data(DATA_FILE))
 data = load_master_data(DATA_FILE)
@@ -43,18 +44,6 @@ c2.metric("Projects Covered", project_counts.shape[0])
 avg_reports = int(len(reports) / max(1, project_counts.shape[0]))
 c3.metric("Avg Reports per Project", avg_reports)
 
-st.markdown("""
-<style>
-div[data-testid="stHorizontalBlock"] {
-    position: sticky;
-    top: 0;
-    background-color: white;
-    z-index: 999;
-    padding-top: 5px;
-}
-</style>
-""", unsafe_allow_html=True)
-
 st.markdown("---")
 table_cols = [col for col in ["Report_ID", "Project", "Discipline", "Report_Date", "Summary", "Status"] if col in reports.columns]
 id_col = "Report_ID" if "Report_ID" in reports.columns else None
@@ -65,7 +54,7 @@ if "Report_Date" in reports.columns:
     trend = reports.copy()
     trend["Month"] = trend["Report_Date"].dt.to_period("M").dt.to_timestamp()
     trend = trend.groupby("Month").size().reset_index(name="Reports")
-    st.plotly_chart(px.line(trend, x="Month", y="Reports", title="Daily Report Submission Trend", markers=True), use_container_width=True)
+    st.plotly_chart(style_chart(px.line(trend, x="Month", y="Reports", title="Daily Report Submission Trend", markers=True)), use_container_width=True)
 
 if "Project" in reports.columns:
-    st.plotly_chart(px.bar(project_counts, x="Project", y="Count", title="Daily Reports by Project"), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(project_counts, x="Project", y="Count", title="Daily Reports by Project")), use_container_width=True)

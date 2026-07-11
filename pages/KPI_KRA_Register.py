@@ -12,6 +12,9 @@ from utils import (
     load_master_data,
     render_navigation,
     render_top_nav,
+    render_page_header,
+    render_table,
+    style_chart,
 )
 
 
@@ -60,8 +63,11 @@ def variance_text(row):
     return f"{sign}{diff:g}{suffix}"
 
 
-st.title("KPI KRA Register")
-st.markdown("Keep KPI/KRA performance visible and compare actual performance against planned targets.")
+render_page_header(
+    "KPI KRA Register",
+    "Keep KPI/KRA performance visible and compare actual performance against planned targets.",
+    "Executive",
+)
 
 data = load_master_data(DATA_FILE)
 global_filter_sidebar(data)
@@ -125,7 +131,7 @@ display_cols = [
 ]
 
 st.subheader("Actual vs Planned KPI/KRA")
-st.dataframe(filtered[display_cols], use_container_width=True, hide_index=True, height=520)
+render_table(filtered, columns=display_cols, height=520, empty_message="No KPI/KRA records match the selected filters.")
 
 chart_rows = filtered[filtered["Planned Value"].notna() | filtered["Actual Value"].notna()].copy()
 if chart_rows.empty:
@@ -140,7 +146,7 @@ else:
     ).dropna(subset=["Value"])
     comparison["Measure"] = comparison["Measure"].replace({"Planned Value": "Planned", "Actual Value": "Actual"})
     st.plotly_chart(
-        px.bar(
+        style_chart(px.bar(
             comparison,
             x="Short KPI",
             y="Value",
@@ -148,6 +154,6 @@ else:
             barmode="group",
             title="KPI/KRA Actual vs Planned",
             hover_data=["KRA"],
-        ),
+        )),
         use_container_width=True,
     )

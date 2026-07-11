@@ -11,7 +11,9 @@ from utils import (
     inject_global_ui,
     render_table_with_details,
     render_navigation,
-    render_top_nav
+    render_top_nav,
+    render_page_header,
+    style_chart,
 )
 from auth import login
 
@@ -23,8 +25,11 @@ if not login():
     st.stop()
 render_navigation()
 render_top_nav()
-st.title("Management Executive Summary")
-st.markdown("Automated executive insights, risk summary, and management recommendations.")
+render_page_header(
+    "Management Executive Summary",
+    "Automated executive insights, risk summary, and management recommendations.",
+    "Executive",
+)
 
 filters = global_filter_sidebar(load_master_data(DATA_FILE))
 data = load_master_data(DATA_FILE)
@@ -75,30 +80,24 @@ c2.metric("Top Performing Project", top_project)
 c3.metric("Lowest Performing Project", lowest_project)
 c4.metric("Open Quality Issues", len(ncr[ncr["Status"].str.lower() == "open"]))
 
-st.markdown("""
-<style>
-div[data-testid="stHorizontalBlock"] {
-    position: sticky;
-    top: 0;
-    background-color: white;
-    z-index: 999;
-    padding-top: 5px;
-}
-</style>
-""", unsafe_allow_html=True)
-
 st.markdown("---")
 st.subheader("Management Summary")
 st.write("### Critical Risks")
-for rec in recommendations:
-    st.write(f"- {rec}")
+if recommendations:
+    for rec in recommendations:
+        st.warning(rec)
+else:
+    st.success("No critical management risks were detected for the selected filters.")
 
 st.write("### Overdue Items")
-st.write(f"- Overdue NCRs: {len(ncr[(ncr["Status"].str.lower() == "open") & (pd.to_datetime(ncr["Due_Date"], errors='coerce') < pd.Timestamp('today'))])}")
-st.write(f"- Overdue OBS: {len(obs[(obs["Status"].str.lower() == "open") & (pd.to_datetime(obs["Due_Date"], errors='coerce') < pd.Timestamp('today'))])}")
-st.write(f"- Overdue CTQ Actions: {len(ctq[(ctq["Status"].str.lower() == "open") & (pd.to_datetime(ctq["Date"], errors='coerce') < pd.Timestamp('today'))])}")
+overdue_ncr = len(ncr[(ncr["Status"].str.lower() == "open") & (pd.to_datetime(ncr.get("Due_Date"), errors="coerce") < pd.Timestamp("today"))]) if not ncr.empty and "Status" in ncr.columns else 0
+overdue_obs = len(obs[(obs["Status"].str.lower() == "open") & (pd.to_datetime(obs.get("Due_Date"), errors="coerce") < pd.Timestamp("today"))]) if not obs.empty and "Status" in obs.columns else 0
+overdue_ctq = len(ctq[(ctq["Status"].str.lower() == "open") & (pd.to_datetime(ctq.get("Date"), errors="coerce") < pd.Timestamp("today"))]) if not ctq.empty and "Status" in ctq.columns else 0
+st.write(f"- Overdue NCRs: {overdue_ncr}")
+st.write(f"- Overdue OBS: {overdue_obs}")
+st.write(f"- Overdue CTQ Actions: {overdue_ctq}")
 
 st.markdown("---")
 if not ncr.empty and "Project" in ncr.columns:
     issue_counts = ncr["Project"].value_counts().rename_axis("Project").reset_index(name="Count")
-    st.plotly_chart(px.bar(issue_counts, x="Project", y="Count", title="Open Quality Issues by Project"), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(issue_counts, x="Project", y="Count", title="Open Quality Issues by Project")), use_container_width=True)

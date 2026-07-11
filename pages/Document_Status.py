@@ -11,7 +11,9 @@ from utils import (
     inject_global_ui,
     render_table_with_details,
     render_navigation,
-    render_top_nav
+    render_top_nav,
+    render_page_header,
+    style_chart,
 )
 from auth import login
 
@@ -24,8 +26,7 @@ if not login():
 render_navigation()
 render_top_nav()
 
-st.title("Document Status")
-st.markdown("Monitor AFC, IFR, IFA, IFC and superseded document compliance.")
+render_page_header("Document Status", "Monitor AFC, IFR, IFA, IFC and superseded document compliance.", "Engineering")
 
 filters = global_filter_sidebar(load_master_data(DATA_FILE))
 data = load_master_data(DATA_FILE)
@@ -45,18 +46,6 @@ c3.metric("Non-AFC Documents", non_afc)
 compliance_pct = int(afc / max(1, len(docs)) * 100)
 c4.metric("AFC Compliance", f"{compliance_pct}%")
 
-st.markdown("""
-<style>
-div[data-testid="stHorizontalBlock"] {
-    position: sticky;
-    top: 0;
-    background-color: white;
-    z-index: 999;
-    padding-top: 5px;
-}
-</style>
-""", unsafe_allow_html=True)
-
 st.markdown("---")
 table_cols = [col for col in ["Document_ID", "Project", "Document_Type", "Status", "Revision", "Issue_Date", "Due_Date"] if col in docs.columns]
 id_col = "Document_ID" if "Document_ID" in docs.columns else None
@@ -65,9 +54,9 @@ selected = render_table_with_details(docs, id_col=id_col, table_columns=table_co
 st.markdown("---")
 pie_data = docs["Document_Type"].value_counts().reset_index()
 pie_data.columns = ["Document_Type", "Count"]
-st.plotly_chart(px.pie(pie_data, values="Count", names="Document_Type", title="Document Status Breakdown"), use_container_width=True)
+st.plotly_chart(style_chart(px.pie(pie_data, values="Count", names="Document_Type", title="Document Status Breakdown")), use_container_width=True)
 
 if "Project" in docs.columns:
     project_docs = docs["Project"].value_counts().reset_index()
     project_docs.columns = ["Project", "Count"]
-    st.plotly_chart(px.bar(project_docs, x="Project", y="Count", title="Documents by Project"), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(project_docs, x="Project", y="Count", title="Documents by Project")), use_container_width=True)

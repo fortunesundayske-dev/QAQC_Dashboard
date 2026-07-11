@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 import auth
-from utils import inject_global_ui, render_navigation, render_top_nav
+from utils import inject_global_ui, render_navigation, render_top_nav, render_table
 
 
 st.set_page_config(page_title="Access Admin", layout="wide")
@@ -62,7 +62,7 @@ c3.metric("Restricted users", len(restricted))
 c4.metric("Rejected requests", len(rejected))
 c5.metric("Admin users", sum(1 for user in approved.values() if user.get("role") == "admin"))
 
-st.caption(f"User store: {getattr(auth, 'USERS_FILE', 'data/users.json')}")
+st.caption("User store: secured application data store")
 if st.button("Refresh access requests", use_container_width=True):
     st.rerun()
 
@@ -122,7 +122,7 @@ if all_accounts:
             for username, user in all_accounts.items()
         ]
     )
-    st.dataframe(accounts_df, use_container_width=True, hide_index=True)
+    render_table(accounts_df, include_internal=True)
 else:
     st.warning("No users were found in the current user store.")
 
@@ -332,7 +332,7 @@ if approved:
             for username, user in approved.items()
         ]
     )
-    st.dataframe(approved_df, use_container_width=True, hide_index=True)
+    render_table(approved_df, include_internal=True)
     st.markdown("#### Manage approved users")
     for username, user in approved.items():
         with st.container(border=True):
@@ -376,7 +376,7 @@ if restricted:
             for username, user in restricted.items()
         ]
     )
-    st.dataframe(restricted_df, use_container_width=True, hide_index=True)
+    render_table(restricted_df, include_internal=True)
     st.markdown("#### Manage restricted users")
     for username, user in restricted.items():
         with st.container(border=True):

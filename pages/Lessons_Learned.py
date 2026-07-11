@@ -11,7 +11,9 @@ from utils import (
     inject_global_ui,
     render_table_with_details,
     render_navigation,
-    render_top_nav
+    render_top_nav,
+    render_page_header,
+    style_chart,
 )
 from auth import login
 
@@ -24,8 +26,7 @@ if not login():
     st.stop()
 render_navigation()
 render_top_nav()
-st.title("Lessons Learned")
-st.markdown("Capture project lessons, impacts, and recommendations for continuous improvement.")
+render_page_header("Lessons Learned", "Capture project lessons, impacts, and recommendations for continuous improvement.", "Reports")
 
 filters = global_filter_sidebar(load_master_data(DATA_FILE))
 data = load_master_data(DATA_FILE)
@@ -39,30 +40,18 @@ table_cols = [col for col in ["Lesson_ID","Project", "Category", "Lesson", "Impa
 id_col = "Lesson_ID" if "Lesson_ID" in lessons.columns else None
 selected = render_table_with_details(lessons, id_col=id_col, table_columns=table_cols, detail_label="Lesson")
 
-st.markdown("""
-<style>
-div[data-testid="stHorizontalBlock"] {
-    position: sticky;
-    top: 0;
-    background-color: white;
-    z-index: 999;
-    padding-top: 5px;
-}
-</style>
-""", unsafe_allow_html=True)
-
 st.markdown("---")
 if "Discipline" in lessons.columns:
     discipline_data = lessons["Discipline"].value_counts().reset_index()
     discipline_data.columns = ["Discipline", "Count"]
-    st.plotly_chart(px.bar(discipline_data, x="Discipline", y="Count", title="Lessons by Discipline"), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(discipline_data, x="Discipline", y="Count", title="Lessons by Discipline")), use_container_width=True)
 
 if "Project" in lessons.columns:
     project_data = lessons["Project"].value_counts().reset_index()
     project_data.columns = ["Project", "Count"]
-    st.plotly_chart(px.bar(project_data, x="Project", y="Count", title="Lessons by Project"), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(project_data, x="Project", y="Count", title="Lessons by Project")), use_container_width=True)
 
 if "Category" in lessons.columns:
     category_data = lessons["Category"].value_counts().reset_index()
     category_data.columns = ["Category", "Count"]
-    st.plotly_chart(px.bar(category_data, x="Category", y="Count", title="Lessons by Category"), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(category_data, x="Category", y="Count", title="Lessons by Category")), use_container_width=True)

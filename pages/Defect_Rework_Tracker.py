@@ -11,7 +11,9 @@ from utils import (
     inject_global_ui,
     render_table_with_details,
     render_navigation,
-    render_top_nav
+    render_top_nav,
+    render_page_header,
+    style_chart,
 )
 from auth import login
 
@@ -24,8 +26,7 @@ if not login():
 render_navigation()
 render_top_nav()
 
-st.title("Defect & Rework Tracker")
-st.markdown("Monitor defects, rework costs, aging, and performance trends.")
+render_page_header("Defect & Rework Tracker", "Monitor defects, rework costs, aging, and performance trends.", "Quality Records")
 
 filters = global_filter_sidebar(load_master_data(DATA_FILE))
 data = load_master_data(DATA_FILE)
@@ -59,39 +60,27 @@ table_cols = [col for col in ["Defect_ID", "Project", "Discipline", "Area/Locati
 id_col = "Defect_ID" if "Defect_ID" in defects.columns else None
 selected = render_table_with_details(defects, id_col=id_col, table_columns=table_cols, detail_label="Defect")
 
-st.markdown("""
-<style>
-div[data-testid="stHorizontalBlock"] {
-    position: sticky;
-    top: 0;
-    background-color: white;
-    z-index: 999;
-    padding-top: 5px;
-}
-</style>
-""", unsafe_allow_html=True)
-
 st.markdown("---")
 trend = defects.copy()
 if "Date Identified" in trend.columns:
     trend["Month"] = trend["Date Identified"].dt.to_period("M").dt.to_timestamp()
     monthly = trend.groupby("Month").size().reset_index(name="Count")
-    st.plotly_chart(px.line(monthly, x="Month", y="Count", title="Monthly Defect Trend", markers=True), use_container_width=True)
+    st.plotly_chart(style_chart(px.line(monthly, x="Month", y="Count", title="Monthly Defect Trend", markers=True)), use_container_width=True)
 
 project_counts = defects["Project"].value_counts().reset_index()
 project_counts.columns = ["Project", "Count"]
-st.plotly_chart(px.bar(project_counts, x="Project", y="Count", title="Defects by Project"), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(project_counts, x="Project", y="Count", title="Defects by Project")), use_container_width=True)
 
 discipline_counts = defects["Discipline"].value_counts().reset_index()
 discipline_counts.columns = ["Discipline", "Count"]
-st.plotly_chart(px.bar(discipline_counts, x="Discipline", y="Count", title="Defects by Discipline"), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(discipline_counts, x="Discipline", y="Count", title="Defects by Discipline")), use_container_width=True)
 
 root_causes = defects["Root Cause"].value_counts().reset_index().head(10)
 root_causes.columns = ["Root Cause", "Count"]
-st.plotly_chart(px.bar(root_causes, x="Root Cause", y="Count", title="Defects by Root Cause"), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(root_causes, x="Root Cause", y="Count", title="Defects by Root Cause")), use_container_width=True)
 
 aging = defects.groupby("Project")["Aging Days"].mean().reset_index()
-st.plotly_chart(px.bar(aging, x="Project", y="Aging Days", title="Defect Aging Analysis"), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(aging, x="Project", y="Aging Days", title="Defect Aging Analysis")), use_container_width=True)
 
 defects["Date Identified"] = pd.to_datetime(defects["Date Identified"], errors="coerce")
 
@@ -103,8 +92,8 @@ cost_trend = (
     .reset_index()
 )
 cost_trend.columns = ["Month", "Rework Cost"]
-st.plotly_chart(px.line(cost_trend, x="Month", y="Rework Cost", title="Rework Cost Trend", markers=True), use_container_width=True)
+st.plotly_chart(style_chart(px.line(cost_trend, x="Month", y="Rework Cost", title="Rework Cost Trend", markers=True)), use_container_width=True)
 
 repeat_defects = defects["Description"].value_counts().reset_index().head(10)
 repeat_defects.columns = ["Description", "Count"]
-st.plotly_chart(px.bar(repeat_defects, x="Description", y="Count", title="Top 10 Recurring Defects"), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(repeat_defects, x="Description", y="Count", title="Top 10 Recurring Defects")), use_container_width=True)

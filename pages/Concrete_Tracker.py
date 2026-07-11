@@ -5,7 +5,7 @@ import plotly.express as px
 import streamlit as st
 
 import auth
-from utils import global_filter_sidebar, inject_global_ui, load_master_data, render_navigation, render_top_nav
+from utils import global_filter_sidebar, inject_global_ui, load_master_data, render_navigation, render_top_nav, render_page_header, render_table, style_chart
 
 
 DATA_FILE = Path(__file__).parents[1] / "data" / "QAQC_Master.xlsx"
@@ -158,15 +158,10 @@ def material_requirement_from_volume(volume, mix):
 
 
 
-st.markdown(
-    """
-<div class="dashboard-hero">
-    <div class="hero-eyebrow">Concrete production intelligence</div>
-    <h1>Concrete Tracker and Forecast Centre</h1>
-    <p>Track pours, calculate material consumption, review stock balance, and forecast procurement using recent production trend, lead time, safety stock, and approved mix design assumptions.</p>
-</div>
-""",
-    unsafe_allow_html=True,
+render_page_header(
+    "Concrete Tracker and Forecast Centre",
+    "Track pours, calculate material consumption, review stock balance, and forecast procurement using recent production trend, lead time, safety stock, and approved mix design assumptions.",
+    "Materials",
 )
 
 data = load_master_data(DATA_FILE)
@@ -257,18 +252,18 @@ with tab_overview:
     with c1:
         if not monthly_volume.empty:
             fig = px.line(monthly_volume, x="Month", y="Volume", markers=True, title="Monthly concrete volume")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(style_chart(fig), use_container_width=True)
         else:
             st.info("No dated valid pours available for trend analysis.")
     with c2:
         if not project_volume.empty:
             fig = px.bar(project_volume, x="Project", y="Volume", title="Concrete volume by project")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(style_chart(fig), use_container_width=True)
         else:
             st.info("No project volume distribution available.")
 
     st.markdown("#### Consumption by month")
-    st.dataframe(monthly_materials, use_container_width=True, hide_index=True)
+    render_table(monthly_materials, empty_message="No monthly consumption records are available.")
 
 with tab_forecast:
     st.markdown("#### Realistic production forecast")
@@ -285,7 +280,7 @@ with tab_forecast:
             ignore_index=True,
         )
         fig = px.line(chart_df, x="Month", y="Volume", color="Type", markers=True, title="Actual vs forecast concrete volume")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(style_chart(fig), use_container_width=True)
 
         next_month = forecast_materials.iloc[0]
         f1, f2, f3, f4 = st.columns(4)
@@ -294,7 +289,7 @@ with tab_forecast:
         f3.metric("Sand", f"{next_month['River Sand 0-4mm (t)']:,.1f} t")
         f4.metric("Aggregates", f"{next_month['5-15mm Stone (t)'] + next_month['15-22mm Stone (t)']:,.1f} t")
 
-        st.dataframe(
+        render_table(
             forecast_materials[
                 [
                     "Month",
@@ -307,8 +302,7 @@ with tab_forecast:
                     "15-22mm Stone (t)",
                 ]
             ],
-            use_container_width=True,
-            hide_index=True,
+            empty_message="No forecast material records are available.",
         )
         st.caption(
             "Forecast basis: recent weighted monthly volume, capped trend, construction intensity factor, and waste allowance. Replace assumptions with approved project planning data when available."
@@ -389,7 +383,7 @@ with tab_stock:
     c3.metric("Coverage horizon", f"{horizon} month(s)")
     c4.metric("Service level", service_level)
 
-    st.dataframe(stock_plan, use_container_width=True, hide_index=True)
+    render_table(stock_plan, empty_message="No stock plan could be generated.")
 
     chart_df = stock_plan.melt(
         id_vars="Material",
@@ -398,7 +392,7 @@ with tab_stock:
         value_name="Tonnes",
     )
     fig = px.bar(chart_df, x="Material", y="Tonnes", color="Measure", barmode="group", title="Stock, reorder point, and order recommendation")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(style_chart(fig), use_container_width=True)
 
     critical = stock_plan[stock_plan["Status"].isin(["Critical", "Order now"])]
     if critical.empty:
@@ -423,7 +417,7 @@ with tab_receipts:
         c1, c2 = st.columns(2)
         with c1:
             fig = px.bar(receipt_summary, x="Material", y="Quantity (t)", title="Material receipts by material")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(style_chart(fig), use_container_width=True)
         with c2:
             if "Date" in inflow.columns:
                 receipt_timeline = (
@@ -433,11 +427,11 @@ with tab_receipts:
                     .sum()
                 )
                 fig = px.line(receipt_timeline, x="Month", y="Quantity (t)", color="Material", markers=True, title="Receipt trend")
-                st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(inflow, use_container_width=True, hide_index=True)
+                st.plotly_chart(style_chart(fig), use_container_width=True)
+        render_table(inflow, empty_message="No material receipt records are available.")
 
 with tab_records:
     display_cols = [col for col in ["Pour_ID", "Date", "Project", "Location", "Volume"] if col in concrete_filtered.columns]
-    st.dataframe(concrete_filtered[display_cols], use_container_width=True, hide_index=True)
+    render_table(concrete_filtered, columns=display_cols, empty_message="No pour records match the selected filters.")
     if missing_volume_count:
         st.warning(f"{missing_volume_count} records have missing or zero concrete volume. Correct these rows to improve forecast accuracy.")

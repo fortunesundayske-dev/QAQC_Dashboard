@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 import auth
-from utils import inject_global_ui, render_navigation, render_top_nav
+from utils import inject_global_ui, render_navigation, render_top_nav, render_table
 
 
 st.set_page_config(page_title="Quality Tools", layout="wide")
@@ -68,7 +68,7 @@ with tab_dmaic:
         ],
         columns=["Phase", "Output"],
     )
-    st.dataframe(dmaic_df, use_container_width=True, hide_index=True)
+    render_table(dmaic_df)
     if baseline and target:
         direction = "reduction" if target < baseline else "improvement"
         change = abs((baseline - target) / baseline) * 100
@@ -96,7 +96,7 @@ with tab_pdca:
             {"Cycle": "Act", "Output": act_decision},
         ]
     )
-    st.dataframe(pdca_df, use_container_width=True, hide_index=True)
+    render_table(pdca_df)
     if current_gap:
         st.info(f"Baseline/gap to verify: {current_gap}")
     if pdca_owner:
@@ -121,7 +121,7 @@ with tab_rca:
     rca_df = pd.DataFrame(
         [{"Category": key, "Possible cause": value or "To be assessed"} for key, value in fishbone.items()]
     )
-    st.dataframe(rca_df, use_container_width=True, hide_index=True)
+    render_table(rca_df)
     root_cause = next((item for item in reversed(why_values) if item), "")
     if root_cause:
         st.success(f"Likely root cause to verify: {root_cause}")

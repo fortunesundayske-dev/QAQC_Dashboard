@@ -42,7 +42,7 @@ def load_master_data(file_path):
         file_path = Path(file_path)
 
         if not file_path.exists():
-            st.error("Excel file not found")
+            st.error("The QA/QC master workbook could not be found.")
             return {}
 
         xls = pd.ExcelFile(file_path)
@@ -52,8 +52,8 @@ def load_master_data(file_path):
             for sheet in xls.sheet_names
         }
 
-    except Exception as e:
-        st.error(f"Error loading master data: {e}")
+    except Exception:
+        st.error("The QA/QC master workbook could not be loaded. Contact an administrator if this continues.")
         return {}
 
 
@@ -899,6 +899,274 @@ def inject_enterprise_theme():
 
     </style>
     """, unsafe_allow_html=True)
+    st.markdown(
+        """
+    <style>
+    :root {
+        --qaqc-bg: #f4f7fb;
+        --qaqc-surface: #ffffff;
+        --qaqc-surface-2: #f8fafc;
+        --qaqc-navy: #0f172a;
+        --qaqc-blue: #2563eb;
+        --qaqc-blue-2: #0ea5e9;
+        --qaqc-text: #111827;
+        --qaqc-muted: #64748b;
+        --qaqc-line: #dbe4ef;
+        --qaqc-success: #15803d;
+        --qaqc-warning: #b45309;
+        --qaqc-danger: #b91c1c;
+        --qaqc-radius: 8px;
+        --qaqc-shadow: 0 14px 32px rgba(15, 23, 42, 0.10);
+        font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    html, body, .stApp, [class*="css"] {
+        font-family: "Inter", "Segoe UI", Roboto, Arial, sans-serif !important;
+    }
+
+    .stApp {
+        background:
+            linear-gradient(180deg, rgba(37, 99, 235, 0.06), transparent 18rem),
+            var(--qaqc-bg) !important;
+        color: var(--qaqc-text) !important;
+    }
+
+    .block-container {
+        max-width: 1560px !important;
+        padding: 0.9rem 1.25rem 2rem !important;
+    }
+
+    #MainMenu, footer, header, [data-testid="stToolbar"], [data-testid="stDecoration"] {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    h1, h2, h3, h4, h5, h6, p, label, span, div {
+        letter-spacing: 0 !important;
+    }
+
+    h1 { color: var(--qaqc-navy) !important; font-size: 1.85rem !important; line-height: 1.18 !important; }
+    h2 { color: var(--qaqc-navy) !important; font-size: 1.35rem !important; }
+    h3 { color: var(--qaqc-navy) !important; font-size: 1.05rem !important; }
+
+    .app-bar {
+        background: var(--qaqc-surface) !important;
+        border: 1px solid var(--qaqc-line) !important;
+        border-radius: var(--qaqc-radius) !important;
+        box-shadow: var(--qaqc-shadow) !important;
+        margin: 0 0 0.85rem !important;
+        min-height: 4rem !important;
+        padding: 0.75rem 1rem !important;
+    }
+
+    .app-bar__welcome, .app-bar__eyebrow { color: var(--qaqc-blue) !important; }
+    .app-bar__title { color: var(--qaqc-navy) !important; font-size: 1.05rem !important; }
+    .app-bar__project, .header-profile__meta { color: var(--qaqc-muted) !important; }
+    .header-profile { background: var(--qaqc-surface-2) !important; border-color: var(--qaqc-line) !important; }
+    .header-profile__name { color: var(--qaqc-navy) !important; }
+
+    .page-header, .dashboard-hero {
+        background: var(--qaqc-surface) !important;
+        border: 1px solid var(--qaqc-line) !important;
+        border-left: 4px solid var(--qaqc-blue) !important;
+        border-radius: var(--qaqc-radius) !important;
+        box-shadow: var(--qaqc-shadow) !important;
+        margin: 0.25rem 0 1rem !important;
+        min-height: auto !important;
+        padding: 1.05rem 1.2rem !important;
+    }
+
+    .page-header__eyebrow, .hero-eyebrow {
+        color: var(--qaqc-blue) !important;
+        font-size: 0.72rem !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+    }
+
+    .page-header h1, .dashboard-hero h1 {
+        color: var(--qaqc-navy) !important;
+        font-size: 1.75rem !important;
+        line-height: 1.18 !important;
+        margin: 0.25rem 0 0.35rem !important;
+    }
+
+    .page-header p, .dashboard-hero p, .section-caption, .stCaptionContainer {
+        color: var(--qaqc-muted) !important;
+        font-size: 0.92rem !important;
+    }
+
+    section[data-testid="stSidebar"] {
+        background: #0f172a !important;
+        border-right: 1px solid rgba(255,255,255,0.10) !important;
+    }
+
+    section[data-testid="stSidebar"] * {
+        color: #e5edf8 !important;
+    }
+
+    .side-nav-link {
+        align-items: center !important;
+        border: 1px solid transparent !important;
+        border-radius: 7px !important;
+        color: #dbeafe !important;
+        display: flex !important;
+        font-size: 0.86rem !important;
+        font-weight: 700 !important;
+        min-height: 2.55rem !important;
+        padding: 0.55rem 0.75rem !important;
+        text-decoration: none !important;
+    }
+
+    .side-nav-link:hover, .side-nav-link:focus-visible {
+        background: rgba(37, 99, 235, 0.35) !important;
+        border-color: rgba(125, 211, 252, 0.45) !important;
+        color: #ffffff !important;
+        transform: none !important;
+    }
+
+    .kpi-card, div[data-testid="stMetric"], .exec-panel, .tool-card, .standard-card,
+    .learning-card, .security-card, div[data-testid="stExpander"] details {
+        background: var(--qaqc-surface) !important;
+        border: 1px solid var(--qaqc-line) !important;
+        border-radius: var(--qaqc-radius) !important;
+        box-shadow: var(--qaqc-shadow) !important;
+        color: var(--qaqc-text) !important;
+    }
+
+    .kpi-card {
+        min-height: 118px !important;
+        padding: 0.9rem 1rem !important;
+    }
+
+    .kpi-card__head { align-items: center; display: flex; justify-content: space-between; gap: 0.75rem; }
+    .kpi-card__icon {
+        align-items: center;
+        background: color-mix(in srgb, var(--accent) 14%, white);
+        border: 1px solid color-mix(in srgb, var(--accent) 28%, white);
+        border-radius: 999px;
+        color: var(--accent);
+        display: flex;
+        font-size: 0.72rem;
+        font-weight: 900;
+        height: 2rem;
+        justify-content: center;
+        width: 2rem;
+    }
+
+    .kpi-title, div[data-testid="stMetricLabel"] {
+        color: var(--qaqc-muted) !important;
+        font-size: 0.76rem !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+    }
+
+    .kpi-value, div[data-testid="stMetricValue"] {
+        color: var(--qaqc-navy) !important;
+        font-size: 1.75rem !important;
+        font-weight: 850 !important;
+        line-height: 1.05 !important;
+    }
+
+    .kpi-detail { color: var(--qaqc-muted); font-size: 0.8rem; margin-top: 0.45rem; }
+
+    div[data-testid="stDataFrame"], .stDataFrame {
+        background: var(--qaqc-surface) !important;
+        border: 1px solid var(--qaqc-line) !important;
+        border-radius: var(--qaqc-radius) !important;
+        box-shadow: var(--qaqc-shadow) !important;
+        overflow: auto !important;
+    }
+
+    .stButton button, div[data-testid="stPopover"] button, .stDownloadButton button {
+        background: var(--qaqc-blue) !important;
+        border: 1px solid #1d4ed8 !important;
+        border-radius: 7px !important;
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        min-height: 2.5rem !important;
+    }
+
+    .stButton button:hover, div[data-testid="stPopover"] button:hover, .stDownloadButton button:hover {
+        background: #1d4ed8 !important;
+        border-color: #1e40af !important;
+        color: #ffffff !important;
+    }
+
+    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div, textarea {
+        background: #ffffff !important;
+        border-color: var(--qaqc-line) !important;
+        border-radius: 7px !important;
+        color: var(--qaqc-text) !important;
+        min-height: 2.6rem !important;
+    }
+
+    div[data-baseweb="select"] span, input, textarea {
+        color: var(--qaqc-text) !important;
+    }
+
+    .status-badge {
+        border-radius: 999px;
+        display: inline-flex;
+        font-size: 0.74rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-top: 0.5rem;
+        padding: 0.38rem 0.56rem;
+    }
+
+    .status-badge--open, .status-badge--warning { background: #fff7ed; color: var(--qaqc-warning); border: 1px solid #fed7aa; }
+    .status-badge--closed, .status-badge--success { background: #f0fdf4; color: var(--qaqc-success); border: 1px solid #bbf7d0; }
+    .status-badge--critical, .status-badge--danger { background: #fef2f2; color: var(--qaqc-danger); border: 1px solid #fecaca; }
+    .status-badge--neutral { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+    .empty-state, .app-alert {
+        align-items: flex-start;
+        background: var(--qaqc-surface) !important;
+        border: 1px solid var(--qaqc-line);
+        border-radius: var(--qaqc-radius);
+        box-shadow: var(--qaqc-shadow);
+        color: var(--qaqc-text);
+        display: flex;
+        gap: 0.85rem;
+        margin: 0.65rem 0;
+        padding: 1rem;
+    }
+
+    .empty-state__mark {
+        align-items: center;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 999px;
+        color: var(--qaqc-blue);
+        display: flex;
+        flex: 0 0 auto;
+        font-weight: 900;
+        height: 2rem;
+        justify-content: center;
+        width: 2rem;
+    }
+
+    .empty-state h3 { margin: 0 0 0.2rem !important; }
+    .empty-state p { color: var(--qaqc-muted) !important; margin: 0 !important; }
+
+    .app-alert--success { border-left: 4px solid var(--qaqc-success); }
+    .app-alert--warning { border-left: 4px solid var(--qaqc-warning); }
+    .app-alert--error, .app-alert--danger { border-left: 4px solid var(--qaqc-danger); }
+    .app-alert--info { border-left: 4px solid var(--qaqc-blue); }
+
+    @media (max-width: 900px) {
+        .block-container { padding: 0.7rem 0.7rem 1.5rem !important; }
+        .app-bar { align-items: flex-start !important; flex-direction: column !important; gap: 0.65rem !important; }
+        .app-bar__right { flex-wrap: wrap !important; width: 100% !important; }
+        .page-header h1, .dashboard-hero h1 { font-size: 1.35rem !important; }
+        .kpi-card, div[data-testid="stMetric"] { min-height: auto !important; }
+        [data-testid="stHorizontalBlock"] { gap: 0.65rem !important; }
+        div[data-testid="stTabs"] div[role="tablist"] { overflow-x: auto !important; white-space: nowrap !important; }
+    }
+    </style>
+    """,
+        unsafe_allow_html=True,
+    )
 
 # =========================
 # HEADER
@@ -1048,18 +1316,28 @@ def _auth_query_suffix():
 # KPI CARDS
 # =========================
 def render_kpi_cards(kpis):
-    cols = st.columns(4)  # 4 per row grid
-    accents = ["#38bdf8", "#22c55e", "#f59e0b", "#ef4444"]
+    if not kpis:
+        return
+    cols = st.columns(min(4, len(kpis)))
+    accents = ["#2563eb", "#16a34a", "#d97706", "#dc2626", "#0f766e", "#7c3aed"]
 
     for i, kpi in enumerate(kpis):
-        with cols[i % 4]:
+        with cols[i % len(cols)]:
             accent = accents[i % len(accents)]
+            detail = kpi.get("detail") or kpi.get("subtitle") or ""
+            status = kpi.get("status") or ""
+            icon = kpi.get("icon") or "QA"
             st.markdown(
                 f"""
 <div class="kpi-card" style="--accent: {accent};">
     <div class="kpi-card__topline"></div>
-    <div class="kpi-title">{html.escape(str(kpi['label']))}</div>
-    <div class="kpi-value">{html.escape(str(kpi['value']))}</div>
+    <div class="kpi-card__head">
+        <div class="kpi-title">{html.escape(str(kpi.get('label', 'Metric')))}</div>
+        <div class="kpi-card__icon">{html.escape(str(icon))}</div>
+    </div>
+    <div class="kpi-value">{html.escape(str(kpi.get('value', '0')))}</div>
+    <div class="kpi-detail">{html.escape(str(detail))}</div>
+    {f'<div class="status-badge status-badge--neutral">{html.escape(str(status))}</div>' if status else ''}
 </div>
 """,
                 unsafe_allow_html=True
@@ -1110,11 +1388,99 @@ def build_kpis(filtered_data):
 # =========================
 # TABLES
 # =========================
-def render_table(df, height=300):
-    if isinstance(df, pd.DataFrame) and not df.empty:
-        st.dataframe(df, height=height, use_container_width=True)
+SENSITIVE_COLUMN_TOKENS = (
+    "password", "hash", "salt", "secret", "token", "webhook", "api_key",
+    "apikey", "client_secret", "connection", "filepath", "file_path",
+    "session", "internal", "_id", "rowid",
+)
+
+
+def current_user_role():
+    return str(
+        st.session_state.get("auth", {}).get("role")
+        or st.session_state.get("role")
+        or "viewer"
+    ).strip().lower()
+
+
+def can_edit_records():
+    return current_user_role() in {"admin", "user", "standard", "standard user"}
+
+
+def can_administer():
+    return current_user_role() == "admin"
+
+
+def sanitize_display_dataframe(df, columns=None, include_internal=False):
+    if not isinstance(df, pd.DataFrame):
+        return pd.DataFrame()
+    display_df = df.copy()
+    if columns:
+        valid_cols = [col for col in columns if col in display_df.columns]
+        if valid_cols:
+            display_df = display_df[valid_cols]
+    if not include_internal:
+        keep_cols = []
+        for col in display_df.columns:
+            normalized = str(col).strip().lower()
+            if normalized in {"id", "index"}:
+                continue
+            if any(token in normalized for token in SENSITIVE_COLUMN_TOKENS):
+                continue
+            keep_cols.append(col)
+        display_df = display_df[keep_cols]
+    for col in display_df.columns:
+        if "date" in str(col).lower() or str(col).lower().endswith("_on"):
+            converted = pd.to_datetime(display_df[col], errors="coerce")
+            if converted.notna().any():
+                display_df[col] = converted.dt.strftime("%d %b %Y").fillna("")
+    return display_df
+
+
+def render_empty_state(title="No records found", message="No data is available for the selected filters.", action_label=None):
+    action = f'<div class="empty-state__action">{html.escape(action_label)}</div>' if action_label else ""
+    st.markdown(
+        f"""
+<div class="empty-state">
+    <div class="empty-state__mark">i</div>
+    <div>
+        <h3>{html.escape(title)}</h3>
+        <p>{html.escape(message)}</p>
+        {action}
+    </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def render_page_header(title, description="", eyebrow="QA/QC Module"):
+    st.markdown(
+        f"""
+<div class="page-header">
+    <div class="page-header__eyebrow">{html.escape(eyebrow)}</div>
+    <h1>{html.escape(title)}</h1>
+    {f'<p>{html.escape(description)}</p>' if description else ''}
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def render_alert(message, kind="info"):
+    kind = str(kind or "info").lower()
+    st.markdown(
+        f'<div class="app-alert app-alert--{html.escape(kind)}">{html.escape(str(message))}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_table(df, height=300, columns=None, empty_message="No records found", include_internal=False):
+    display_df = sanitize_display_dataframe(df, columns=columns, include_internal=include_internal)
+    if isinstance(display_df, pd.DataFrame) and not display_df.empty:
+        st.dataframe(display_df, height=height, use_container_width=True, hide_index=True)
     else:
-        st.info("No data")
+        render_empty_state("No records found", empty_message)
 
 def render_table_with_details(
     df,
@@ -1126,15 +1492,10 @@ def render_table_with_details(
         st.info("No data available")
         return None
 
-    display_df = df.copy()
-
-    if table_columns:
-        valid_cols = [c for c in table_columns if c in display_df.columns]
-        if valid_cols:
-            display_df = display_df[valid_cols]
+    display_df = sanitize_display_dataframe(df, columns=table_columns, include_internal=can_administer())
 
     st.subheader(detail_label)
-    st.dataframe(display_df, use_container_width=True)
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     if id_col and id_col in df.columns:
         selected_id = st.selectbox(
@@ -1145,7 +1506,7 @@ def render_table_with_details(
         selected_row = df[df[id_col].astype(str) == selected_id]
 
         st.write("Selected Record")
-        st.dataframe(selected_row, use_container_width=True)
+        st.dataframe(sanitize_display_dataframe(selected_row, include_internal=can_administer()), use_container_width=True, hide_index=True)
 
         return selected_row
 
@@ -1365,6 +1726,11 @@ def project_filter_sidebar(projects, page="main"):
 # UI STYLING
 # =========================
 def inject_global_ui():
+    try:
+        import plotly.io as pio
+        pio.templates.default = "plotly_white"
+    except Exception:
+        pass
     st.markdown(
     """
     <style>
@@ -4271,23 +4637,26 @@ def inject_global_ui():
 
 def style_chart(fig):
     fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor="rgba(15, 27, 45, 0.92)",
-        plot_bgcolor="rgba(8, 17, 31, 0.5)",
-        font=dict(color="#dbe7f5", family="Inter, Arial, sans-serif"),
-        title=dict(font=dict(size=16, color="#f8fafc")),
-        margin=dict(l=32, r=24, t=54, b=34),
-        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1")),
+        template="plotly_white",
+        paper_bgcolor="rgba(255, 255, 255, 0)",
+        plot_bgcolor="rgba(248, 250, 252, 0.72)",
+        colorway=["#2563eb", "#16a34a", "#d97706", "#dc2626", "#0f766e", "#7c3aed", "#475569"],
+        font=dict(color="#111827", family="Inter, Segoe UI, Arial, sans-serif", size=12),
+        title=dict(font=dict(size=16, color="#0f172a"), x=0.02, xanchor="left"),
+        margin=dict(l=34, r=24, t=56, b=38),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#475569"), orientation="h", yanchor="bottom", y=1.02),
     )
     fig.update_xaxes(
-        gridcolor="rgba(148, 163, 184, 0.14)",
-        linecolor="rgba(148, 163, 184, 0.22)",
-        zerolinecolor="rgba(148, 163, 184, 0.18)",
+        gridcolor="rgba(148, 163, 184, 0.22)",
+        linecolor="rgba(148, 163, 184, 0.35)",
+        zerolinecolor="rgba(148, 163, 184, 0.25)",
+        title_font=dict(color="#475569"),
     )
     fig.update_yaxes(
-        gridcolor="rgba(148, 163, 184, 0.14)",
-        linecolor="rgba(148, 163, 184, 0.22)",
-        zerolinecolor="rgba(148, 163, 184, 0.18)",
+        gridcolor="rgba(148, 163, 184, 0.22)",
+        linecolor="rgba(148, 163, 184, 0.35)",
+        zerolinecolor="rgba(148, 163, 184, 0.25)",
+        title_font=dict(color="#475569"),
     )
     return fig
 

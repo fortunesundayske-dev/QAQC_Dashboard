@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 import auth
-from utils import inject_global_ui, render_navigation, render_top_nav
+from utils import inject_global_ui, render_navigation, render_top_nav, render_table
 
 
 st.set_page_config(page_title="Learning Academy", layout="wide")
@@ -106,11 +106,11 @@ with tab_paths:
         ],
         columns=["Step", "Activity"],
     )
-    st.dataframe(sequence, use_container_width=True, hide_index=True)
+    render_table(sequence)
 
 with tab_matrix:
     matrix = pd.DataFrame(learning_paths)
-    st.dataframe(matrix, use_container_width=True, hide_index=True)
+    render_table(matrix)
     st.info("Use this as a starting point for a formal competency matrix. Final authorisation should be controlled by project QA management.")
 
 with tab_quiz:
@@ -143,10 +143,8 @@ with tab_records:
     status = st.selectbox("Status", ["Planned", "In progress", "Completed", "Needs reassessment"])
     evidence = st.text_area("Evidence / assessor comments")
     if st.button("Create training record preview", use_container_width=True):
-        st.dataframe(
+        render_table(
             pd.DataFrame(
                 [{"Trainee": name, "Discipline": discipline, "Course": course, "Status": status, "Evidence": evidence}]
-            ),
-            use_container_width=True,
-            hide_index=True,
+            )
         )

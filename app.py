@@ -617,7 +617,7 @@ if home_search:
         st.info("No dashboard records match your search.")
     else:
         st.caption(f"{len(search_results)} result(s) found")
-        st.dataframe(search_results, use_container_width=True, hide_index=True, height=260)
+        render_table(search_results, height=260, empty_message="No matching records were found.")
 
 ncr = filtered_data.get("NCR Log", pd.DataFrame())
 obs = filtered_data.get("OBS Log", pd.DataFrame())
@@ -691,7 +691,7 @@ with bottom_col2:
         if recent_ncr.empty:
             st.info("No recent NCR records available.")
         else:
-            st.dataframe(recent_ncr, use_container_width=True, hide_index=True, height=314)
+            render_table(recent_ncr, height=314, empty_message="No recent NCR records are available.")
 
 module_cards = [
     module_card("Audit", [("Planned", len(filtered_data.get("Audit Register", pd.DataFrame()))), ("Documents", len(docs))], "#2563eb", 83),
