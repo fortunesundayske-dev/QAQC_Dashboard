@@ -72,6 +72,7 @@ def get_database():
     return client[database_name]
 
 
+@lru_cache(maxsize=1)
 def ensure_user_schema():
     """Create or update the users collection validator and indexes."""
     database = get_database()

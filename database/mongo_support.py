@@ -2,6 +2,7 @@
 
 import secrets
 from datetime import datetime, timezone
+from functools import lru_cache
 
 from pymongo import ASCENDING, DESCENDING
 from pymongo.errors import CollectionInvalid
@@ -32,6 +33,7 @@ def _utc_now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+@lru_cache(maxsize=1)
 def ensure_support_schema():
     database = get_database()
     try:

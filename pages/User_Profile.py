@@ -49,19 +49,18 @@ with c1:
     st.caption(f"Role: {user['role'].title()} | Status: {user['status'].title()}")
 
 with c2:
-    with st.form("profile_form"):
-        name = st.text_input("Full name", value=user.get("name", ""))
-        email = st.text_input("Email", value=user.get("email", ""))
-        discipline_options = auth.DISCIPLINES
-        saved_discipline = user.get("discipline", "Quality Management")
-        discipline_choice = st.selectbox(
-            "Primary discipline",
-            discipline_options + ["Other / custom"],
-            index=discipline_options.index(saved_discipline) if saved_discipline in discipline_options else len(discipline_options),
-        )
-        custom_discipline = st.text_input("Custom discipline", value=saved_discipline if saved_discipline not in discipline_options else "")
-        uploaded = st.file_uploader("Profile photo", type=["png", "jpg", "jpeg"])
-        saved = st.form_submit_button("Save profile", use_container_width=True)
+    name = st.text_input("Full name", value=user.get("name", ""))
+    email = st.text_input("Email", value=user.get("email", ""))
+    discipline_options = auth.DISCIPLINES
+    saved_discipline = user.get("discipline", "Quality Management")
+    discipline_choice = st.selectbox(
+        "Primary discipline",
+        discipline_options + ["Other / custom"],
+        index=discipline_options.index(saved_discipline) if saved_discipline in discipline_options else len(discipline_options),
+    )
+    custom_discipline = st.text_input("Custom discipline", value=saved_discipline if saved_discipline not in discipline_options else "")
+    uploaded = st.file_uploader("Profile photo", type=["png", "jpg", "jpeg"])
+    saved = st.button("Save profile", type="primary", use_container_width=True)
 
     if saved:
         discipline = custom_discipline.strip() if discipline_choice == "Other / custom" else discipline_choice

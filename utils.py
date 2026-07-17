@@ -53,6 +53,17 @@ def _profile_photo_src(photo):
 # DATA LOADING (DICT SYSTEM)
 # =========================
 
+@st.cache_data(show_spinner=False)
+def _load_master_data_cached(file_path, modified_ns):
+    del modified_ns
+    file_path = Path(file_path)
+    xls = pd.ExcelFile(file_path)
+    return {
+        sheet: pd.read_excel(xls, sheet)
+        for sheet in xls.sheet_names
+    }
+
+
 def load_master_data(file_path):
     try:
         file_path = Path(file_path)
@@ -60,13 +71,8 @@ def load_master_data(file_path):
         if not file_path.exists():
             st.error("The QA/QC master workbook could not be found.")
             return {}
-
-        xls = pd.ExcelFile(file_path)
-
-        return {
-            sheet: pd.read_excel(xls, sheet)
-            for sheet in xls.sheet_names
-        }
+        resolved = file_path.resolve()
+        return _load_master_data_cached(str(resolved), resolved.stat().st_mtime_ns)
 
     except Exception:
         st.error("The QA/QC master workbook could not be loaded. Contact an administrator if this continues.")

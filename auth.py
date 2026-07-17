@@ -52,7 +52,7 @@ def _ensure_auth_store():
         pass
     users = load_users()
     if users:
-        return
+        return users
 
     salt = secrets.token_hex(16)
     admin = {
@@ -71,13 +71,14 @@ def _ensure_auth_store():
         "failed_attempts": 0,
         "locked_until": None,
     }
-    _save_users({"admin": admin})
+    users = {"admin": admin}
+    _save_users(users)
+    return users
 
 
 def _load_users():
     try:
-        _ensure_auth_store()
-        return load_users()
+        return _ensure_auth_store()
     except Exception as exc:
         error_name = type(exc).__name__
         if error_name in {"InvalidURI", "ConfigurationError", "ValueError"}:
