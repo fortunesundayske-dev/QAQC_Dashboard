@@ -1665,26 +1665,27 @@ def extract_projects(data):
 def render_navigation():
     grouped_pages = grouped_navigation_pages()
 
-    user = st.session_state.get("auth") or {}
-    nav_col, tool_col, account_col = st.columns([0.2, 0.5, 0.3], gap="small")
-    with nav_col:
-        with st.popover("›  Page Navigation", use_container_width=False):
-            suffix = _auth_query_suffix()
-            links = []
-            for group, items in grouped_pages:
-                links.append(f'<div class="nav-popover-group">{html.escape(group)}</div>')
-                for label, page in items:
-                    href = "/" + suffix if page == "app.py" else "/" + quote(Path(page).stem) + suffix
-                    links.append(f'<a class="nav-popover-link" href="{href}" target="_self">{html.escape(label)}</a>')
-            st.markdown('<div class="nav-popover-menu">' + "".join(links) + "</div>", unsafe_allow_html=True)
-    with tool_col:
-        st.markdown(
-            '<div class="command-tools command-tools--compact"><span>⌕</span><span>•</span><span>● Online</span></div>',
-            unsafe_allow_html=True,
-        )
-    with account_col:
-        if user.get("logged_in"):
-            _render_account_menu(user)
+    with st.container(key="primary_navigation_row"):
+        user = st.session_state.get("auth") or {}
+        nav_col, tool_col, account_col = st.columns([0.2, 0.5, 0.3], gap="small")
+        with nav_col:
+            with st.popover("›  Page Navigation", use_container_width=False):
+                suffix = _auth_query_suffix()
+                links = []
+                for group, items in grouped_pages:
+                    links.append(f'<div class="nav-popover-group">{html.escape(group)}</div>')
+                    for label, page in items:
+                        href = "/" + suffix if page == "app.py" else "/" + quote(Path(page).stem) + suffix
+                        links.append(f'<a class="nav-popover-link" href="{href}" target="_self">{html.escape(label)}</a>')
+                st.markdown('<div class="nav-popover-menu">' + "".join(links) + "</div>", unsafe_allow_html=True)
+        with tool_col:
+            st.markdown(
+                '<div class="command-tools command-tools--compact"><span>⌕</span><span>•</span><span>● Online</span></div>',
+                unsafe_allow_html=True,
+            )
+        with account_col:
+            if user.get("logged_in"):
+                _render_account_menu(user)
     return
     st.markdown("### 🧭 Page Navigation", unsafe_allow_html=True)
 
@@ -5190,6 +5191,162 @@ def inject_global_ui():
         .app-logo-img--nlng img {{
             max-height: 2.15rem !important;
         }}
+    }}
+
+    /* Final responsive contract for desktop, tablet, and phone layouts. */
+    .st-key-primary_navigation_row {{
+        margin: 0.45rem 0 0.75rem;
+        width: 100%;
+    }}
+
+    .st-key-primary_navigation_row div[data-testid="stHorizontalBlock"] {{
+        align-items: center;
+    }}
+
+    .st-key-primary_navigation_row div[data-testid="column"],
+    .st-key-navigation_account div[data-testid="column"] {{
+        min-width: 0 !important;
+    }}
+
+    .st-key-navigation_account div[data-testid="stPopover"] button {{
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }}
+
+    img, svg, canvas {{
+        max-width: 100%;
+    }}
+
+    div[data-testid="stDataFrame"],
+    div[data-testid="stTable"],
+    .element-container:has(table) {{
+        max-width: 100%;
+        overflow-x: auto !important;
+    }}
+
+    @media (max-width: 1024px) {{
+        .block-container {{
+            max-width: 100% !important;
+            padding: 0.7rem 0.8rem 1.25rem !important;
+        }}
+
+        .app-capability-strip {{
+            gap: 0.25rem !important;
+        }}
+
+        .app-capability-strip span:nth-child(-n+3) {{
+            display: none;
+        }}
+
+        .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"] {{
+            gap: 0.5rem !important;
+        }}
+    }}
+
+    @media (max-width: 768px) {{
+        .block-container {{
+            padding: 0.55rem 0.55rem 1rem !important;
+        }}
+
+        .app-bar {{
+            gap: 0.55rem !important;
+            padding: 0.72rem !important;
+        }}
+
+        .app-bar__eyebrow {{
+            font-size: 0.78rem !important;
+        }}
+
+        .app-bar__title {{
+            font-size: 0.9rem !important;
+            line-height: 1.2 !important;
+        }}
+
+        .app-bar__project,
+        .app-capability-strip,
+        .command-tools {{
+            display: none !important;
+        }}
+
+        .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"] {{
+            align-items: stretch !important;
+            flex-wrap: wrap !important;
+        }}
+
+        .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {{
+            flex: 1 1 42% !important;
+            width: 42% !important;
+        }}
+
+        .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {{
+            display: none !important;
+        }}
+
+        .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:last-child {{
+            flex: 1 1 55% !important;
+            width: 55% !important;
+        }}
+
+        .st-key-navigation_account div[data-testid="stHorizontalBlock"] {{
+            display: flex !important;
+            flex-wrap: nowrap !important;
+        }}
+
+        .header-account-avatar {{
+            height: 2.25rem !important;
+            width: 2.25rem !important;
+        }}
+
+        .st-key-navigation_account div[data-testid="stPopover"] button,
+        .st-key-primary_navigation_row div[data-testid="stPopover"] button {{
+            font-size: 0.76rem !important;
+            min-height: 2.45rem !important;
+            padding-left: 0.55rem !important;
+            padding-right: 0.55rem !important;
+        }}
+
+        .page-header,
+        .dashboard-hero {{
+            padding: 0.8rem 0.8rem 0.8rem 1.25rem !important;
+        }}
+
+        .page-header h1,
+        .dashboard-hero h1 {{
+            font-size: 1.25rem !important;
+        }}
+
+        div[data-testid="stForm"],
+        div[data-testid="stExpander"],
+        .security-card,
+        .exec-panel {{
+            max-width: 100% !important;
+        }}
+
+        input, textarea, select {{
+            font-size: 16px !important;
+        }}
+
+        .stButton button,
+        .stDownloadButton button,
+        div[data-testid="stFormSubmitButton"] button {{
+            min-height: 2.75rem !important;
+        }}
+
+        .js-plotly-plot,
+        .plot-container,
+        .svg-container {{
+            max-width: calc(100vw - 1.1rem) !important;
+            width: 100% !important;
+        }}
+    }}
+
+    @media (max-width: 430px) {{
+        .app-logo-img--evomec {{ display: none !important; }}
+        .app-brand-lockup {{ gap: 0.5rem !important; }}
+        .app-bar__title {{ font-size: 0.82rem !important; }}
+        .st-key-navigation_account div[data-testid="stPopover"] button {{ font-size: 0.7rem !important; }}
+        .nav-popover-menu {{ max-height: 65vh; overflow-y: auto; }}
     }}
     </style>
     """,
