@@ -76,11 +76,22 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-4. Run the app:
+4. Set MongoDB credentials (PowerShell):
+
+```powershell
+$env:MONGODB_URI="mongodb+srv://USERNAME:PASSWORD@HOST/?retryWrites=true&w=majority"
+$env:MONGODB_DATABASE="qaqc_dashboard"
+```
+
+5. Migrate the existing users once, then run the app:
 
 ```bash
+python database/migrate_users_to_mongodb.py
 streamlit run app.py
 ```
+
+The migration preserves the existing password hashes. It refuses to overwrite a
+non-empty MongoDB users collection unless `--force` is explicitly supplied.
 
 ## Data Source
 

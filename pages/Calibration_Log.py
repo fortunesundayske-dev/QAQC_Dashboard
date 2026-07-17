@@ -296,7 +296,6 @@ render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
 DATA_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
-USERS_FILE = BASE_DIR / "data" / "users.json"
 CALIBRATION_REPORT_DIR = BASE_DIR / "outputs" / "calibration_reports"
 data = load_master_data(DATA_FILE)
 log = get_calibration_log(data)
@@ -308,8 +307,8 @@ if isinstance(raw_calibration_log, pd.DataFrame) and not raw_calibration_log.emp
 
 def registered_account_emails():
     try:
-        users = json.loads(USERS_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        users = auth.all_users()
+    except Exception:
         return []
     emails = [
         str(user.get("email", "")).strip()

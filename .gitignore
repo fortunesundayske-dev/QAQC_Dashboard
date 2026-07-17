@@ -1,22 +1,23 @@
+# Local secrets
+.env
+
 # Python
 __pycache__/
 *.pyc
 
-# Virtual environment
-venv/
+# Virtual environments
 .venv/
+venv/
 
-# Streamlit
+# Local Streamlit configuration
 .streamlit/
 
-# Local notification settings
+# Local SMTP settings
 data/smtp_config.json
 data/teams_config.json
 data/teams_notification_log.json
 
-# Excel temp files
+# Temporary files
 ~$*
-
-# OS files
 .DS_Store
 Thumbs.db

@@ -12,10 +12,11 @@ from pathlib import Path
 
 import streamlit as st
 
+from database.mongo_users import load_users, save_users
+
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
-USERS_FILE = DATA_DIR / "users.json"
 PROFILE_DIR = DATA_DIR / "profile_photos"
 PBKDF2_ITERATIONS = 260_000
 DEFAULT_ADMIN_PASSWORD = "admin123"
@@ -43,7 +44,8 @@ def _ensure_auth_store():
         # Some hosted deployments mount the app directory read-only.
         # Profile upload can fail gracefully later; sign-in should still work.
         pass
-    if USERS_FILE.exists():
+    users = load_users()
+    if users:
         return
 
     salt = secrets.token_hex(16)
@@ -68,14 +70,11 @@ def _ensure_auth_store():
 
 def _load_users():
     _ensure_auth_store()
-    with USERS_FILE.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+    return load_users()
 
 
 def _save_users(users):
-    DATA_DIR.mkdir(exist_ok=True)
-    with USERS_FILE.open("w", encoding="utf-8") as handle:
-        json.dump(users, handle, indent=2)
+    save_users(users)
 
 
 def _try_save_users(users):

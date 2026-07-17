@@ -10,3 +10,5 @@ services:
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-qaqc_dashboard}
