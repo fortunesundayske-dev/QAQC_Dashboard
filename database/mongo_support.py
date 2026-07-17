@@ -45,7 +45,7 @@ def ensure_support_schema():
     return collection
 
 
-def create_ticket(username, email, subject, category, message):
+def create_ticket(username, email, subject, category, message, attachment=None):
     ticket = {
         "ticket_id": f"SUP-{datetime.now(timezone.utc):%Y%m%d}-{secrets.token_hex(3).upper()}",
         "username": username,
@@ -57,6 +57,8 @@ def create_ticket(username, email, subject, category, message):
         "created_at": _utc_now(),
         "updated_at": _utc_now(),
     }
+    if attachment:
+        ticket["attachment"] = attachment
     ensure_support_schema().insert_one(ticket)
     ticket.pop("_id", None)
     return ticket
