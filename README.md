@@ -110,6 +110,11 @@ MONGODB_URI = "mongodb+srv://USER:PASSWORD@HOST/?retryWrites=true&w=majority"
 MONGODB_DATABASE = "qaqc_dashboard"
 ```
 
+An `mongodb+srv://` URI must contain exactly one Atlas hostname. If using a
+comma-separated Atlas seed list, use the `mongodb://` scheme instead. The app
+normalizes this common scheme mismatch and shows a safe configuration message
+for invalid credentials, network timeouts, and malformed URIs.
+
 Add `CLOUDINARY_URL`, `OPENAI_API_KEY`, and the `QAQC_SMTP_*` values there to
 enable cloud uploads, AI support, and email notifications in production.
 

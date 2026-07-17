@@ -1,6 +1,5 @@
 """MongoDB persistence and schema management for dashboard user accounts."""
 
-import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -40,6 +39,20 @@ USER_VALIDATOR = {
 }
 
 
+def normalize_mongodb_uri(uri):
+    """Normalize a common Atlas SRV/seed-list scheme mismatch."""
+    value = str(uri or "").strip().strip('"').strip("'")
+    if not value.startswith(("mongodb://", "mongodb+srv://")):
+        raise ValueError("MONGODB_URI must start with mongodb:// or mongodb+srv://.")
+
+    if value.startswith("mongodb+srv://"):
+        authority = value[len("mongodb+srv://"):].split("/", 1)[0]
+        hosts = authority.rsplit("@", 1)[-1]
+        if "," in hosts:
+            value = "mongodb://" + value[len("mongodb+srv://"):]
+    return value
+
+
 def _settings():
     uri = str(get_setting("MONGODB_URI", "")).strip()
     if not uri:
@@ -48,7 +61,7 @@ def _settings():
             "Streamlit Cloud → App settings → Secrets."
         )
     database_name = str(get_setting("MONGODB_DATABASE", "qaqc_dashboard")).strip() or "qaqc_dashboard"
-    return uri, database_name
+    return normalize_mongodb_uri(uri), database_name
 
 
 @lru_cache(maxsize=1)

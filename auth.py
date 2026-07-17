@@ -14,7 +14,7 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
-from database.mongo_users import load_users, save_users
+from database.mongo_users import get_database, load_users, save_users
 from database.cloudinary_storage import upload_profile_photo
 from database.settings import get_setting
 
@@ -75,8 +75,31 @@ def _ensure_auth_store():
 
 
 def _load_users():
-    _ensure_auth_store()
-    return load_users()
+    try:
+        _ensure_auth_store()
+        return load_users()
+    except Exception as exc:
+        error_name = type(exc).__name__
+        if error_name in {"InvalidURI", "ConfigurationError", "ValueError"}:
+            st.error("The MongoDB connection string is invalid.")
+            st.info(
+                "Use one Atlas hostname with mongodb+srv://, or use mongodb:// "
+                "for a comma-separated seed list. Check MONGODB_URI in Streamlit Secrets."
+            )
+        elif error_name == "OperationFailure":
+            st.error("MongoDB rejected the database username or password.")
+            st.info("Reset the Atlas database-user password and update MONGODB_URI in Streamlit Secrets.")
+        else:
+            st.error("The dashboard cannot currently reach MongoDB Atlas.")
+            st.info(
+                "Confirm the cluster is running and its Atlas Network Access list permits "
+                "the deployed app, then reboot the Streamlit app."
+            )
+        st.caption(f"Connection error type: {error_name}")
+        if st.button("Retry database connection", use_container_width=True):
+            get_database.cache_clear()
+            st.rerun()
+        st.stop()
 
 
 def _save_users(users):
