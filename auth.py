@@ -16,6 +16,7 @@ import streamlit.components.v1 as components
 
 from database.mongo_users import load_users, save_users
 from database.cloudinary_storage import upload_profile_photo
+from database.settings import get_setting
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -163,11 +164,11 @@ def send_email(recipient, subject, body):
         except (OSError, json.JSONDecodeError):
             smtp_config = {}
 
-    smtp_host = os.getenv("QAQC_SMTP_HOST") or os.getenv("SMTP_HOST") or smtp_config.get("SMTP_HOST")
-    smtp_user = os.getenv("QAQC_SMTP_USER") or os.getenv("SMTP_USER") or smtp_config.get("SMTP_USER")
-    smtp_password = os.getenv("QAQC_SMTP_PASSWORD") or os.getenv("SMTP_PASSWORD") or smtp_config.get("SMTP_PASSWORD")
-    smtp_port = int(os.getenv("QAQC_SMTP_PORT") or os.getenv("SMTP_PORT") or smtp_config.get("SMTP_PORT", "587"))
-    smtp_from = os.getenv("QAQC_SMTP_FROM") or os.getenv("SMTP_FROM") or smtp_config.get("SMTP_FROM")
+    smtp_host = get_setting("QAQC_SMTP_HOST") or get_setting("SMTP_HOST") or smtp_config.get("SMTP_HOST")
+    smtp_user = get_setting("QAQC_SMTP_USER") or get_setting("SMTP_USER") or smtp_config.get("SMTP_USER")
+    smtp_password = get_setting("QAQC_SMTP_PASSWORD") or get_setting("SMTP_PASSWORD") or smtp_config.get("SMTP_PASSWORD")
+    smtp_port = int(get_setting("QAQC_SMTP_PORT") or get_setting("SMTP_PORT") or smtp_config.get("SMTP_PORT", "587"))
+    smtp_from = get_setting("QAQC_SMTP_FROM") or get_setting("SMTP_FROM") or smtp_config.get("SMTP_FROM")
     sender = smtp_from or smtp_user or "no-reply@qaqc.local"
 
     if not smtp_host or not smtp_user or not smtp_password or not recipient:
@@ -179,8 +180,8 @@ def send_email(recipient, subject, body):
     msg["To"] = recipient
     msg.set_content(body)
 
-    use_ssl = str(os.getenv("QAQC_SMTP_SSL") or os.getenv("SMTP_SSL") or smtp_config.get("SMTP_SSL", "0")) == "1" or smtp_port == 465
-    use_starttls = str(os.getenv("QAQC_SMTP_STARTTLS") or os.getenv("SMTP_STARTTLS") or smtp_config.get("SMTP_STARTTLS", "1")) == "1"
+    use_ssl = str(get_setting("QAQC_SMTP_SSL") or get_setting("SMTP_SSL") or smtp_config.get("SMTP_SSL", "0")) == "1" or smtp_port == 465
+    use_starttls = str(get_setting("QAQC_SMTP_STARTTLS") or get_setting("SMTP_STARTTLS") or smtp_config.get("SMTP_STARTTLS", "1")) == "1"
     smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
     with smtp_class(smtp_host, smtp_port, timeout=20) as smtp:
         if not use_ssl and use_starttls:

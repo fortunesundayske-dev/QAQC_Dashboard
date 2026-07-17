@@ -5,12 +5,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from database.settings import get_setting
+
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
 def automatic_reply(ticket, messages):
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    api_key = str(get_setting("OPENAI_API_KEY", "")).strip()
     if not api_key:
         return (
             "Thanks for contacting QA/QC Support. Your request has been recorded. "
@@ -25,7 +27,7 @@ def automatic_reply(ticket, messages):
         for item in messages[-12:]
     )
     response = OpenAI(api_key=api_key).responses.create(
-        model=os.getenv("OPENAI_SUPPORT_MODEL", "gpt-5-mini"),
+        model=str(get_setting("OPENAI_SUPPORT_MODEL", "gpt-5-mini")),
         instructions=(
             "You are the first-line support assistant for an enterprise QA/QC dashboard. "
             "Give concise, safe troubleshooting steps based only on the conversation. "

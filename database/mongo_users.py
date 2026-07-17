@@ -8,6 +8,8 @@ from pymongo import ASCENDING, MongoClient, ReplaceOne
 from pymongo.errors import CollectionInvalid
 from dotenv import load_dotenv
 
+from database.settings import get_setting
+
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
@@ -39,10 +41,14 @@ USER_VALIDATOR = {
 
 
 def _settings():
-    uri = os.getenv("MONGODB_URI", "").strip()
+    uri = str(get_setting("MONGODB_URI", "")).strip()
     if not uri:
-        raise RuntimeError("MONGODB_URI is not configured.")
-    return uri, os.getenv("MONGODB_DATABASE", "qaqc_dashboard").strip() or "qaqc_dashboard"
+        raise RuntimeError(
+            "MONGODB_URI is not configured. Add it to .env locally or to "
+            "Streamlit Cloud → App settings → Secrets."
+        )
+    database_name = str(get_setting("MONGODB_DATABASE", "qaqc_dashboard")).strip() or "qaqc_dashboard"
+    return uri, database_name
 
 
 @lru_cache(maxsize=1)

@@ -7,6 +7,7 @@ import auth
 from database.cloudinary_storage import ALLOWED_ATTACHMENT_TYPES, MAX_ATTACHMENT_BYTES, upload_support_attachment
 from database.mongo_support import add_ticket_message, create_ticket, escalate_ticket, list_tickets, update_ticket_status
 from database.support_ai import automatic_reply
+from database.settings import get_setting
 from utils import inject_global_ui, render_navigation, render_page_header, render_table, render_top_nav
 
 
@@ -47,9 +48,9 @@ if submitted:
         try:
             reply, used_ai = automatic_reply(ticket, ticket.get("messages", []))
         except Exception:
-            reply, used_ai = automatic_reply({}, []) if not os.getenv("OPENAI_API_KEY") else ("AI support is temporarily unavailable. Request a live admin for assistance.", False)
+            reply, used_ai = automatic_reply({}, []) if not get_setting("OPENAI_API_KEY") else ("AI support is temporarily unavailable. Request a live admin for assistance.", False)
         add_ticket_message(ticket["ticket_id"], "QA/QC Support Assistant", "assistant", reply, is_ai=used_ai)
-        support_email = os.getenv("QAQC_SUPPORT_EMAIL", "").strip()
+        support_email = str(get_setting("QAQC_SUPPORT_EMAIL", "")).strip()
         notified = False
         try:
             if support_email:
@@ -105,7 +106,7 @@ else:
     if not is_admin and not active_ticket.get("escalated"):
         if st.button("Request live admin", type="primary", use_container_width=True):
             if escalate_ticket(active_ticket["ticket_id"], username):
-                support_email = os.getenv("QAQC_SUPPORT_EMAIL", "").strip()
+                support_email = str(get_setting("QAQC_SUPPORT_EMAIL", "")).strip()
                 try:
                     if support_email:
                         auth.send_email(

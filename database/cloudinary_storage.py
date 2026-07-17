@@ -9,6 +9,13 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 import cloudinary.uploader  # noqa: E402
 
+from database.settings import get_setting  # noqa: E402
+
+
+cloudinary_url = str(get_setting("CLOUDINARY_URL", "")).strip()
+if cloudinary_url:
+    cloudinary.config(cloudinary_url=cloudinary_url)
+
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 ALLOWED_ATTACHMENT_TYPES = ["png", "jpg", "jpeg", "pdf", "doc", "docx", "xls", "xlsx", "csv", "txt"]

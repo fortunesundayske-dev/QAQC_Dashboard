@@ -102,6 +102,17 @@ Copy the SMTP and support settings from `.env.example` into the Git-ignored
 `.env` file to enable approval and customer-support email delivery. Support
 tickets are saved to MongoDB even when SMTP is not configured.
 
+For Streamlit Cloud, copy the same key/value pairs into **App settings →
+Secrets** using TOML syntax. At minimum the deployed app requires:
+
+```toml
+MONGODB_URI = "mongodb+srv://USER:PASSWORD@HOST/?retryWrites=true&w=majority"
+MONGODB_DATABASE = "qaqc_dashboard"
+```
+
+Add `CLOUDINARY_URL`, `OPENAI_API_KEY`, and the `QAQC_SMTP_*` values there to
+enable cloud uploads, AI support, and email notifications in production.
+
 ## Data Source
 
 Place the QAQC Excel workbook at `data/QAQC_Master.xlsx`. Use the provided template and sample data to start.
