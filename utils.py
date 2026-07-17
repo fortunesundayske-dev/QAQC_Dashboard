@@ -14,6 +14,9 @@ from urllib import request, error
 from urllib.parse import quote
 from io import BytesIO
 
+from database.cloudinary_storage import DEFAULT_MASTER_WORKBOOK_PUBLIC_ID, get_master_workbook_reference
+from database.settings import get_setting
+
 from ui_theme import (
     CHART_COLORS_DARK,
     CHART_COLORS_LIGHT,
@@ -64,8 +67,40 @@ def _load_master_data_cached(file_path, modified_ns):
     }
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _cloud_master_reference(public_id):
+    return get_master_workbook_reference(public_id)
+
+
+@st.cache_data(show_spinner=False)
+def _load_cloud_master_data(url, version):
+    del version
+    from io import BytesIO
+    from urllib.request import urlopen
+
+    with urlopen(url, timeout=30) as response:
+        workbook = BytesIO(response.read())
+    xls = pd.ExcelFile(workbook)
+    return {
+        sheet: pd.read_excel(xls, sheet)
+        for sheet in xls.sheet_names
+    }
+
+
 def load_master_data(file_path):
     try:
+        cloudinary_configured = bool(str(get_setting("CLOUDINARY_URL", "")).strip())
+        public_id = str(
+            get_setting("QAQC_MASTER_WORKBOOK_PUBLIC_ID", DEFAULT_MASTER_WORKBOOK_PUBLIC_ID)
+        ).strip()
+        if cloudinary_configured and public_id:
+            try:
+                reference = _cloud_master_reference(public_id)
+                return _load_cloud_master_data(reference["url"], reference["version"])
+            except Exception:
+                # Preserve dashboard availability if Cloudinary is temporarily unavailable.
+                pass
+
         file_path = Path(file_path)
 
         if not file_path.exists():

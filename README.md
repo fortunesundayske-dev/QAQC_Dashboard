@@ -126,6 +126,20 @@ To migrate legacy local profile images once, run:
 python scripts/migrate_profile_photos.py
 ```
 
+## Cloud master workbook
+
+The dashboard prefers the versioned Cloudinary copy of `QAQC_Master.xlsx` and
+uses the repository file only as an offline fallback. After editing the workbook
+locally, publish it with:
+
+```bash
+python scripts/upload_master_workbook.py
+```
+
+The deployed dashboard checks Cloudinary for a new workbook version every 60
+seconds. Override the default asset only when needed with
+`QAQC_MASTER_WORKBOOK_PUBLIC_ID`.
+
 ## Data Source
 
 Place the QAQC Excel workbook at `data/QAQC_Master.xlsx`. Use the provided template and sample data to start.

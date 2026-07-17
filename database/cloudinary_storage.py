@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 import cloudinary.uploader  # noqa: E402
+import cloudinary.api  # noqa: E402
 
 from database.settings import get_setting  # noqa: E402
 
@@ -15,6 +16,8 @@ from database.settings import get_setting  # noqa: E402
 cloudinary_url = str(get_setting("CLOUDINARY_URL", "")).strip()
 if cloudinary_url:
     cloudinary.config(cloudinary_url=cloudinary_url)
+
+DEFAULT_MASTER_WORKBOOK_PUBLIC_ID = "qaqc-dashboard/data/QAQC_Master.xlsx"
 
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -78,4 +81,35 @@ def upload_profile_photo(uploaded_file, username):
         "resource_type": "image",
         "bytes": int(result.get("bytes") or uploaded_file.size),
         "updated_at": result.get("created_at"),
+    }
+
+
+def upload_master_workbook(path, public_id=DEFAULT_MASTER_WORKBOOK_PUBLIC_ID):
+    path = Path(path)
+    if not path.exists() or path.suffix.lower() != ".xlsx":
+        raise ValueError("A valid .xlsx master workbook is required.")
+    result = cloudinary.uploader.upload(
+        str(path),
+        resource_type="raw",
+        public_id=public_id,
+        overwrite=True,
+        invalidate=True,
+    )
+    return {
+        "url": result["secure_url"],
+        "public_id": result["public_id"],
+        "version": int(result["version"]),
+        "bytes": int(result.get("bytes") or path.stat().st_size),
+        "updated_at": result.get("created_at"),
+    }
+
+
+def get_master_workbook_reference(public_id=DEFAULT_MASTER_WORKBOOK_PUBLIC_ID):
+    result = cloudinary.api.resource(public_id, resource_type="raw")
+    return {
+        "url": result["secure_url"],
+        "public_id": result["public_id"],
+        "version": int(result["version"]),
+        "bytes": int(result.get("bytes") or 0),
+        "updated_at": result.get("updated_at") or result.get("created_at"),
     }
