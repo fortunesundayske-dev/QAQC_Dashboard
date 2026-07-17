@@ -37,8 +37,9 @@ reject_user = getattr(auth, "reject_user", None)
 restrict_user = getattr(auth, "restrict_user", None)
 unrestrict_user = getattr(auth, "unrestrict_user", None)
 delete_user = getattr(auth, "delete_user", None)
+change_user_role = getattr(auth, "change_user_role", None)
 
-if any(action is None for action in [approve_user, reject_user, restrict_user, unrestrict_user, delete_user]):
+if any(action is None for action in [approve_user, reject_user, restrict_user, unrestrict_user, delete_user, change_user_role]):
     st.error("Access administration needs the latest auth.py file. Please redeploy the latest repository version.")
     st.stop()
 
@@ -228,6 +229,27 @@ with st.container(border=True):
                 else:
                     st.error(message)
         elif status == "approved":
+            current_role = user.get("role", "user")
+            role_options = ["user", "viewer", "admin"]
+            new_role = st.selectbox(
+                "Account role",
+                role_options,
+                index=role_options.index(current_role) if current_role in role_options else 0,
+                key=f"control_change_role_{username}",
+                disabled=is_self,
+            )
+            if st.button(
+                "Save role",
+                key=f"control_save_role_{username}",
+                use_container_width=True,
+                disabled=is_self or new_role == current_role,
+            ):
+                ok, message = change_user_role(username, new_role)
+                if ok:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
             restrict_col, delete_col = st.columns(2)
             if restrict_col.button("Restrict", key=f"control_restrict_{username}", use_container_width=True, disabled=is_self):
                 ok, message = restrict_user(username)
@@ -247,6 +269,26 @@ with st.container(border=True):
             if is_self:
                 st.info("You cannot restrict or delete your own active admin account.")
         elif status == "restricted":
+            current_role = user.get("role", "user")
+            role_options = ["user", "viewer", "admin"]
+            new_role = st.selectbox(
+                "Account role",
+                role_options,
+                index=role_options.index(current_role) if current_role in role_options else 0,
+                key=f"control_change_role_restricted_{username}",
+            )
+            if st.button(
+                "Save role",
+                key=f"control_save_role_restricted_{username}",
+                use_container_width=True,
+                disabled=new_role == current_role,
+            ):
+                ok, message = change_user_role(username, new_role)
+                if ok:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
             unrestrict_col, delete_col = st.columns(2)
             if unrestrict_col.button("Unrestrict", key=f"control_unrestrict_{username}", use_container_width=True):
                 ok, message = unrestrict_user(username)

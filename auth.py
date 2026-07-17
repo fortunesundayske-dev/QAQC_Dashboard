@@ -484,6 +484,11 @@ def logout():
         st.rerun()
 
 
+def sign_out():
+    """Clear the active session and invalidate its persisted token."""
+    _set_logged_out()
+
+
 def get_role():
     init_auth()
     return st.session_state.auth.get("role")
@@ -592,6 +597,26 @@ def approve_user(username, role="user"):
     if email_sent:
         return True, "Approved and email sent."
     return True, "Approved. Configure SMTP environment variables to send approval email."
+
+
+def change_user_role(username, role):
+    if role not in {"user", "viewer", "admin"}:
+        return False, "Invalid role."
+    users = _load_users()
+    admin = current_user()
+    user = users.get(username)
+    if not user:
+        return False, "User not found."
+    if user.get("status") not in {"approved", "restricted"}:
+        return False, "Approve the user before changing their role."
+    if admin and username == admin.get("username") and role != "admin":
+        return False, "You cannot remove your own active admin role."
+    user["role"] = role
+    user["role_updated_at"] = _utc_now()
+    user["role_updated_by"] = admin["username"] if admin else "admin"
+    if not _try_save_users(users):
+        return False, "Role change could not be saved."
+    return True, f"Role changed to {role.title()}."
 
 
 def restrict_user(username):

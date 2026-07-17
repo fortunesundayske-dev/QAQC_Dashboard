@@ -1185,23 +1185,6 @@ def render_header():
     nlng_logo = f'<img src="{nlng_src}" alt="NLNG">' if nlng_src else '<span>NLNG</span>'
     evomec_logo = f'<img src="{evomec_src}" alt="EVOMEC">' if evomec_src else '<span>EVOMEC</span>'
     user = st.session_state.get("auth") or {}
-    profile_html = ""
-    if user.get("logged_in"):
-        photo = user.get("profile_photo")
-        if photo and Path(photo).exists():
-            avatar = f'<img class="header-profile__photo" src="{_image_data_uri(photo)}" alt="Profile photo">'
-        else:
-            initials = "".join(part[:1] for part in str(user.get("name", "User")).split()[:2]).upper() or "U"
-            avatar = f'<div class="header-profile__initials">{html.escape(initials)}</div>'
-        profile_html = f"""
-<div class="header-profile">
-    {avatar}
-    <div>
-        <div class="header-profile__name">{html.escape(str(user.get("name", "User")))}</div>
-        <div class="header-profile__meta">{html.escape(str(user.get("role", "user")).title())}</div>
-    </div>
-</div>
-"""
     st.html(
         f"""
 <div class="app-bar">
@@ -1222,12 +1205,29 @@ def render_header():
             <span>Data Driven</span>
             <span>Secure</span>
         </div>
-        {profile_html}
         <div class="app-logo-img app-logo-img--evomec">{evomec_logo}</div>
     </div>
 </div>
 """
     )
+
+    if user.get("logged_in"):
+        account_spacer, account_col = st.columns([4.5, 1.5])
+        with account_col:
+            account_name = str(user.get("name", "User"))
+            account_role = str(user.get("role", "user")).title()
+            with st.popover(f"◉  {account_name} · {account_role}", use_container_width=True):
+                photo = user.get("profile_photo")
+                if photo and Path(str(photo)).exists():
+                    st.image(str(photo), width=72)
+                st.markdown(f"**{account_name}**")
+                st.caption(f"{account_role} · {user.get('discipline', 'QA/QC')}")
+                st.page_link("pages/User_Profile.py", label="User Profile", use_container_width=True)
+                if st.button("Sign out", key="header_account_sign_out", use_container_width=True, type="primary"):
+                    import auth
+
+                    auth.sign_out()
+                    st.rerun()
 
             
 # =========================
