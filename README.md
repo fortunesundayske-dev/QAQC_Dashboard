@@ -12,6 +12,8 @@ A modern enterprise-grade QA/QC management dashboard for construction projects, 
 - MongoDB-backed user accounts and customer-support tickets
 - Approval and support email notifications through SMTP
 - Automatic sign-out after two minutes without activity
+- Interactive support chat with optional AI first response and live-admin escalation
+- Cloudinary-backed support attachments and profile photos referenced from MongoDB
 
 ## Folder Structure
 

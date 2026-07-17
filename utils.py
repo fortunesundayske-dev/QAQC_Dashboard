@@ -41,6 +41,14 @@ def _image_data_uri(path):
     suffix = p.suffix.lower().lstrip(".")
     mime = "jpeg" if suffix in {"jpg", "jpeg"} else suffix
     return f"data:image/{mime};base64,{base64.b64encode(p.read_bytes()).decode('ascii')}"
+
+
+def _profile_photo_src(photo):
+    value = str(photo or "").strip()
+    if value.startswith(("https://", "http://")):
+        return value
+    path = Path(value) if value else None
+    return _image_data_uri(path) if path and path.exists() else ""
 # =========================
 # DATA LOADING (DICT SYSTEM)
 # =========================
@@ -1212,22 +1220,67 @@ def render_header():
     )
 
     if user.get("logged_in"):
-        account_spacer, account_col = st.columns([4.5, 1.5])
-        with account_col:
+        st.markdown(
+            """
+<style>
+.st-key-header_account_menu {
+    margin-bottom: 1.4rem;
+    margin-top: -5.4rem;
+    padding-right: 5.25rem;
+    position: relative;
+    z-index: 1000;
+}
+.st-key-header_account_menu div[data-testid="stHorizontalBlock"] { align-items: center; }
+.header-account-avatar {
+    align-items: center;
+    background: linear-gradient(135deg, #2563eb, #22c55e);
+    border: 2px solid rgba(96, 165, 250, 0.7);
+    border-radius: 999px;
+    color: #fff;
+    display: flex;
+    font-size: 0.72rem;
+    font-weight: 900;
+    height: 2.55rem;
+    justify-content: center;
+    overflow: hidden;
+    width: 2.55rem;
+}
+.header-account-avatar img { height: 100%; object-fit: cover; width: 100%; }
+.st-key-header_account_menu div[data-testid="stPopover"] button {
+    min-height: 2.75rem;
+    white-space: nowrap;
+}
+@media (max-width: 900px) {
+    .st-key-header_account_menu { margin-top: 0.35rem; padding-right: 0; }
+}
+</style>
+""",
+            unsafe_allow_html=True,
+        )
+        with st.container(key="header_account_menu"):
+            _, avatar_col, account_col = st.columns([7.25, 0.5, 2.25], gap="small")
             account_name = str(user.get("name", "User"))
             account_role = str(user.get("role", "user")).title()
-            with st.popover(f"◉  {account_name} · {account_role}", use_container_width=True):
-                photo = user.get("profile_photo")
-                if photo and Path(str(photo)).exists():
-                    st.image(str(photo), width=72)
-                st.markdown(f"**{account_name}**")
-                st.caption(f"{account_role} · {user.get('discipline', 'QA/QC')}")
-                st.page_link("pages/User_Profile.py", label="User Profile", use_container_width=True)
-                if st.button("Sign out", key="header_account_sign_out", use_container_width=True, type="primary"):
-                    import auth
+            photo = user.get("profile_photo")
+            with avatar_col:
+                photo_src = _profile_photo_src(photo)
+                if photo_src:
+                    avatar_content = f'<img src="{photo_src}" alt="Profile photo">'
+                else:
+                    avatar_content = html.escape("".join(part[:1] for part in account_name.split()[:2]).upper() or "U")
+                st.markdown(f'<div class="header-account-avatar">{avatar_content}</div>', unsafe_allow_html=True)
+            with account_col:
+                with st.popover(f"{account_name} · {account_role}", use_container_width=True):
+                    if photo_src:
+                        st.image(photo_src, width=72)
+                    st.markdown(f"**{account_name}**")
+                    st.caption(f"{account_role} · {user.get('discipline', 'QA/QC')}")
+                    st.page_link("pages/User_Profile.py", label="User Profile", use_container_width=True)
+                    if st.button("Sign out", key="header_account_sign_out", use_container_width=True, type="primary"):
+                        import auth
 
-                    auth.sign_out()
-                    st.rerun()
+                        auth.sign_out()
+                        st.rerun()
 
             
 # =========================
@@ -1692,8 +1745,9 @@ def render_top_nav():
     if user:
         photo = user.get("profile_photo")
         photo_html = ""
-        if photo and Path(photo).exists():
-            photo_html = f'<img class="sidebar-profile__photo" src="{_image_data_uri(photo)}" alt="Profile photo">'
+        photo_src = _profile_photo_src(photo)
+        if photo_src:
+            photo_html = f'<img class="sidebar-profile__photo" src="{photo_src}" alt="Profile photo">'
         else:
             initials = "".join(part[:1] for part in str(user.get("name", "User")).split()[:2]).upper() or "U"
             photo_html = f'<div class="profile-avatar sidebar-profile__initials">{html.escape(initials)}</div>'

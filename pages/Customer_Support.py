@@ -5,7 +5,8 @@ import streamlit as st
 
 import auth
 from database.cloudinary_storage import ALLOWED_ATTACHMENT_TYPES, MAX_ATTACHMENT_BYTES, upload_support_attachment
-from database.mongo_support import create_ticket, list_tickets, update_ticket_status
+from database.mongo_support import add_ticket_message, create_ticket, escalate_ticket, list_tickets, update_ticket_status
+from database.support_ai import automatic_reply
 from utils import inject_global_ui, render_navigation, render_page_header, render_table, render_top_nav
 
 
@@ -43,6 +44,11 @@ if submitted:
             st.error(f"The attachment could not be uploaded: {exc}")
             st.stop()
         ticket = create_ticket(username, email, subject, category, message, attachment=attachment)
+        try:
+            reply, used_ai = automatic_reply(ticket, ticket.get("messages", []))
+        except Exception:
+            reply, used_ai = automatic_reply({}, []) if not os.getenv("OPENAI_API_KEY") else ("AI support is temporarily unavailable. Request a live admin for assistance.", False)
+        add_ticket_message(ticket["ticket_id"], "QA/QC Support Assistant", "assistant", reply, is_ai=used_ai)
         support_email = os.getenv("QAQC_SUPPORT_EMAIL", "").strip()
         notified = False
         try:
@@ -61,6 +67,10 @@ if submitted:
 is_admin = auth.get_role() == "admin"
 tickets = list_tickets(None if is_admin else username)
 st.markdown("### " + ("All support tickets" if is_admin else "My support tickets"))
+if is_admin:
+    waiting_count = sum(1 for item in tickets if item.get("escalated") and item.get("status") not in {"resolved", "closed"})
+    if waiting_count:
+        st.error(f"{waiting_count} user(s) are waiting for live admin support.")
 if not tickets:
     st.info("No support tickets found.")
 else:
@@ -70,6 +80,56 @@ else:
         row["attachment_url"] = (row.pop("attachment", None) or {}).get("url", "")
         ticket_rows.append(row)
     render_table(pd.DataFrame(ticket_rows), include_internal=True)
+
+    st.markdown("### Live support conversation")
+    chat_labels = {
+        f"{'🔴 ' if item.get('escalated') else ''}{item['ticket_id']} — {item['subject']}": item
+        for item in tickets
+    }
+    chat_label = st.selectbox("Conversation", list(chat_labels), key="support_chat_ticket")
+    active_ticket = chat_labels[chat_label]
+    if active_ticket.get("escalated"):
+        st.warning("Live admin assistance requested." if not is_admin else "This user is waiting for live admin assistance.")
+    conversation = active_ticket.get("messages") or [{
+        "sender": active_ticket.get("username", "User"),
+        "sender_role": "user",
+        "message": active_ticket.get("message", ""),
+        "created_at": active_ticket.get("created_at", ""),
+    }]
+    for entry in conversation:
+        role = "assistant" if entry.get("sender_role") in {"assistant", "admin"} else "user"
+        with st.chat_message(role):
+            st.markdown(entry.get("message", ""))
+            st.caption(f"{entry.get('sender', 'Support')} · {entry.get('created_at', '')}")
+
+    if not is_admin and not active_ticket.get("escalated"):
+        if st.button("Request live admin", type="primary", use_container_width=True):
+            if escalate_ticket(active_ticket["ticket_id"], username):
+                support_email = os.getenv("QAQC_SUPPORT_EMAIL", "").strip()
+                try:
+                    if support_email:
+                        auth.send_email(
+                            support_email,
+                            f"Live support requested: {active_ticket['ticket_id']}",
+                            f"{username} requested live admin support.\nSubject: {active_ticket['subject']}",
+                        )
+                except Exception:
+                    pass
+                st.success("An admin has been notified. Continue in this chat while you wait.")
+                st.rerun()
+
+    chat_message = st.chat_input("Reply as admin..." if is_admin else "Message support...")
+    if chat_message:
+        sender_role = "admin" if is_admin else "user"
+        add_ticket_message(active_ticket["ticket_id"], username, sender_role, chat_message)
+        if not is_admin and not active_ticket.get("escalated"):
+            refreshed = next(item for item in list_tickets(username) if item["ticket_id"] == active_ticket["ticket_id"])
+            try:
+                reply, used_ai = automatic_reply(refreshed, refreshed.get("messages", []))
+            except Exception:
+                reply, used_ai = "AI support is temporarily unavailable. Request a live admin for assistance.", False
+            add_ticket_message(active_ticket["ticket_id"], "QA/QC Support Assistant", "assistant", reply, is_ai=used_ai)
+        st.rerun()
 
 if is_admin and tickets:
     st.markdown("### Manage ticket")

@@ -10,3 +10,4 @@ pymongo==4.13.2
 dnspython==2.8.0
 python-dotenv==1.1.1
 cloudinary==1.44.1
+openai==2.46.0

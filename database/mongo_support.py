@@ -56,6 +56,15 @@ def create_ticket(username, email, subject, category, message, attachment=None):
         "status": "open",
         "created_at": _utc_now(),
         "updated_at": _utc_now(),
+        "escalated": False,
+        "messages": [
+            {
+                "sender": username,
+                "sender_role": "user",
+                "message": message.strip(),
+                "created_at": _utc_now(),
+            }
+        ],
     }
     if attachment:
         ticket["attachment"] = attachment
@@ -75,5 +84,34 @@ def update_ticket_status(ticket_id, status, updated_by):
     result = ensure_support_schema().update_one(
         {"ticket_id": ticket_id},
         {"$set": {"status": status, "updated_at": _utc_now(), "updated_by": updated_by}},
+    )
+    return result.modified_count == 1
+
+
+def add_ticket_message(ticket_id, sender, sender_role, message, is_ai=False):
+    entry = {
+        "sender": sender,
+        "sender_role": sender_role,
+        "message": message.strip(),
+        "is_ai": bool(is_ai),
+        "created_at": _utc_now(),
+    }
+    result = ensure_support_schema().update_one(
+        {"ticket_id": ticket_id},
+        {"$push": {"messages": entry}, "$set": {"updated_at": _utc_now()}},
+    )
+    return result.modified_count == 1
+
+
+def escalate_ticket(ticket_id, requested_by):
+    result = ensure_support_schema().update_one(
+        {"ticket_id": ticket_id},
+        {"$set": {
+            "escalated": True,
+            "status": "in_progress",
+            "escalated_at": _utc_now(),
+            "escalated_by": requested_by,
+            "updated_at": _utc_now(),
+        }},
     )
     return result.modified_count == 1

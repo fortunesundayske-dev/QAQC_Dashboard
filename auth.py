@@ -15,6 +15,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from database.mongo_users import load_users, save_users
+from database.cloudinary_storage import upload_profile_photo
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -530,16 +531,13 @@ def update_profile(name, email, discipline, uploaded_photo=None):
     record["discipline"] = discipline
 
     if uploaded_photo is not None:
-        suffix = Path(uploaded_photo.name).suffix.lower() or ".png"
-        filename = f"{record['username']}{suffix}"
-        photo_path = PROFILE_DIR / filename
         try:
-            PROFILE_DIR.mkdir(exist_ok=True)
-            photo_path.write_bytes(uploaded_photo.getbuffer())
-        except OSError:
-            st.error("Profile photo could not be saved on this deployment.")
+            asset = upload_profile_photo(uploaded_photo, record["username"])
+        except Exception as exc:
+            st.error(f"Profile photo could not be uploaded: {exc}")
             return False
-        record["profile_photo"] = str(photo_path)
+        record["profile_photo"] = asset["url"]
+        record["profile_photo_asset"] = asset
 
     if not _try_save_users(users):
         st.error("Profile changes could not be saved on this deployment.")

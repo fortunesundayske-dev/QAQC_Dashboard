@@ -21,7 +21,7 @@ user = getattr(auth, "current_user", lambda: None)()
 
 def render_profile_avatar(user_record):
     photo = user_record.get("profile_photo")
-    if photo and Path(str(photo)).exists():
+    if photo and (str(photo).startswith(("https://", "http://")) or Path(str(photo)).exists()):
         st.image(str(photo), width=180)
         return
 

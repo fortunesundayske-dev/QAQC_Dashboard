@@ -48,3 +48,27 @@ def delete_attachment(attachment):
         invalidate=True,
     )
     return result.get("result") in {"ok", "not found"}
+
+
+def upload_profile_photo(uploaded_file, username):
+    if uploaded_file.size > 5 * 1024 * 1024:
+        raise ValueError("Profile photos must be 5 MB or smaller.")
+    suffix = Path(uploaded_file.name).suffix.lower().lstrip(".")
+    if suffix not in {"png", "jpg", "jpeg"}:
+        raise ValueError("Profile photos must be PNG or JPEG files.")
+    result = cloudinary.uploader.upload(
+        uploaded_file.getvalue(),
+        resource_type="image",
+        folder="qaqc-dashboard/profiles",
+        public_id=username,
+        overwrite=True,
+        invalidate=True,
+        transformation=[{"width": 512, "height": 512, "crop": "fill", "gravity": "face"}],
+    )
+    return {
+        "url": result["secure_url"],
+        "public_id": result["public_id"],
+        "resource_type": "image",
+        "bytes": int(result.get("bytes") or uploaded_file.size),
+        "updated_at": result.get("created_at"),
+    }
