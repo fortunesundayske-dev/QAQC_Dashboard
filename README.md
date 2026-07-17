@@ -118,6 +118,14 @@ for invalid credentials, network timeouts, and malformed URIs.
 Add `CLOUDINARY_URL`, `OPENAI_API_KEY`, and the `QAQC_SMTP_*` values there to
 enable cloud uploads, AI support, and email notifications in production.
 
+Profile-photo changes are uploaded to Cloudinary and their secure URLs are
+stored in each MongoDB user record, so photos follow the account across devices.
+To migrate legacy local profile images once, run:
+
+```bash
+python scripts/migrate_profile_photos.py
+```
+
 ## Data Source
 
 Place the QAQC Excel workbook at `data/QAQC_Master.xlsx`. Use the provided template and sample data to start.
