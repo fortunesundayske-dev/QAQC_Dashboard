@@ -1244,6 +1244,7 @@ def get_navigation_pages():
         "Audit_Surveillance": "Audit & Surveillance",
         "Calibration_Log": "Calibration Log",
         "Concrete_Tracker": "Concrete Tracker",
+        "Customer_Support": "Customer Support",
         "CTQ_Dashboard": "CTQ Dashboard",
         "Daily_Reports": "Daily Reports",
         "Defect_Rework_Tracker": "Defect & Rework",
@@ -1280,6 +1281,7 @@ def get_navigation_pages():
         "Lessons Learned",
         "Management Summary",
         "User Profile",
+        "Customer Support",
         "Access Admin",
     ]
 
@@ -1335,7 +1337,7 @@ NAVIGATION_GROUPS = {
     "Materials and Equipment": ["Concrete Tracker", "Calibration Log"],
     "Audits and Reports": ["Audit & Surveillance", "Daily Reports", "Lessons Learned"],
     "Knowledge and Tools": ["Standards Library", "Learning Academy", "Quality Tools"],
-    "Account and Administration": ["User Profile", "Access Admin"],
+    "Account and Administration": ["User Profile", "Customer Support", "Access Admin"],
 }
 
 

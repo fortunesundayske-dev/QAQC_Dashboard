@@ -9,6 +9,9 @@ A modern enterprise-grade QA/QC management dashboard for construction projects, 
 - Global filters for project, discipline, date range, status, month, and year
 - Export management reports to Excel and PDF
 - Responsive layout, dark/light theme toggle, automatic refresh support
+- MongoDB-backed user accounts and customer-support tickets
+- Approval and support email notifications through SMTP
+- Automatic sign-out after two minutes without activity
 
 ## Folder Structure
 
@@ -92,6 +95,10 @@ streamlit run app.py
 
 The migration preserves the existing password hashes. It refuses to overwrite a
 non-empty MongoDB users collection unless `--force` is explicitly supplied.
+
+Copy the SMTP and support settings from `.env.example` into the Git-ignored
+`.env` file to enable approval and customer-support email delivery. Support
+tickets are saved to MongoDB even when SMTP is not configured.
 
 ## Data Source
 

@@ -52,29 +52,23 @@ with c2:
     with st.form("profile_form"):
         name = st.text_input("Full name", value=user.get("name", ""))
         email = st.text_input("Email", value=user.get("email", ""))
-        discipline = st.selectbox(
+        discipline_options = auth.DISCIPLINES
+        saved_discipline = user.get("discipline", "Quality Management")
+        discipline_choice = st.selectbox(
             "Primary discipline",
-            ["Civil", "Mechanical", "Piping", "Welding", "Electrical", "Instrumentation", "NDT", "Quality Management"],
-            index=[
-                "Civil",
-                "Mechanical",
-                "Piping",
-                "Welding",
-                "Electrical",
-                "Instrumentation",
-                "NDT",
-                "Quality Management",
-            ].index(user.get("discipline", "Quality Management"))
-            if user.get("discipline", "Quality Management")
-            in ["Civil", "Mechanical", "Piping", "Welding", "Electrical", "Instrumentation", "NDT", "Quality Management"]
-            else 7,
+            discipline_options + ["Other / custom"],
+            index=discipline_options.index(saved_discipline) if saved_discipline in discipline_options else len(discipline_options),
         )
+        custom_discipline = st.text_input("Custom discipline", value=saved_discipline if saved_discipline not in discipline_options else "")
         uploaded = st.file_uploader("Profile photo", type=["png", "jpg", "jpeg"])
         saved = st.form_submit_button("Save profile", use_container_width=True)
 
     if saved:
+        discipline = custom_discipline.strip() if discipline_choice == "Other / custom" else discipline_choice
         update_profile = getattr(auth, "update_profile", None)
-        if update_profile and update_profile(name, email, discipline, uploaded):
+        if not discipline:
+            st.error("Enter your custom discipline.")
+        elif update_profile and update_profile(name, email, discipline, uploaded):
             st.success("Profile updated.")
             st.rerun()
         else:

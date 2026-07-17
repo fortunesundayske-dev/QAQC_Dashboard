@@ -6,11 +6,13 @@ import os
 import re
 import secrets
 import smtplib
+import time
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from database.mongo_users import load_users, save_users
 
@@ -22,6 +24,8 @@ PBKDF2_ITERATIONS = 260_000
 DEFAULT_ADMIN_PASSWORD = "admin123"
 LOGO_FILE = BASE_DIR / "assets" / "evomec_logo.png"
 SESSION_TOKEN_PARAM = "auth_token"
+INACTIVITY_TIMEOUT_SECONDS = 120
+DISCIPLINES = ["Civil", "Mechanical", "Piping", "Welding", "Electrical", "Instrumentation", "NDT", "Quality Management"]
 
 
 def _utc_now():
@@ -149,7 +153,7 @@ def _valid_password(password):
     return all(checks)
 
 
-def _send_approval_email(user):
+def send_email(recipient, subject, body):
     smtp_config = {}
     smtp_config_file = DATA_DIR / "smtp_config.json"
     if smtp_config_file.exists():
@@ -165,19 +169,14 @@ def _send_approval_email(user):
     smtp_from = os.getenv("QAQC_SMTP_FROM") or os.getenv("SMTP_FROM") or smtp_config.get("SMTP_FROM")
     sender = smtp_from or smtp_user or "no-reply@qaqc.local"
 
-    if not smtp_host or not smtp_user or not smtp_password:
+    if not smtp_host or not smtp_user or not smtp_password or not recipient:
         return False
 
     msg = EmailMessage()
-    msg["Subject"] = "QA/QC Dashboard access approved"
+    msg["Subject"] = subject
     msg["From"] = sender
-    msg["To"] = user["email"]
-    msg.set_content(
-        f"Hello {user['name']},\n\n"
-        "Your QA/QC Dashboard account has been approved. "
-        "You can now sign in with your registered username or work email.\n\n"
-        "Regards,\nQA/QC Dashboard Security"
-    )
+    msg["To"] = recipient
+    msg.set_content(body)
 
     use_ssl = str(os.getenv("QAQC_SMTP_SSL") or os.getenv("SMTP_SSL") or smtp_config.get("SMTP_SSL", "0")) == "1" or smtp_port == 465
     use_starttls = str(os.getenv("QAQC_SMTP_STARTTLS") or os.getenv("SMTP_STARTTLS") or smtp_config.get("SMTP_STARTTLS", "1")) == "1"
@@ -188,6 +187,17 @@ def _send_approval_email(user):
         smtp.login(smtp_user, smtp_password)
         smtp.send_message(msg)
     return True
+
+
+def _send_approval_email(user):
+    return send_email(
+        user["email"],
+        "QA/QC Dashboard access approved",
+        f"Hello {user['name']},\n\n"
+        "Your QA/QC Dashboard account has been approved. "
+        "You can now sign in with your registered username or work email.\n\n"
+        "Regards,\nQA/QC Dashboard Security",
+    )
 
 
 def init_auth():
@@ -237,7 +247,26 @@ def _set_logged_in(username, user, session_token=None):
     st.session_state.discipline = user.get("discipline", "QA/QC")
     st.session_state.profile_photo = user.get("profile_photo")
     st.session_state.auth_token = session_token or st.session_state.auth.get("auth_token")
+    st.session_state.auth_last_activity = time.time()
     _set_query_token(st.session_state.auth_token)
+
+
+def _enforce_inactivity_timeout():
+    if not st.session_state.auth.get("logged_in"):
+        return False
+    now = time.time()
+    last_activity = float(st.session_state.get("auth_last_activity", now))
+    if now - last_activity >= INACTIVITY_TIMEOUT_SECONDS:
+        _set_logged_out()
+        st.session_state.auth_timeout_message = "You were signed out after 2 minutes of inactivity."
+        return True
+    st.session_state.auth_last_activity = now
+    components.html(
+        f"<script>setTimeout(function(){{window.parent.location.reload();}}, {INACTIVITY_TIMEOUT_SECONDS * 1000});</script>",
+        height=0,
+        width=0,
+    )
+    return False
 
 
 def _restore_from_query_token():
@@ -282,11 +311,15 @@ def _set_logged_out():
 def login():
     init_auth()
 
-    if st.session_state.auth["logged_in"]:
+    if st.session_state.auth["logged_in"] and not _enforce_inactivity_timeout():
         storage_warning = st.session_state.pop("auth_storage_warning", None)
         if storage_warning:
             st.warning(storage_warning)
         return True
+
+    timeout_message = st.session_state.pop("auth_timeout_message", None)
+    if timeout_message:
+        st.warning(timeout_message)
 
     if _restore_from_query_token():
         return True
@@ -383,20 +416,24 @@ def login():
                 name = st.text_input("Full name")
                 username = st.text_input("Preferred username").strip().lower()
                 email = st.text_input("Work email")
-                discipline = st.selectbox(
+                discipline_choice = st.selectbox(
                     "Primary discipline",
-                    ["Civil", "Mechanical", "Piping", "Welding", "Electrical", "Instrumentation", "NDT", "Quality Management"],
+                    DISCIPLINES + ["Other / custom"],
                 )
+                custom_discipline = st.text_input("Custom discipline (required when Other / custom is selected)")
                 password = st.text_input("Password", type="password")
                 confirm = st.text_input("Confirm password", type="password")
                 submitted = st.form_submit_button("Submit for approval", use_container_width=True)
 
             if submitted:
+                discipline = custom_discipline.strip() if discipline_choice == "Other / custom" else discipline_choice
                 users = _load_users()
                 if not name or not username or not email:
                     st.error("Full name, username, and email are required.")
                 elif username in users:
                     st.error("That username already exists.")
+                elif not discipline:
+                    st.error("Enter your custom discipline.")
                 elif password != confirm:
                     st.error("Passwords do not match.")
                 elif not _valid_password(password):
