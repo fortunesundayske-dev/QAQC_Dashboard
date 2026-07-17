@@ -1219,68 +1219,48 @@ def render_header():
 """
     )
 
-    if user.get("logged_in"):
-        st.markdown(
-            """
+
+
+def _render_account_menu(user):
+    account_name = str(user.get("name", "User"))
+    account_role = str(user.get("role", "user")).title()
+    photo_src = _profile_photo_src(user.get("profile_photo"))
+    st.markdown(
+        """
 <style>
-.st-key-header_account_menu {
-    margin-bottom: 1.4rem;
-    margin-top: -5.4rem;
-    padding-right: 5.25rem;
-    position: relative;
-    z-index: 1000;
-}
-.st-key-header_account_menu div[data-testid="stHorizontalBlock"] { align-items: center; }
 .header-account-avatar {
-    align-items: center;
-    background: linear-gradient(135deg, #2563eb, #22c55e);
-    border: 2px solid rgba(96, 165, 250, 0.7);
-    border-radius: 999px;
-    color: #fff;
-    display: flex;
-    font-size: 0.72rem;
-    font-weight: 900;
-    height: 2.55rem;
-    justify-content: center;
-    overflow: hidden;
-    width: 2.55rem;
+    align-items: center; background: linear-gradient(135deg, #2563eb, #22c55e);
+    border: 2px solid rgba(96,165,250,.7); border-radius: 999px; color: #fff;
+    display: flex; font-size: .72rem; font-weight: 900; height: 2.45rem;
+    justify-content: center; overflow: hidden; width: 2.45rem;
 }
 .header-account-avatar img { height: 100%; object-fit: cover; width: 100%; }
-.st-key-header_account_menu div[data-testid="stPopover"] button {
-    min-height: 2.75rem;
-    white-space: nowrap;
-}
-@media (max-width: 900px) {
-    .st-key-header_account_menu { margin-top: 0.35rem; padding-right: 0; }
-}
+.st-key-navigation_account div[data-testid="stHorizontalBlock"] { align-items: center; }
+.st-key-navigation_account div[data-testid="stPopover"] button { min-height: 2.55rem; white-space: nowrap; }
 </style>
 """,
-            unsafe_allow_html=True,
-        )
-        with st.container(key="header_account_menu"):
-            _, avatar_col, account_col = st.columns([7.25, 0.5, 2.25], gap="small")
-            account_name = str(user.get("name", "User"))
-            account_role = str(user.get("role", "user")).title()
-            photo = user.get("profile_photo")
-            with avatar_col:
-                photo_src = _profile_photo_src(photo)
+        unsafe_allow_html=True,
+    )
+    with st.container(key="navigation_account"):
+        avatar_col, menu_col = st.columns([0.42, 2.58], gap="small")
+        with avatar_col:
+            if photo_src:
+                avatar_content = f'<img src="{photo_src}" alt="Profile photo">'
+            else:
+                avatar_content = html.escape("".join(part[:1] for part in account_name.split()[:2]).upper() or "U")
+            st.markdown(f'<div class="header-account-avatar">{avatar_content}</div>', unsafe_allow_html=True)
+        with menu_col:
+            with st.popover(f"{account_name} · {account_role}", use_container_width=True):
                 if photo_src:
-                    avatar_content = f'<img src="{photo_src}" alt="Profile photo">'
-                else:
-                    avatar_content = html.escape("".join(part[:1] for part in account_name.split()[:2]).upper() or "U")
-                st.markdown(f'<div class="header-account-avatar">{avatar_content}</div>', unsafe_allow_html=True)
-            with account_col:
-                with st.popover(f"{account_name} · {account_role}", use_container_width=True):
-                    if photo_src:
-                        st.image(photo_src, width=72)
-                    st.markdown(f"**{account_name}**")
-                    st.caption(f"{account_role} · {user.get('discipline', 'QA/QC')}")
-                    st.page_link("pages/User_Profile.py", label="User Profile", use_container_width=True)
-                    if st.button("Sign out", key="header_account_sign_out", use_container_width=True, type="primary"):
-                        import auth
+                    st.image(photo_src, width=72)
+                st.markdown(f"**{account_name}**")
+                st.caption(f"{account_role} · {user.get('discipline', 'QA/QC')}")
+                st.page_link("pages/User_Profile.py", label="User Profile", use_container_width=True)
+                if st.button("Sign out", key="header_account_sign_out", use_container_width=True, type="primary"):
+                    import auth
 
-                        auth.sign_out()
-                        st.rerun()
+                    auth.sign_out()
+                    st.rerun()
 
             
 # =========================
@@ -1679,7 +1659,8 @@ def extract_projects(data):
 def render_navigation():
     grouped_pages = grouped_navigation_pages()
 
-    nav_col, tool_col = st.columns([0.18, 0.82], gap="small")
+    user = st.session_state.get("auth") or {}
+    nav_col, tool_col, account_col = st.columns([0.2, 0.5, 0.3], gap="small")
     with nav_col:
         with st.popover("›  Page Navigation", use_container_width=False):
             suffix = _auth_query_suffix()
@@ -1695,6 +1676,9 @@ def render_navigation():
             '<div class="command-tools command-tools--compact"><span>⌕</span><span>•</span><span>● Online</span></div>',
             unsafe_allow_html=True,
         )
+    with account_col:
+        if user.get("logged_in"):
+            _render_account_menu(user)
     return
     st.markdown("### 🧭 Page Navigation", unsafe_allow_html=True)
 
