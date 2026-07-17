@@ -1240,9 +1240,9 @@ def render_header():
     <div class="app-brand-lockup">
         <div class="app-logo-img app-logo-img--nlng">{nlng_logo}</div>
         <div>
-            <div class="app-bar__eyebrow">All pages redesigned with enterprise QA/QC standards</div>
-            <div class="app-bar__title">QAQC Dashboard - Global UI/UX Design System</div>
-            <div class="app-bar__project">Desktop, tablet, and mobile quality command centre</div>
+            <div class="app-bar__eyebrow">Enterprise Quality Management System</div>
+            <div class="app-bar__title">EVOMEC QMS</div>
+            <div class="app-bar__project">QA/QC command centre for desktop, tablet, and mobile</div>
         </div>
     </div>
     <div class="app-bar__right">
