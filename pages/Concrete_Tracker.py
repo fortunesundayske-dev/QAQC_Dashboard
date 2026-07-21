@@ -5,6 +5,8 @@ import plotly.express as px
 import streamlit as st
 
 import auth
+from database.audit_log import record_activity
+from database.concrete_records import append_concrete_volume
 from utils import global_filter_sidebar, inject_global_ui, load_master_data, render_navigation, render_top_nav, render_page_header, render_table, style_chart
 
 
@@ -167,6 +169,61 @@ render_page_header(
 data = load_master_data(DATA_FILE)
 filtered_data = global_filter_sidebar(data)
 concrete = filtered_data.get("Concrete Tracker", pd.DataFrame()).copy()
+
+if str(auth.get_role()).lower() == "admin":
+    with st.expander("Admin: enter daily concrete volume", expanded=False):
+        st.caption("Manual entries are saved to the QA/QC master workbook and included in activity auditing.")
+        with st.form("manual_concrete_volume_form", clear_on_submit=True):
+            entry_col1, entry_col2 = st.columns(2)
+            entry_date = entry_col1.date_input("Consumption date")
+            entry_volume = entry_col2.number_input(
+                "Concrete volume consumed (m3)", min_value=0.0, step=0.5, format="%.2f"
+            )
+            entry_project = st.text_input("Project")
+            entry_location = st.text_input("Location / work area")
+            entry_notes = st.text_area("Notes (optional)", max_chars=500)
+            entry_submitted = st.form_submit_button(
+                "Save daily concrete volume", type="primary", use_container_width=True
+            )
+        if entry_submitted:
+            actor = auth.current_user() or {}
+            try:
+                record, storage = append_concrete_volume(
+                    entry_date=entry_date,
+                    project=entry_project,
+                    location=entry_location,
+                    volume=entry_volume,
+                    username=actor.get("username", "admin"),
+                    notes=entry_notes,
+                )
+                record_activity(
+                    "add_concrete_volume",
+                    category="quality_record",
+                    page="Concrete Tracker",
+                    target=record["Pour_ID"],
+                    details={
+                        "date": record["Date"], "project": record["Project"],
+                        "location": record["Location"], "volume_m3": record["Volume"],
+                        "storage": storage,
+                    },
+                    actor=actor,
+                )
+                st.session_state["concrete_entry_success"] = (
+                    f"Saved {record['Volume']:,.2f} m3 for {record['Project']} "
+                    f"({record['Pour_ID']}) to {storage}."
+                )
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as exc:
+                record_activity(
+                    "add_concrete_volume", category="quality_record", page="Concrete Tracker",
+                    status="failed", details={"error": str(exc)}, actor=actor,
+                )
+                st.error(f"The concrete volume could not be saved: {exc}")
+
+success_message = st.session_state.pop("concrete_entry_success", None)
+if success_message:
+    st.success(success_message)
 
 if concrete.empty:
     st.warning("No concrete tracker records available.")

@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 import auth
+from database.audit_log import record_activity
 from database.cloudinary_storage import ALLOWED_ATTACHMENT_TYPES, MAX_ATTACHMENT_BYTES, upload_support_attachment
 from database.mongo_support import add_ticket_message, create_ticket, escalate_ticket, list_tickets, update_ticket_status
 from database.support_ai import automatic_reply
@@ -50,6 +51,11 @@ if submitted:
         except Exception:
             reply, used_ai = automatic_reply({}, []) if not get_setting("OPENAI_API_KEY") else ("AI support is temporarily unavailable. Request a live admin for assistance.", False)
         add_ticket_message(ticket["ticket_id"], "QA/QC Support Assistant", "assistant", reply, is_ai=used_ai)
+        record_activity(
+            "create_support_ticket", category="support", page="Customer Support",
+            target=ticket["ticket_id"],
+            details={"category": category, "attachment_added": attachment is not None}, actor=user,
+        )
         support_email = str(get_setting("QAQC_SUPPORT_EMAIL", "")).strip()
         notified = False
         try:
@@ -106,6 +112,10 @@ else:
     if not is_admin and not active_ticket.get("escalated"):
         if st.button("Request live admin", type="primary", use_container_width=True):
             if escalate_ticket(active_ticket["ticket_id"], username):
+                record_activity(
+                    "escalate_support_ticket", category="support", page="Customer Support",
+                    target=active_ticket["ticket_id"], actor=user,
+                )
                 support_email = str(get_setting("QAQC_SUPPORT_EMAIL", "")).strip()
                 try:
                     if support_email:
@@ -123,6 +133,10 @@ else:
     if chat_message:
         sender_role = "admin" if is_admin else "user"
         add_ticket_message(active_ticket["ticket_id"], username, sender_role, chat_message)
+        record_activity(
+            "reply_support_ticket", category="support", page="Customer Support",
+            target=active_ticket["ticket_id"], details={"sender_role": sender_role}, actor=user,
+        )
         if not is_admin and not active_ticket.get("escalated"):
             refreshed = next(item for item in list_tickets(username) if item["ticket_id"] == active_ticket["ticket_id"])
             try:
@@ -141,6 +155,10 @@ if is_admin and tickets:
     status = st.selectbox("Status", statuses, index=statuses.index(selected.get("status", "open")))
     if st.button("Update ticket status", use_container_width=True):
         if update_ticket_status(selected["ticket_id"], status, username):
+            record_activity(
+                "update_support_ticket_status", category="support", page="Customer Support",
+                target=selected["ticket_id"], details={"status": status}, actor=user,
+            )
             st.success("Ticket status updated.")
             st.rerun()
         else:

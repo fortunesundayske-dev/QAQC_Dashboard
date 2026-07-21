@@ -17,6 +17,7 @@ import streamlit.components.v1 as components
 from database.mongo_users import get_database, load_users, save_users
 from database.cloudinary_storage import upload_profile_photo
 from database.settings import get_setting
+from database.audit_log import record_activity
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -216,12 +217,25 @@ def send_email(recipient, subject, body):
 
 
 def _send_approval_email(user):
+    recipient = str(user.get("email") or "").strip()
+    if not recipient:
+        return False
+
+    display_name = str(user.get("name") or user.get("username") or "Requestor").strip()
+    role = str(user.get("role") or "user").replace("_", " ").title()
+    dashboard_url = str(get_setting("QAQC_APP_URL") or "").strip()
+    sign_in_line = (
+        f"Sign in here: {dashboard_url}\n\n"
+        if dashboard_url
+        else "You can now sign in with your registered username or work email.\n\n"
+    )
     return send_email(
-        user["email"],
+        recipient,
         "QA/QC Dashboard access approved",
-        f"Hello {user['name']},\n\n"
-        "Your QA/QC Dashboard account has been approved. "
-        "You can now sign in with your registered username or work email.\n\n"
+        f"Hello {display_name},\n\n"
+        "Your request for access to the QA/QC Dashboard has been approved by an administrator.\n"
+        f"Assigned role: {role}\n\n"
+        f"{sign_in_line}"
         "Regards,\nQA/QC Dashboard Security",
     )
 
@@ -283,7 +297,7 @@ def _enforce_inactivity_timeout():
     now = time.time()
     last_activity = float(st.session_state.get("auth_last_activity", now))
     if now - last_activity >= INACTIVITY_TIMEOUT_SECONDS:
-        _set_logged_out()
+        _set_logged_out(reason="inactivity_timeout")
         st.session_state.auth_timeout_message = "You were signed out after 2 minutes of inactivity."
         return True
     st.session_state.auth_last_activity = now
@@ -305,18 +319,27 @@ def _restore_from_query_token():
         saved_hash = user.get("session_token_hash")
         if saved_hash and hmac.compare_digest(saved_hash, token_hash) and user.get("status") == "approved":
             _set_logged_in(username, user, session_token=token)
+            record_activity("restore_session", category="authentication", page="Sign in", actor=user)
             return True
     _clear_query_token()
     return False
 
 
-def _set_logged_out():
-    username = st.session_state.get("auth", {}).get("username")
+def _set_logged_out(reason="user_sign_out"):
+    actor = dict(st.session_state.get("auth") or {})
+    username = actor.get("username")
     if username:
         users = _load_users()
         if username in users and users[username].get("session_token_hash"):
             users[username].pop("session_token_hash", None)
             _try_save_users(users)
+        record_activity(
+            "sign_out",
+            category="authentication",
+            page="Account",
+            details={"reason": reason},
+            actor=actor,
+        )
     st.session_state.auth = {
         "logged_in": False,
         "username": None,
@@ -402,6 +425,7 @@ def login():
             st.markdown('<div class="auth-forgot">Forgot password?</div>', unsafe_allow_html=True)
 
             if st.button("Sign in", type="primary", use_container_width=True):
+                login_identifier = username
                 users = _load_users()
                 username, user = _find_user_by_login(users, username)
 
@@ -409,14 +433,30 @@ def login():
                     if user:
                         user["failed_attempts"] = int(user.get("failed_attempts", 0)) + 1
                         _try_save_users(users)
+                    record_activity(
+                        "sign_in",
+                        category="authentication",
+                        page="Sign in",
+                        status="failed",
+                        details={"reason": "invalid_credentials"},
+                        actor=user or {"username": login_identifier},
+                    )
                     st.error("Invalid username or password.")
                     return False
 
                 if user.get("status") == "restricted":
+                    record_activity(
+                        "sign_in", category="authentication", page="Sign in",
+                        status="denied", details={"reason": "restricted_account"}, actor=user,
+                    )
                     st.warning("Your account has been restricted. Contact an administrator for access.")
                     return False
 
                 if user.get("status") != "approved":
+                    record_activity(
+                        "sign_in", category="authentication", page="Sign in",
+                        status="denied", details={"reason": "approval_pending"}, actor=user,
+                    )
                     st.warning("Your account is waiting for administrator approval.")
                     return False
 
@@ -430,6 +470,7 @@ def login():
                         "Login access is active."
                     )
                 _set_logged_in(username, user, session_token=session_token)
+                record_activity("sign_in", category="authentication", page="Sign in", actor=user)
                 st.rerun()
 
             if remember:
@@ -483,6 +524,13 @@ def login():
                         "locked_until": None,
                     }
                     if _try_save_users(users):
+                        record_activity(
+                            "request_access",
+                            category="authentication",
+                            page="Registration",
+                            target=username,
+                            actor=users[username],
+                        )
                         st.success("Registration submitted. An administrator must approve access before sign in.")
                     else:
                         st.error(
@@ -506,13 +554,13 @@ def login():
 
 def logout():
     if st.sidebar.button("Sign out", use_container_width=True):
-        _set_logged_out()
+        _set_logged_out(reason="user_sign_out")
         st.rerun()
 
 
 def sign_out():
     """Clear the active session and invalidate its persisted token."""
-    _set_logged_out()
+    _set_logged_out(reason="user_sign_out")
 
 
 def get_role():
@@ -535,7 +583,7 @@ def require_role(roles):
         st.error(f"This module is restricted to: {allowed}. Your current role is: {current}.")
         st.info("To approve or manage users, sign out and sign in with an admin account.")
         if st.button("Sign out and switch account", use_container_width=True, key="role_guard_sign_out"):
-            _set_logged_out()
+            _set_logged_out(reason="role_access_denied")
             st.rerun()
         st.stop()
 
@@ -571,6 +619,14 @@ def update_profile(name, email, discipline, uploaded_photo=None):
     st.session_state.auth["email"] = email
     st.session_state.auth["discipline"] = discipline
     st.session_state.auth["profile_photo"] = record.get("profile_photo")
+    record_activity(
+        "update_profile",
+        category="account",
+        page="User Profile",
+        target=record["username"],
+        details={"profile_photo_updated": uploaded_photo is not None, "discipline": discipline},
+        actor=record,
+    )
     return True
 
 
@@ -615,10 +671,34 @@ def approve_user(username, role="user"):
     try:
         email_sent = _send_approval_email(user)
     except Exception as exc:
+        user["approval_email_sent_at"] = None
+        user["approval_email_error"] = f"{type(exc).__name__}: {exc}"
+        _try_save_users(users)
+        record_activity(
+            "approve_user", category="administration", page="Access Admin",
+            target=username, status="partial",
+            details={"assigned_role": role, "approval_email": "failed", "error": str(exc)},
+            actor=admin,
+        )
         return True, f"Approved, but email failed: {exc}"
 
     if email_sent:
+        user["approval_email_sent_at"] = _utc_now()
+        user["approval_email_error"] = None
+        _try_save_users(users)
+        record_activity(
+            "approve_user", category="administration", page="Access Admin",
+            target=username, details={"assigned_role": role, "approval_email": "sent"}, actor=admin,
+        )
         return True, "Approved and email sent."
+    user["approval_email_sent_at"] = None
+    user["approval_email_error"] = "SMTP is not configured or the requestor has no email address."
+    _try_save_users(users)
+    record_activity(
+        "approve_user", category="administration", page="Access Admin",
+        target=username, status="partial",
+        details={"assigned_role": role, "approval_email": "not_sent"}, actor=admin,
+    )
     return True, "Approved. Configure SMTP environment variables to send approval email."
 
 
@@ -639,6 +719,10 @@ def change_user_role(username, role):
     user["role_updated_by"] = admin["username"] if admin else "admin"
     if not _try_save_users(users):
         return False, "Role change could not be saved."
+    record_activity(
+        "change_user_role", category="administration", page="Access Admin",
+        target=username, details={"new_role": role}, actor=admin,
+    )
     return True, f"Role changed to {role.title()}."
 
 
@@ -655,6 +739,7 @@ def restrict_user(username):
     users[username].pop("session_token_hash", None)
     if not _try_save_users(users):
         return False, "Restriction could not be saved on this deployment."
+    record_activity("restrict_user", category="administration", page="Access Admin", target=username, actor=admin)
     return True, "User restricted."
 
 
@@ -672,6 +757,7 @@ def unrestrict_user(username):
         users[username]["approved_by"] = admin["username"] if admin else "admin"
     if not _try_save_users(users):
         return False, "Unrestrict could not be saved on this deployment."
+    record_activity("unrestrict_user", category="administration", page="Access Admin", target=username, actor=admin)
     return True, "User unrestricted."
 
 
@@ -685,13 +771,18 @@ def delete_user(username):
     users.pop(username, None)
     if not _try_save_users(users):
         return False, "Delete could not be saved on this deployment."
+    record_activity("delete_user", category="administration", page="Access Admin", target=username, actor=admin)
     return True, "User deleted."
 
 
 def reject_user(username):
     users = _load_users()
+    admin = current_user()
     if username not in users:
         return False
     users[username]["status"] = "rejected"
     users[username]["rejected_at"] = _utc_now()
-    return _try_save_users(users)
+    saved = _try_save_users(users)
+    if saved:
+        record_activity("reject_user", category="administration", page="Access Admin", target=username, actor=admin)
+    return saved

@@ -117,9 +117,25 @@ for invalid credentials, network timeouts, and malformed URIs.
 
 Add `CLOUDINARY_URL`, `OPENAI_API_KEY`, and the `QAQC_SMTP_*` values there to
 enable cloud uploads, AI support, and email notifications in production.
+Set `QAQC_APP_URL` to the deployed dashboard URL to include a direct sign-in
+link in each requestor's approval email.
 
 Profile-photo changes are uploaded to Cloudinary and their secure URLs are
 stored in each MongoDB user record, so photos follow the account across devices.
+User activity is stored in MongoDB for the admin Activity Log and each event is
+also archived as an immutable JSON file under the dated Cloudinary path
+`qaqc-dashboard/activity-logs/YYYY/MM/DD/`.
+
+To upload a timestamped backup of the dashboard application files, run:
+
+```bash
+python scripts/upload_dashboard_backup.py
+```
+
+The authenticated backup deliberately excludes secrets, account/profile data,
+runtime/temp files, local databases, and the entire `assets/standards` folder
+containing standards PDFs. Validate the backup selection without uploading by
+adding `--dry-run`.
 To migrate legacy local profile images once, run:
 
 ```bash

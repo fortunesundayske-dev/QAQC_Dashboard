@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 import uuid
 import html
+import inspect
 from urllib import request, error
 from urllib.parse import quote
 from io import BytesIO
@@ -35,6 +36,16 @@ TEAMS_NOTIFICATION_LOG_FILE = BASE_DIR / "data" / "teams_notification_log.json"
 ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
+
+
+def record_site_activity(action, **kwargs):
+    """Best-effort activity logging without coupling dashboard utilities to storage."""
+    try:
+        from database.audit_log import record_activity
+
+        return record_activity(action, **kwargs)
+    except Exception:
+        return False
 
 
 def _image_data_uri(path):
@@ -264,6 +275,13 @@ def save_calibration_log_to_excel(records, excel_file=EXCEL_FILE):
         raise RuntimeError("The Excel workbook is open or locked. Close QAQC_Master.xlsx, then save again.") from exc
     except Exception as exc:
         raise RuntimeError(f"Calibration log could not be saved to Excel: {exc}") from exc
+    record_site_activity(
+        "save_calibration_log",
+        category="quality_record",
+        page="Calibration Log",
+        target="Calibration Log",
+        details={"record_count": len(export)},
+    )
 
 
 def acknowledge_calibration(record_id, note=""):
@@ -273,6 +291,10 @@ def acknowledge_calibration(record_id, note=""):
     if note:
         record["note"] = note
     _write_calibration_acknowledgements(payload)
+    record_site_activity(
+        "acknowledge_calibration", category="quality_record", page="Calibration Log",
+        target=str(record_id), details={"note_added": bool(note)},
+    )
 
 
 def snooze_calibration(record_id, days=1, note=""):
@@ -282,6 +304,10 @@ def snooze_calibration(record_id, days=1, note=""):
     if note:
         record["note"] = note
     _write_calibration_acknowledgements(payload)
+    record_site_activity(
+        "snooze_calibration", category="quality_record", page="Calibration Log",
+        target=str(record_id), details={"days": int(days), "note_added": bool(note)},
+    )
 
 
 def mark_calibration_notified(record_ids):
@@ -290,6 +316,10 @@ def mark_calibration_notified(record_ids):
     for record_id in record_ids:
         payload.setdefault(str(record_id), {})["last_notified_on"] = today_value
     _write_calibration_acknowledgements(payload)
+    record_site_activity(
+        "mark_calibration_notified", category="notification", page="Calibration Log",
+        details={"record_count": len(record_ids)},
+    )
 
 
 # =========================
@@ -312,6 +342,10 @@ def write_teams_config(webhook_url):
     payload = {"webhook_url": str(webhook_url or "").strip(), "updated_at": datetime.now().isoformat(timespec="seconds")}
     with TEAMS_CONFIG_FILE.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
+    record_site_activity(
+        "update_teams_configuration", category="configuration", page="Calibration Log",
+        details={"configured": bool(payload["webhook_url"])},
+    )
 
 
 def get_teams_webhook_url():
@@ -1315,6 +1349,7 @@ def get_navigation_pages():
     pages_dir = BASE_DIR / "pages"
     label_overrides = {
         "Access_Admin": "Access Admin",
+        "Activity_Log": "Activity Log",
         "Audit_Surveillance": "Audit & Surveillance",
         "Calibration_Log": "Calibration Log",
         "Concrete_Tracker": "Concrete Tracker",
@@ -1357,6 +1392,7 @@ def get_navigation_pages():
         "User Profile",
         "Customer Support",
         "Access Admin",
+        "Activity Log",
     ]
 
     pages = {
@@ -1374,6 +1410,7 @@ def get_navigation_pages():
     role = st.session_state.get("auth", {}).get("role") or st.session_state.get("role")
     if role != "admin":
         pages.pop("Access Admin", None)
+        pages.pop("Activity Log", None)
 
     ordered = {
         label: pages[label]
@@ -1411,7 +1448,7 @@ NAVIGATION_GROUPS = {
     "Materials and Equipment": ["Concrete Tracker", "Calibration Log"],
     "Audits and Reports": ["Audit & Surveillance", "Daily Reports", "Lessons Learned"],
     "Knowledge and Tools": ["Standards Library", "Learning Academy", "Quality Tools"],
-    "Account and Administration": ["User Profile", "Customer Support", "Access Admin"],
+    "Account and Administration": ["User Profile", "Customer Support", "Access Admin", "Activity Log"],
 }
 
 
@@ -1698,6 +1735,7 @@ def extract_projects(data):
 # =========================
 
 def render_navigation():
+    _record_page_access()
     grouped_pages = grouped_navigation_pages()
 
     with st.container(key="primary_navigation_row"):
@@ -1745,6 +1783,30 @@ def render_navigation():
             st.switch_page(page)
 
  
+
+
+def _record_page_access():
+    """Record one page view per page/session while avoiding Streamlit rerun noise."""
+    user = st.session_state.get("auth") or {}
+    if not user.get("logged_in"):
+        return
+    page = "Executive Home"
+    for frame_info in inspect.stack():
+        path = Path(frame_info.filename)
+        if path.parent.name == "pages":
+            page = path.stem.replace("_", " ")
+            break
+    marker = f"audit_page_view::{page}"
+    if st.session_state.get(marker):
+        return
+    try:
+        from database.audit_log import record_activity
+
+        if record_activity("view_page", category="navigation", page=page):
+            st.session_state[marker] = True
+    except Exception:
+        pass
+
 
 def render_top_nav():
     render_header()
