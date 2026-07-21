@@ -1,7 +1,7 @@
 import sys
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -56,6 +56,31 @@ class FakeAuditCollection:
 
 
 class DashboardFeatureTests(unittest.TestCase):
+    def test_activity_archive_configures_cloudinary_directly(self):
+        upload_result = {
+            "secure_url": "https://cloudinary.example/event.json",
+            "public_id": "qaqc-dashboard/activity-logs/2026/07/21/event.json",
+        }
+        record = {
+            "event_id": "event",
+            "occurred_at": datetime(2026, 7, 21, 14, 5, tzinfo=timezone.utc),
+            "action": "test",
+        }
+        with patch.object(
+            audit_log,
+            "get_setting",
+            return_value="cloudinary://api-key:api-secret@cloud-name",
+        ), patch.object(
+            audit_log.cloudinary.uploader,
+            "upload",
+            return_value=upload_result,
+        ) as upload:
+            archive = audit_log._upload_activity_record(record)
+
+        self.assertEqual(archive["public_id"], upload_result["public_id"])
+        self.assertEqual(upload.call_args.kwargs["type"], "authenticated")
+        self.assertEqual(upload.call_args.kwargs["resource_type"], "raw")
+
     def test_admin_approval_sends_email_and_records_delivery(self):
         users = {
             "requestor": {
@@ -103,7 +128,7 @@ class DashboardFeatureTests(unittest.TestCase):
             "public_id": "qaqc-dashboard/activity-logs/2026/07/21/event.json",
         }
         with patch.object(audit_log, "ensure_activity_log", return_value=collection), \
-             patch("database.cloudinary_storage.upload_activity_record", return_value=archive):
+             patch.object(audit_log, "_upload_activity_record", return_value=archive):
             saved = audit_log.record_activity(
                 "update_record",
                 actor={"username": "tester", "name": "Test User", "role": "user"},

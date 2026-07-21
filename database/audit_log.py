@@ -3,11 +3,20 @@
 from datetime import datetime, timezone
 from functools import lru_cache
 import json
+from pathlib import Path
 import uuid
+from urllib.parse import unquote, urlparse
 
+import cloudinary
+import cloudinary.uploader
+from dotenv import load_dotenv
 from pymongo import DESCENDING
 
 from database.mongo_users import get_database
+from database.settings import get_setting
+
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
 MAX_DETAIL_LENGTH = 2_000
@@ -36,6 +45,44 @@ def _safe_details(details):
     if len(encoded) > MAX_DETAIL_LENGTH:
         return {"summary": encoded[:MAX_DETAIL_LENGTH] + "..."}
     return safe
+
+
+def _upload_activity_record(record):
+    """Archive an event without depending on another application module's import state."""
+    cloudinary_url = str(get_setting("CLOUDINARY_URL", "")).strip()
+    if not cloudinary_url:
+        raise RuntimeError("CLOUDINARY_URL is not configured.")
+    parsed_url = urlparse(cloudinary_url)
+    if parsed_url.scheme != "cloudinary" or not all(
+        [parsed_url.hostname, parsed_url.username, parsed_url.password]
+    ):
+        raise RuntimeError("CLOUDINARY_URL is invalid.")
+    cloudinary.config(
+        cloud_name=parsed_url.hostname,
+        api_key=unquote(parsed_url.username),
+        api_secret=unquote(parsed_url.password),
+        secure=True,
+    )
+    occurred_at = record["occurred_at"]
+    event_id = str(record.get("event_id") or uuid.uuid4().hex)
+    payload = dict(record)
+    payload.pop("_id", None)
+    payload["occurred_at"] = occurred_at.isoformat()
+    content = json.dumps(payload, default=str, sort_keys=True, indent=2).encode("utf-8")
+    public_id = (
+        f"qaqc-dashboard/activity-logs/{occurred_at:%Y/%m/%d}/{event_id}.json"
+    )
+    result = cloudinary.uploader.upload(
+        content,
+        resource_type="raw",
+        type="authenticated",
+        public_id=public_id,
+        overwrite=False,
+    )
+    return {
+        "url": result["secure_url"],
+        "public_id": result["public_id"],
+    }
 
 
 @lru_cache(maxsize=1)
@@ -87,9 +134,7 @@ def record_activity(
         collection = ensure_activity_log()
         result = collection.insert_one(document)
         try:
-            from database.cloudinary_storage import upload_activity_record
-
-            archive = upload_activity_record(document)
+            archive = _upload_activity_record(document)
             collection.update_one(
                 {"_id": result.inserted_id},
                 {"$set": {
