@@ -136,6 +136,26 @@ def list_concrete_projects():
     return sorted(projects.values(), key=str.casefold)
 
 
+def list_concrete_projects_from_data(data):
+    """Return canonical project names from workbook frames already loaded by a page."""
+    if not isinstance(data, dict):
+        return []
+
+    projects = {}
+    preferred_sheets = [PROJECT_REGISTER_SHEET, SHEET_NAME]
+    remaining_sheets = [name for name in data if name not in preferred_sheets]
+    for sheet_name in preferred_sheets + remaining_sheets:
+        frame = data.get(sheet_name)
+        if frame is None or not hasattr(frame, "columns") or "Project" not in frame.columns:
+            continue
+        for value in frame["Project"].dropna().tolist():
+            display_name = _clean_project_name(value)
+            key = _project_key(display_name)
+            if key and key not in projects:
+                projects[key] = display_name
+    return sorted(projects.values(), key=str.casefold)
+
+
 def append_concrete_volume(*, entry_date, project, location, volume, username, notes=""):
     project = _clean_project_name(project)
     location = str(location or "").strip()

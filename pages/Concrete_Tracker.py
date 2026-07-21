@@ -6,7 +6,7 @@ import streamlit as st
 
 import auth
 from database.audit_log import record_activity
-from database.concrete_records import append_concrete_volume, list_concrete_projects
+from database.concrete_records import append_concrete_volume, list_concrete_projects_from_data
 from utils import global_filter_sidebar, inject_global_ui, load_master_data, render_navigation, render_top_nav, render_page_header, render_table, style_chart
 
 
@@ -150,11 +150,6 @@ def clean_receipts(df):
     return frame
 
 
-@st.cache_data(ttl=300, show_spinner=False)
-def concrete_project_options():
-    return list_concrete_projects()
-
-
 def material_requirement_from_volume(volume, mix):
     return {
         "Cement": volume * mix["cement_kg_per_m3"] / 1000,
@@ -182,7 +177,7 @@ if str(auth.get_role()).lower() == "admin":
             "project to keep its canonical name, or add a new project once."
         )
         try:
-            project_options = concrete_project_options()
+            project_options = list_concrete_projects_from_data(data)
         except Exception as exc:
             project_options = []
             st.warning(f"The current project list could not be loaded: {exc}")
