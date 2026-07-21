@@ -5093,15 +5093,28 @@ def inject_global_ui():
             linear-gradient(135deg, #071426 0%, #0b1f36 52%, #04101f 100%) !important;
     }}
 
-    .stApp {{
+    html,
+    body,
+    #root,
+    .stApp,
+    [data-testid="stApp"] {{
         background-color: #071426 !important;
         background-image:
-            linear-gradient(135deg, rgba(3, 12, 25, 0.82), rgba(5, 22, 43, 0.74)),
+            linear-gradient(135deg, rgba(3, 12, 25, 0.62), rgba(5, 22, 43, 0.52)),
             url("{page_background}") !important;
         background-position: center, center right !important;
         background-repeat: no-repeat, no-repeat !important;
         background-size: cover, cover !important;
         background-attachment: fixed, fixed !important;
+    }}
+
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    [data-testid="stMainBlockContainer"],
+    main,
+    .main,
+    .block-container {{
+        background: transparent !important;
     }}
 
     .block-container {{
@@ -5342,7 +5355,22 @@ def inject_global_ui():
     div[data-testid="stVerticalBlockBorderWrapper"],
     div[data-testid="stExpander"] details,
     div[data-testid="stDataFrame"] {{
+        backdrop-filter: blur(12px) saturate(118%);
         transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, filter 0.2s ease !important;
+    }}
+
+    .page-header,
+    .dashboard-hero,
+    .kpi-card,
+    div[data-testid="stMetric"],
+    .exec-panel,
+    .module-card,
+    .tool-card,
+    .standard-card,
+    .learning-card,
+    .security-card,
+    div[data-testid="stExpander"] details {{
+        background-color: color-mix(in srgb, var(--qaqc-surface) 84%, transparent) !important;
     }}
 
     .page-header:hover,
@@ -5388,7 +5416,11 @@ def inject_global_ui():
     }}
 
     @media (max-width: 768px) {{
-        .stApp {{
+        html,
+        body,
+        #root,
+        .stApp,
+        [data-testid="stApp"] {{
             background-attachment: scroll, scroll !important;
         }}
 
