@@ -10,7 +10,7 @@ A modern enterprise-grade QA/QC management dashboard for construction projects, 
 - Export management reports to Excel and PDF
 - Responsive layout, dark/light theme toggle, automatic refresh support
 - MongoDB-backed user accounts and customer-support tickets
-- Approval and support email notifications through SMTP
+- Approval and support email notifications through Exchange Online / Microsoft Graph
 - Automatic sign-out after two minutes without activity
 - Interactive support chat with optional AI first response and live-admin escalation
 - Cloudinary-backed support attachments and profile photos referenced from MongoDB
@@ -98,9 +98,11 @@ streamlit run app.py
 The migration preserves the existing password hashes. It refuses to overwrite a
 non-empty MongoDB users collection unless `--force` is explicitly supplied.
 
-Copy the SMTP and support settings from `.env.example` into the Git-ignored
-`.env` file to enable approval and customer-support email delivery. Support
-tickets are saved to MongoDB even when SMTP is not configured.
+Copy the Exchange Online and support settings from `.env.example` into the
+Git-ignored `.env` file to enable approval and customer-support email delivery.
+The Azure application needs Microsoft Graph `Mail.Send` application permission
+with administrator consent. Support tickets are saved to MongoDB even when
+Exchange is not configured.
 
 For Streamlit Cloud, copy the same key/value pairs into **App settings →
 Secrets** using TOML syntax. At minimum the deployed app requires:
@@ -115,8 +117,9 @@ comma-separated Atlas seed list, use the `mongodb://` scheme instead. The app
 normalizes this common scheme mismatch and shows a safe configuration message
 for invalid credentials, network timeouts, and malformed URIs.
 
-Add `CLOUDINARY_URL`, `OPENAI_API_KEY`, and the `QAQC_SMTP_*` values there to
-enable cloud uploads, AI support, and email notifications in production.
+Add `CLOUDINARY_URL`, `OPENAI_API_KEY`, and the `QAQC_EXCHANGE_*` values there
+to enable cloud uploads, AI support, and Exchange email notifications in
+production.
 Set `QAQC_APP_URL` to the deployed dashboard URL to include a direct sign-in
 link in each requestor's approval email.
 

@@ -5,11 +5,12 @@ import json
 import os
 import re
 import secrets
-import smtplib
 import time
 from datetime import datetime, timezone
-from email.message import EmailMessage
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode
+from urllib.request import Request, urlopen
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -29,6 +30,8 @@ LOGO_FILE = BASE_DIR / "assets" / "evomec_logo.png"
 SESSION_TOKEN_PARAM = "auth_token"
 INACTIVITY_TIMEOUT_SECONDS = 120
 DISCIPLINES = ["Civil", "Mechanical", "Piping", "Welding", "Electrical", "Instrumentation", "NDT", "Quality Management"]
+DEFAULT_ADMIN_EMAIL = "fortune.kpakue@evomeclimited.com"
+MICROSOFT_GRAPH_ROOT = "https://graph.microsoft.com/v1.0"
 
 
 def _utc_now():
@@ -58,7 +61,7 @@ def _ensure_auth_store():
     salt = secrets.token_hex(16)
     admin = {
         "username": "admin",
-        "email": "admin@evomec.local",
+        "email": DEFAULT_ADMIN_EMAIL,
         "name": "System Administrator",
         "role": "admin",
         "status": "approved",
@@ -181,38 +184,64 @@ def _valid_password(password):
 
 
 def send_email(recipient, subject, body):
-    smtp_config = {}
-    smtp_config_file = DATA_DIR / "smtp_config.json"
-    if smtp_config_file.exists():
-        try:
-            smtp_config = json.loads(smtp_config_file.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            smtp_config = {}
-
-    smtp_host = get_setting("QAQC_SMTP_HOST") or get_setting("SMTP_HOST") or smtp_config.get("SMTP_HOST")
-    smtp_user = get_setting("QAQC_SMTP_USER") or get_setting("SMTP_USER") or smtp_config.get("SMTP_USER")
-    smtp_password = get_setting("QAQC_SMTP_PASSWORD") or get_setting("SMTP_PASSWORD") or smtp_config.get("SMTP_PASSWORD")
-    smtp_port = int(get_setting("QAQC_SMTP_PORT") or get_setting("SMTP_PORT") or smtp_config.get("SMTP_PORT", "587"))
-    smtp_from = get_setting("QAQC_SMTP_FROM") or get_setting("SMTP_FROM") or smtp_config.get("SMTP_FROM")
-    sender = smtp_from or smtp_user or "no-reply@qaqc.local"
-
-    if not smtp_host or not smtp_user or not smtp_password or not recipient:
+    """Send mail through Exchange Online using Microsoft Graph application auth."""
+    recipient = str(recipient or "").strip()
+    tenant_id = str(get_setting("QAQC_EXCHANGE_TENANT_ID", "")).strip()
+    client_id = str(get_setting("QAQC_EXCHANGE_CLIENT_ID", "")).strip()
+    client_secret = str(get_setting("QAQC_EXCHANGE_CLIENT_SECRET", "")).strip()
+    sender = str(get_setting("QAQC_EXCHANGE_SENDER", DEFAULT_ADMIN_EMAIL)).strip()
+    if not all([recipient, tenant_id, client_id, client_secret, sender]):
         return False
 
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = sender
-    msg["To"] = recipient
-    msg.set_content(body)
+    token_request = Request(
+        f"https://login.microsoftonline.com/{quote(tenant_id, safe='')}/oauth2/v2.0/token",
+        data=urlencode(
+            {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "scope": "https://graph.microsoft.com/.default",
+                "grant_type": "client_credentials",
+            }
+        ).encode("utf-8"),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    try:
+        with urlopen(token_request, timeout=20) as response:
+            token_payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        raise RuntimeError(f"Exchange token request failed with HTTP {exc.code}.") from exc
+    except (URLError, TimeoutError) as exc:
+        raise RuntimeError("Exchange token service could not be reached.") from exc
+    access_token = str(token_payload.get("access_token") or "").strip()
+    if not access_token:
+        raise RuntimeError("Exchange did not return an access token.")
 
-    use_ssl = str(get_setting("QAQC_SMTP_SSL") or get_setting("SMTP_SSL") or smtp_config.get("SMTP_SSL", "0")) == "1" or smtp_port == 465
-    use_starttls = str(get_setting("QAQC_SMTP_STARTTLS") or get_setting("SMTP_STARTTLS") or smtp_config.get("SMTP_STARTTLS", "1")) == "1"
-    smtp_class = smtplib.SMTP_SSL if use_ssl else smtplib.SMTP
-    with smtp_class(smtp_host, smtp_port, timeout=20) as smtp:
-        if not use_ssl and use_starttls:
-            smtp.starttls()
-        smtp.login(smtp_user, smtp_password)
-        smtp.send_message(msg)
+    mail_payload = {
+        "message": {
+            "subject": str(subject or ""),
+            "body": {"contentType": "Text", "content": str(body or "")},
+            "toRecipients": [{"emailAddress": {"address": recipient}}],
+        },
+        "saveToSentItems": True,
+    }
+    mail_request = Request(
+        f"{MICROSOFT_GRAPH_ROOT}/users/{quote(sender, safe='')}/sendMail",
+        data=json.dumps(mail_payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(mail_request, timeout=20) as response:
+            if int(getattr(response, "status", 202)) not in {200, 202}:
+                raise RuntimeError("Exchange rejected the email request.")
+    except HTTPError as exc:
+        raise RuntimeError(f"Exchange sendMail failed with HTTP {exc.code}.") from exc
+    except (URLError, TimeoutError) as exc:
+        raise RuntimeError("Exchange mail service could not be reached.") from exc
     return True
 
 
@@ -692,14 +721,14 @@ def approve_user(username, role="user"):
         )
         return True, "Approved and email sent."
     user["approval_email_sent_at"] = None
-    user["approval_email_error"] = "SMTP is not configured or the requestor has no email address."
+    user["approval_email_error"] = "Exchange Online is not configured or the requestor has no email address."
     _try_save_users(users)
     record_activity(
         "approve_user", category="administration", page="Access Admin",
         target=username, status="partial",
         details={"assigned_role": role, "approval_email": "not_sent"}, actor=admin,
     )
-    return True, "Approved. Configure SMTP environment variables to send approval email."
+    return True, "Approved. Configure Exchange Online credentials to send approval email."
 
 
 def change_user_role(username, role):

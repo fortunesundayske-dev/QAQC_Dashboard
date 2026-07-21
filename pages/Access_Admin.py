@@ -449,7 +449,7 @@ st.markdown(
 <div class="tool-grid">
     <div class="security-card"><h3>Identity</h3><p>Use SSO/MFA where possible. Keep admin accounts separate from normal user accounts.</p></div>
     <div class="security-card"><h3>Transport</h3><p>Run only behind HTTPS with secure cookies and trusted reverse proxy configuration.</p></div>
-    <div class="security-card"><h3>Secrets</h3><p>Store SMTP, database, and signing secrets in environment variables or a secrets vault, never in source code.</p></div>
+    <div class="security-card"><h3>Secrets</h3><p>Store Exchange Online, database, and signing secrets in environment variables or a secrets vault, never in source code.</p></div>
     <div class="security-card"><h3>Audit</h3><p>Retain login, approval, export, and critical data-change logs for project and client audit review.</p></div>
 </div>
 """,

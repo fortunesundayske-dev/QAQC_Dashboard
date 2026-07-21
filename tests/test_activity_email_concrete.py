@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import unittest
+import json
 from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,13 +19,10 @@ from database import activity_workbook, audit_log, concrete_records
 from scripts import upload_dashboard_backup
 
 
-class FakeSMTP:
-    sent_message = None
-
-    def __init__(self, host, port, timeout):
-        self.host = host
-        self.port = port
-        self.timeout = timeout
+class FakeGraphResponse:
+    def __init__(self, payload=None, status=200):
+        self.payload = payload or {}
+        self.status = status
 
     def __enter__(self):
         return self
@@ -32,14 +30,8 @@ class FakeSMTP:
     def __exit__(self, *_args):
         return False
 
-    def starttls(self):
-        return None
-
-    def login(self, username, password):
-        self.credentials = (username, password)
-
-    def send_message(self, message):
-        type(self).sent_message = message
+    def read(self):
+        return json.dumps(self.payload).encode("utf-8")
 
 
 class FakeAuditCollection:
@@ -147,7 +139,7 @@ class DashboardFeatureTests(unittest.TestCase):
         self.assertEqual(workbook["2026-07-22"]["B5"].value, "event-2")
         self.assertEqual(workbook["2026-07-22"].freeze_panes, "A5")
 
-    def test_admin_approval_sends_email_and_records_delivery(self):
+    def test_admin_approval_sends_exchange_email_and_records_delivery(self):
         users = {
             "requestor": {
                 "username": "requestor",
@@ -157,32 +149,47 @@ class DashboardFeatureTests(unittest.TestCase):
                 "status": "pending",
             }
         }
-        smtp_settings = {
-            "QAQC_SMTP_HOST": "smtp.example.com",
-            "QAQC_SMTP_PORT": "587",
-            "QAQC_SMTP_USER": "mailer@example.com",
-            "QAQC_SMTP_PASSWORD": "app-password",
-            "QAQC_SMTP_FROM": "QAQC <mailer@example.com>",
-            "QAQC_SMTP_STARTTLS": "1",
-            "QAQC_SMTP_SSL": "0",
+        exchange_settings = {
+            "QAQC_EXCHANGE_TENANT_ID": "tenant-id",
+            "QAQC_EXCHANGE_CLIENT_ID": "client-id",
+            "QAQC_EXCHANGE_CLIENT_SECRET": "client-secret",
+            "QAQC_EXCHANGE_SENDER": "fortune.kpakue@evomeclimited.com",
             "QAQC_APP_URL": "https://qaqc.example.com",
         }
         snapshots = []
+        graph_requests = []
+
+        def fake_urlopen(request, timeout):
+            self.assertEqual(timeout, 20)
+            graph_requests.append(request)
+            if "oauth2/v2.0/token" in request.full_url:
+                return FakeGraphResponse({"access_token": "graph-token"})
+            return FakeGraphResponse(status=202)
+
         with patch.object(auth, "_load_users", return_value=users), \
              patch.object(auth, "current_user", return_value={"username": "admin", "role": "admin"}), \
              patch.object(auth, "_try_save_users", side_effect=lambda value: snapshots.append(dict(value["requestor"])) or True), \
-             patch.object(auth, "get_setting", side_effect=lambda name, default="": smtp_settings.get(name, default)), \
-             patch.object(auth.smtplib, "SMTP", FakeSMTP), \
+             patch.object(auth, "get_setting", side_effect=lambda name, default="": exchange_settings.get(name, default)), \
+             patch.object(auth, "urlopen", side_effect=fake_urlopen), \
              patch.object(auth, "record_activity") as activity:
             ok, message = auth.approve_user("requestor", "viewer")
 
         self.assertTrue(ok)
         self.assertEqual(message, "Approved and email sent.")
-        self.assertEqual(FakeSMTP.sent_message["To"], "requestor@example.com")
-        self.assertIn("access approved", FakeSMTP.sent_message["Subject"].lower())
-        body = FakeSMTP.sent_message.get_content()
-        self.assertIn("Assigned role: Viewer", body)
-        self.assertIn("https://qaqc.example.com", body)
+        self.assertEqual(len(graph_requests), 2)
+        self.assertIn("login.microsoftonline.com/tenant-id", graph_requests[0].full_url)
+        self.assertIn(
+            "graph.microsoft.com/v1.0/users/fortune.kpakue%40evomeclimited.com/sendMail",
+            graph_requests[1].full_url,
+        )
+        mail_payload = json.loads(graph_requests[1].data.decode("utf-8"))
+        self.assertEqual(
+            mail_payload["message"]["toRecipients"][0]["emailAddress"]["address"],
+            "requestor@example.com",
+        )
+        self.assertIn("access approved", mail_payload["message"]["subject"].lower())
+        self.assertIn("Assigned role: Viewer", mail_payload["message"]["body"]["content"])
+        self.assertIn("https://qaqc.example.com", mail_payload["message"]["body"]["content"])
         self.assertIsNotNone(snapshots[-1]["approval_email_sent_at"])
         self.assertIsNone(snapshots[-1]["approval_email_error"])
         activity.assert_called_once()

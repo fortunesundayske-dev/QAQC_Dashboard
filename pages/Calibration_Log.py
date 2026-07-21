@@ -441,7 +441,7 @@ def render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix):
                 key=f"{key_prefix}_download_eml_draft",
             )
             st.caption("Open the downloaded email draft in Outlook or another mail app; the PDF is already attached inside the draft file.")
-            st.warning("The direct email-app link below cannot attach files. Use the email draft download above when you want the PDF attached automatically without SMTP.")
+            st.warning("The direct email-app link below cannot attach files. Use the email draft download above when you want the PDF attached through your Exchange email application.")
             if recipient.strip() or cc.strip():
                 st.link_button("Open Email App", mailto_url(recipient, cc, subject, body), use_container_width=True)
             else:

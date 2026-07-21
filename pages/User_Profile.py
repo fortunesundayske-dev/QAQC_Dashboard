@@ -78,7 +78,7 @@ st.markdown(
     """
 <div class="security-card">
     <h3>Account security</h3>
-    <p>Use a unique strong password and keep access limited to approved project personnel. For production deployment, place this app behind HTTPS, central identity management or SSO, SMTP approval email, backups, audit logs, secrets management, and network firewall controls.</p>
+    <p>Use a unique strong password and keep access limited to approved project personnel. For production deployment, place this app behind HTTPS, central identity management or SSO, Exchange Online approval email, backups, audit logs, secrets management, and network firewall controls.</p>
 </div>
 """,
     unsafe_allow_html=True,
