@@ -98,8 +98,17 @@ streamlit run app.py
 The migration preserves the existing password hashes. It refuses to overwrite a
 non-empty MongoDB users collection unless `--force` is explicitly supplied.
 
-Copy the Exchange Online and support settings from `.env.example` into the
-Git-ignored `.env` file to enable approval and customer-support email delivery.
+For local Streamlit development, generate the Git-ignored secrets file from
+the existing `.env` values:
+
+```bash
+python scripts/create_streamlit_secrets.py
+```
+
+Then add the three Azure application values still marked as missing to
+`.streamlit/secrets.toml`. A sanitized reference is available at
+`.streamlit/secrets.toml.example`; the populated file is never committed.
+These Exchange Online settings enable approval and customer-support email delivery.
 The Azure application needs Microsoft Graph `Mail.Send` application permission
 with administrator consent. Support tickets are saved to MongoDB even when
 Exchange is not configured.

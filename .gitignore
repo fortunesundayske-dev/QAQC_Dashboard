@@ -9,8 +9,9 @@ __pycache__/
 .venv/
 venv/
 
-# Local Streamlit configuration
-.streamlit/
+# Local Streamlit secrets (configuration and the sanitized example remain trackable)
+.streamlit/secrets.toml
+.streamlit/secrets.toml.tmp
 
 # Local SMTP settings
 data/smtp_config.json
