@@ -1,5 +1,5 @@
 from pathlib import Path
-from datetime import date
+from datetime import date, timedelta
 from email.message import EmailMessage
 from email.utils import formataddr
 from io import BytesIO
@@ -13,6 +13,8 @@ import pandas as pd
 import streamlit as st
 
 import auth
+from database.audit_log import record_activity
+from database.calibration_records import update_calibration_record
 from utils import (
     acknowledge_calibration,
     generate_calibration_pdf as shared_generate_calibration_pdf,
@@ -27,7 +29,6 @@ from utils import (
     read_teams_notification_log,
     render_navigation,
     render_top_nav,
-    save_calibration_log_to_excel,
     send_calibration_teams_alerts,
     snooze_calibration,
     write_teams_config,
@@ -300,9 +301,6 @@ CALIBRATION_REPORT_DIR = BASE_DIR / "outputs" / "calibration_reports"
 data = load_master_data(DATA_FILE)
 log = get_calibration_log(data)
 summary = get_calibration_summary(data)
-raw_calibration_log = data.get("Calibration Log", pd.DataFrame()).copy() if isinstance(data, dict) else pd.DataFrame()
-if isinstance(raw_calibration_log, pd.DataFrame) and not raw_calibration_log.empty and "Calibration_ID" not in raw_calibration_log.columns:
-    raw_calibration_log.insert(0, "Calibration_ID", [f"CAL-{index + 1:03d}" for index in range(len(raw_calibration_log))])
 
 
 def registered_account_emails():
@@ -690,34 +688,157 @@ def render_teams_settings(records, is_admin=False):
     st.dataframe(dataframe_for_display(log_df[visible_columns].sort_values("sent_at", ascending=False)), use_container_width=True, hide_index=True)
 
 
-def render_excel_log_editor(records):
-    st.markdown("#### Edit Excel calibration log")
+CALIBRATION_STATUS_OPTIONS = [
+    "Calibrated / Active",
+    "Pending Calibration",
+    "Under Calibration",
+    "Out of Service",
+    "Decommissioned / Closed",
+]
+
+
+def _display_value(value):
+    return "" if value is None or pd.isna(value) else str(value).strip()
+
+
+def _calibration_cycle_days(row):
+    calibrated_on = pd.to_datetime(row.get("Calibration_Date"), errors="coerce")
+    due_on = pd.to_datetime(row.get("Next_Due_Date"), errors="coerce")
+    if pd.notna(calibrated_on) and pd.notna(due_on):
+        existing_cycle = int((due_on.normalize() - calibrated_on.normalize()).days)
+        if 1 <= existing_cycle <= 3650:
+            return existing_cycle
+
+    calibration_type = _display_value(row.get("Calibration_Type")).lower()
+    if any(term in calibration_type for term in ("biennial", "two year", "2 year", "24 month")):
+        return 730
+    if any(term in calibration_type for term in ("semiannual", "semi-annual", "six month", "6 month", "biannual")):
+        return 182
+    if "quarter" in calibration_type or "3 month" in calibration_type:
+        return 91
+    if "month" in calibration_type:
+        return 30
+    return 365
+
+
+def _equipment_option_label(record_id, records):
+    selected = records[records["Calibration_ID"].astype(str) == str(record_id)].head(1)
+    if selected.empty:
+        return str(record_id)
+    row = selected.iloc[0]
+    equipment = _display_value(row.get("Equipment_Type")) or "Equipment"
+    serial = _display_value(row.get("Serial_No"))
+    return f"{record_id} · {equipment}" + (f" · Serial {serial}" if serial else "")
+
+
+def render_admin_calibration_update(records, key_prefix):
+    st.markdown("#### Admin equipment update")
     if not isinstance(records, pd.DataFrame) or records.empty:
-        st.info("No Excel calibration rows are available to edit.")
+        st.info("No calibration records are available for this view.")
         return
 
-    st.caption("Edits here save directly to the Calibration Log sheet in data/QAQC_Master.xlsx.")
-    edited = st.data_editor(
-        dataframe_for_display(records),
-        use_container_width=True,
-        hide_index=True,
-        num_rows="dynamic",
-        key="calibration_excel_editor",
+    record_ids = records["Calibration_ID"].dropna().astype(str).drop_duplicates().tolist()
+    selected_id = st.selectbox(
+        "Equipment record",
+        record_ids,
+        format_func=lambda record_id: _equipment_option_label(record_id, records),
+        key=f"{key_prefix}_admin_record",
     )
-    action_cols = st.columns([1, 1, 2])
-    with action_cols[0]:
-        if st.button("Save to Excel", use_container_width=True, key="save_calibration_excel"):
-            try:
-                save_calibration_log_to_excel(edited, DATA_FILE)
-                st.success("Calibration Log sheet saved to QAQC_Master.xlsx.")
-                st.rerun()
-            except Exception as exc:
-                st.error(str(exc))
-    with action_cols[1]:
-        if st.button("Refresh from Excel", use_container_width=True, key="refresh_calibration_excel"):
-            st.rerun()
-    with action_cols[2]:
-        st.markdown('<p class="cal-table-caption">Close the Excel workbook before saving from this page.</p>', unsafe_allow_html=True)
+    selected = records[records["Calibration_ID"].astype(str) == str(selected_id)].head(1)
+    if selected.empty:
+        st.error("The selected calibration record is no longer available.")
+        return
+    row = selected.iloc[0]
+    current_status = _display_value(row.get("Status"))
+    current_calibration_date = pd.to_datetime(row.get("Calibration_Date"), errors="coerce")
+    current_due_date = pd.to_datetime(row.get("Next_Due_Date"), errors="coerce")
+    st.caption(
+        f"Current status: {current_status or 'Not set'} · "
+        f"Calibration date: {current_calibration_date:%Y-%m-%d} · "
+        f"Due date: {current_due_date:%Y-%m-%d}"
+    )
+    st.caption(
+        "Saving updates the Calibration Log in the Cloudinary master workbook and the local Excel copy. "
+        "Use Calibrated / Active after successful calibration so future due-date reminders remain enabled."
+    )
+
+    status_options = list(CALIBRATION_STATUS_OPTIONS)
+    if current_status and current_status not in status_options:
+        status_options.insert(0, current_status)
+    status_index = status_options.index(current_status) if current_status in status_options else 0
+    calibrated_default = date.today()
+    due_default = calibrated_default + timedelta(days=_calibration_cycle_days(row))
+
+    with st.form(f"{key_prefix}_admin_update_form"):
+        date_columns = st.columns(3)
+        with date_columns[0]:
+            new_status = st.selectbox("New equipment status", status_options, index=status_index)
+        with date_columns[1]:
+            new_calibration_date = st.date_input("Calibration completed on", value=calibrated_default)
+        with date_columns[2]:
+            new_due_date = st.date_input("Next calibration due", value=due_default)
+        certificate_no = st.text_input(
+            "Calibration certificate number",
+            value=_display_value(row.get("Certificate_No")),
+        )
+        notes = st.text_area(
+            "Update notes (optional)",
+            max_chars=500,
+            placeholder="Calibration provider, work order, certificate notes, or other record details",
+        )
+        submitted = st.form_submit_button(
+            "Save calibration update",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if not submitted:
+        return
+
+    actor = auth.current_user() or {}
+    try:
+        updated, storage = update_calibration_record(
+            record_id=selected_id,
+            calibration_date=new_calibration_date,
+            next_due_date=new_due_date,
+            status=new_status,
+            username=actor.get("username", "admin"),
+            certificate_no=certificate_no,
+            notes=notes,
+        )
+        record_activity(
+            "update_calibration_record",
+            category="quality_record",
+            page="Calibration Log",
+            target=selected_id,
+            details={
+                "previous": updated["previous"],
+                "status": updated["status"],
+                "calibration_date": updated["calibration_date"],
+                "next_due_date": updated["next_due_date"],
+                "certificate_no": updated["certificate_no"],
+                "notes_added": bool(notes.strip()),
+                "storage": storage,
+            },
+            actor=actor,
+        )
+        st.session_state["calibration_update_success"] = (
+            f"Updated {selected_id}: {updated['status']}, calibrated {updated['calibration_date']}, "
+            f"next due {updated['next_due_date']} ({storage})."
+        )
+        st.cache_data.clear()
+        st.rerun()
+    except Exception as exc:
+        record_activity(
+            "update_calibration_record",
+            category="quality_record",
+            page="Calibration Log",
+            target=selected_id,
+            status="failed",
+            details={"error": str(exc)},
+            actor=actor,
+        )
+        st.error(f"The calibration record could not be updated: {exc}")
 
 
 if log.empty:
@@ -765,6 +886,10 @@ st.markdown(
 )
 
 render_metric_grid(summary, len(overdue), len(due_21))
+
+calibration_update_success = st.session_state.pop("calibration_update_success", None)
+if calibration_update_success:
+    st.success(calibration_update_success)
 
 if is_admin and not reminders.empty and not get_teams_webhook_url():
     st.warning("Microsoft Teams webhook is not configured. Teams calibration alerts are skipped until a webhook URL is saved in Teams Notifications.")
@@ -827,13 +952,18 @@ with tab_overdue:
         render_calibration_report_actions(filtered_overdue, "Overdue report actions", "overdue")
         render_table_toolbar(len(filtered_overdue))
         st.dataframe(dataframe_for_display(filtered_overdue[display_cols]), use_container_width=True, hide_index=True)
+        if is_admin:
+            render_admin_calibration_update(filtered_overdue, "overdue")
 
 with tab_all:
     visible = filter_calibration_records(log, "all")
 
     render_table_toolbar(len(visible))
     st.dataframe(dataframe_for_display(visible[display_cols]), use_container_width=True, hide_index=True, height=520)
-    render_excel_log_editor(raw_calibration_log)
+    if is_admin:
+        render_admin_calibration_update(visible, "all")
+    else:
+        st.caption("Calibration record changes are restricted to administrators.")
 
 with tab_notifications:
     render_teams_settings(reminders, is_admin=is_admin)

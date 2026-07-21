@@ -11,6 +11,7 @@ A modern enterprise-grade QA/QC management dashboard for construction projects, 
 - Responsive layout, dark/light theme toggle, automatic refresh support
 - MongoDB-backed user accounts and customer-support tickets
 - Approval and support email notifications through Exchange Online / Microsoft Graph
+- Admin-only calibration status, completed-date, certificate, and next-due updates synchronized to Cloudinary and Excel
 - Automatic sign-out after two minutes without activity
 - Interactive support chat with optional AI first response and live-admin escalation
 - Cloudinary-backed support attachments and profile photos referenced from MongoDB

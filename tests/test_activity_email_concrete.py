@@ -2,7 +2,8 @@ import sys
 import tempfile
 import unittest
 import json
-from datetime import date, datetime, timezone
+import shutil
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -15,7 +16,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import auth
-from database import activity_workbook, audit_log, concrete_records
+from database import activity_workbook, audit_log, calibration_records, concrete_records
 from scripts import upload_dashboard_backup
 
 
@@ -62,6 +63,97 @@ class FakeAuditCollection:
 
 
 class DashboardFeatureTests(unittest.TestCase):
+    def test_admin_can_update_expired_calibration_in_cloud_and_local_workbooks(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            authoritative_path = temp_path / "cloud-QAQC_Master.xlsx"
+            local_path = temp_path / "local-QAQC_Master.xlsx"
+            workbook = Workbook()
+            calibration_sheet = workbook.active
+            calibration_sheet.title = "Calibration Log"
+            calibration_sheet.append(
+                [
+                    "Calibration_ID",
+                    "Equipment_Type",
+                    "Calibration_Date",
+                    "Next_Due_Date",
+                    "Reminder_Date",
+                    "Days_Until_Due",
+                    "Alert_Status",
+                    "Status",
+                    "Certificate_No",
+                    "Remarks",
+                ]
+            )
+            calibration_sheet.append(
+                [
+                    "CAL-EXPIRED-001",
+                    "Pressure gauge",
+                    datetime.combine(date.today() - timedelta(days=730), datetime.min.time()),
+                    datetime.combine(date.today() - timedelta(days=365), datetime.min.time()),
+                    None,
+                    -365,
+                    "Overdue",
+                    "Pending Calibration",
+                    "OLD-CERT",
+                    "Expired equipment",
+                ]
+            )
+            workbook.create_sheet("Other Data")["A1"] = "preserved"
+            workbook.save(authoritative_path)
+
+            captured = {}
+
+            def fake_download(destination):
+                shutil.copy2(authoritative_path, destination)
+                return True, "qaqc-dashboard/data/QAQC_Master.xlsx"
+
+            def fake_upload(path, public_id):
+                uploaded = load_workbook(path, data_only=True)
+                captured["row"] = list(
+                    uploaded["Calibration Log"].iter_rows(min_row=2, max_row=2, values_only=True)
+                )[0]
+                captured["other"] = uploaded["Other Data"]["A1"].value
+                captured["public_id"] = public_id
+                uploaded.close()
+                return {"public_id": public_id}
+
+            with patch.object(calibration_records, "LOCAL_WORKBOOK", local_path), \
+                 patch.object(calibration_records, "_download_current_workbook", side_effect=fake_download), \
+                 patch.object(calibration_records, "upload_master_workbook", side_effect=fake_upload):
+                updated, storage = calibration_records.update_calibration_record(
+                    record_id="CAL-EXPIRED-001",
+                    calibration_date=date.today(),
+                    next_due_date=date.today() + timedelta(days=365),
+                    status="Calibrated / Active",
+                    username="admin",
+                    certificate_no="NEW-CERT-001",
+                    notes="Calibration completed and certificate received.",
+                )
+
+            headers = [cell.value for cell in calibration_sheet[1]]
+            uploaded_row = dict(zip(headers, captured["row"]))
+            local_workbook = load_workbook(local_path, data_only=True)
+            local_row = list(
+                local_workbook["Calibration Log"].iter_rows(min_row=2, max_row=2, values_only=True)
+            )[0]
+            local_workbook.close()
+
+        self.assertEqual(storage, "cloudinary")
+        self.assertEqual(updated["record_id"], "CAL-EXPIRED-001")
+        self.assertEqual(updated["status"], "Calibrated / Active")
+        self.assertEqual(updated["days_until_due"], 365)
+        self.assertEqual(updated["alert_status"], "OK")
+        self.assertEqual(uploaded_row["Calibration_Date"].date(), date.today())
+        self.assertEqual(uploaded_row["Next_Due_Date"].date(), date.today() + timedelta(days=365))
+        self.assertEqual(uploaded_row["Reminder_Date"].date(), date.today() + timedelta(days=344))
+        self.assertEqual(uploaded_row["Status"], "Calibrated / Active")
+        self.assertEqual(uploaded_row["Certificate_No"], "NEW-CERT-001")
+        self.assertIn("Calibration completed", uploaded_row["Remarks"])
+        self.assertEqual(captured["other"], "preserved")
+        self.assertEqual(captured["public_id"], "qaqc-dashboard/data/QAQC_Master.xlsx")
+        self.assertEqual(local_row, captured["row"])
+
     def test_activity_workbook_configures_cloudinary_directly(self):
         upload_result = {
             "secure_url": "https://cloudinary.example/activity.xlsx",
