@@ -14,7 +14,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import auth
-from database import audit_log, concrete_records
+from database import activity_workbook, audit_log, concrete_records
 from scripts import upload_dashboard_backup
 
 
@@ -46,40 +46,106 @@ class FakeAuditCollection:
     def __init__(self):
         self.inserted = None
         self.updates = []
+        self.records = []
 
     def insert_one(self, document):
         self.inserted = dict(document)
+        self.records.append(dict(document))
         return SimpleNamespace(inserted_id="mongo-id")
 
     def update_one(self, query, update):
         self.updates.append((query, update))
 
+    def find(self, _query):
+        records = self.records
+
+        class Cursor(list):
+            def sort(self, *_args):
+                return self
+
+        return Cursor(records)
+
+    def update_many(self, query, update):
+        self.updates.append((query, update))
+
 
 class DashboardFeatureTests(unittest.TestCase):
-    def test_activity_archive_configures_cloudinary_directly(self):
+    def test_activity_workbook_configures_cloudinary_directly(self):
         upload_result = {
-            "secure_url": "https://cloudinary.example/event.json",
-            "public_id": "qaqc-dashboard/activity-logs/2026/07/21/event.json",
+            "secure_url": "https://cloudinary.example/activity.xlsx",
+            "public_id": "qaqc-dashboard/activity-logs/QAQC_Activity_Log.xlsx",
+            "version": 123,
+            "bytes": 456,
         }
         record = {
             "event_id": "event",
             "occurred_at": datetime(2026, 7, 21, 14, 5, tzinfo=timezone.utc),
             "action": "test",
         }
+        captured = {}
+
+        def fake_upload(path, **_kwargs):
+            workbook = load_workbook(path, data_only=True)
+            captured["sheets"] = workbook.sheetnames
+            captured["event_id"] = workbook["2026-07-21"]["B5"].value
+            return upload_result
+
+        settings = {
+            "CLOUDINARY_URL": "cloudinary://api-key:api-secret@cloud-name",
+            "QAQC_ACTIVITY_WORKBOOK_PUBLIC_ID": upload_result["public_id"],
+        }
         with patch.object(
             audit_log,
             "get_setting",
-            return_value="cloudinary://api-key:api-secret@cloud-name",
+            side_effect=lambda name, default="": settings.get(name, default),
         ), patch.object(
             audit_log.cloudinary.uploader,
             "upload",
-            return_value=upload_result,
+            side_effect=fake_upload,
         ) as upload:
-            archive = audit_log._upload_activity_record(record)
+            archive = audit_log._upload_activity_workbook([record])
 
         self.assertEqual(archive["public_id"], upload_result["public_id"])
+        self.assertEqual(captured["sheets"], ["2026-07-21"])
+        self.assertEqual(captured["event_id"], "event")
         self.assertEqual(upload.call_args.kwargs["type"], "authenticated")
         self.assertEqual(upload.call_args.kwargs["resource_type"], "raw")
+        self.assertTrue(upload.call_args.kwargs["overwrite"])
+
+    def test_activity_workbook_uses_one_sheet_per_date_and_deduplicates_events(self):
+        records = [
+            {
+                "event_id": "event-1",
+                "occurred_at": datetime(2026, 7, 21, 9, 0, tzinfo=timezone.utc),
+                "username": "admin",
+                "action": "sign_in",
+                "details": {},
+            },
+            {
+                "event_id": "event-1",
+                "occurred_at": datetime(2026, 7, 21, 9, 0, tzinfo=timezone.utc),
+                "username": "admin",
+                "action": "sign_in",
+                "details": {},
+            },
+            {
+                "event_id": "event-2",
+                "occurred_at": datetime(2026, 7, 22, 0, 1, tzinfo=timezone.utc),
+                "username": "requestor",
+                "action": "view_page",
+                "details": {"page": "Overview"},
+            },
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            workbook_path = Path(temp_dir) / "QAQC_Activity_Log.xlsx"
+            result = activity_workbook.build_activity_workbook(records, workbook_path)
+            workbook = load_workbook(workbook_path, data_only=True)
+
+        self.assertEqual(result["record_count"], 2)
+        self.assertEqual(workbook.sheetnames, ["2026-07-21", "2026-07-22"])
+        self.assertEqual(workbook["2026-07-21"].max_row, 5)
+        self.assertEqual(workbook["2026-07-22"]["B5"].value, "event-2")
+        self.assertEqual(workbook["2026-07-22"].freeze_panes, "A5")
 
     def test_admin_approval_sends_email_and_records_delivery(self):
         users = {
@@ -124,11 +190,21 @@ class DashboardFeatureTests(unittest.TestCase):
     def test_activity_is_saved_to_mongodb_and_cloudinary_without_secrets(self):
         collection = FakeAuditCollection()
         archive = {
-            "url": "https://cloudinary.example/activity.json",
-            "public_id": "qaqc-dashboard/activity-logs/2026/07/21/event.json",
+            "url": "https://cloudinary.example/activity.xlsx",
+            "public_id": "qaqc-dashboard/activity-logs/QAQC_Activity_Log.xlsx",
+            "version": 123,
         }
         with patch.object(audit_log, "ensure_activity_log", return_value=collection), \
-             patch.object(audit_log, "_upload_activity_record", return_value=archive):
+             patch.object(
+                 audit_log,
+                 "_upload_activity_workbook",
+                 side_effect=lambda records: {
+                     **archive,
+                     "event_ids": [record["event_id"] for record in records],
+                     "record_count": len(records),
+                     "sheet_names": ["2026-07-21"],
+                 },
+             ):
             saved = audit_log.record_activity(
                 "update_record",
                 actor={"username": "tester", "name": "Test User", "role": "user"},
@@ -139,6 +215,10 @@ class DashboardFeatureTests(unittest.TestCase):
         self.assertEqual(collection.inserted["username"], "tester")
         self.assertNotIn("password", collection.inserted["details"])
         self.assertEqual(collection.updates[-1][1]["$set"]["cloud_archive_status"], "archived")
+        self.assertEqual(
+            collection.updates[-1][1]["$set"]["cloud_archive_public_id"],
+            "qaqc-dashboard/activity-logs/QAQC_Activity_Log.xlsx",
+        )
 
     def test_admin_can_append_daily_concrete_volume(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -159,6 +239,13 @@ class DashboardFeatureTests(unittest.TestCase):
                     username="admin",
                     notes="Daily total",
                 )
+                second_record, _storage = concrete_records.append_concrete_volume(
+                    entry_date=date(2026, 7, 22),
+                    project="  nlng  ",
+                    location="Pile cap",
+                    volume=18.0,
+                    username="admin",
+                )
 
             saved_workbook = load_workbook(workbook_path, data_only=True)
             saved_sheet = saved_workbook["Concrete Tracker"]
@@ -169,6 +256,15 @@ class DashboardFeatureTests(unittest.TestCase):
             self.assertEqual(row["Volume"], 42.5)
             self.assertEqual(row["Entered_By"], "admin")
             self.assertEqual(record["Location"], "Tank foundation")
+            self.assertEqual(second_record["Project"], "NLNG")
+            self.assertFalse(second_record["Project_Added_To_Register"])
+            project_sheet = saved_workbook["Project Register"]
+            registered = [cell.value for cell in project_sheet["A"][1:] if cell.value]
+            self.assertEqual(registered, ["NLNG"])
+            self.assertEqual(
+                [saved_sheet.cell(row=row_number, column=2).value for row_number in (2, 3)],
+                ["NLNG", "NLNG"],
+            )
 
     def test_dashboard_backup_excludes_standards_and_secrets(self):
         self.assertFalse(upload_dashboard_backup.should_include(ROOT_DIR / "assets" / "standards" / "example.pdf"))

@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from functools import lru_cache
 import json
 from pathlib import Path
+import tempfile
+import threading
 import uuid
 from urllib.parse import unquote, urlparse
 
@@ -12,6 +14,7 @@ import cloudinary.uploader
 from dotenv import load_dotenv
 from pymongo import DESCENDING
 
+from database.activity_workbook import build_activity_workbook
 from database.mongo_users import get_database
 from database.settings import get_setting
 
@@ -21,6 +24,8 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 MAX_DETAIL_LENGTH = 2_000
 SENSITIVE_KEYS = {"password", "salt", "secret", "token", "authorization", "cookie"}
+DEFAULT_ACTIVITY_WORKBOOK_PUBLIC_ID = "qaqc-dashboard/activity-logs/QAQC_Activity_Log.xlsx"
+_ARCHIVE_LOCK = threading.Lock()
 
 
 def _utc_now():
@@ -47,8 +52,7 @@ def _safe_details(details):
     return safe
 
 
-def _upload_activity_record(record):
-    """Archive an event without depending on another application module's import state."""
+def _configure_cloudinary():
     cloudinary_url = str(get_setting("CLOUDINARY_URL", "")).strip()
     if not cloudinary_url:
         raise RuntimeError("CLOUDINARY_URL is not configured.")
@@ -63,26 +67,58 @@ def _upload_activity_record(record):
         api_secret=unquote(parsed_url.password),
         secure=True,
     )
-    occurred_at = record["occurred_at"]
-    event_id = str(record.get("event_id") or uuid.uuid4().hex)
-    payload = dict(record)
-    payload.pop("_id", None)
-    payload["occurred_at"] = occurred_at.isoformat()
-    content = json.dumps(payload, default=str, sort_keys=True, indent=2).encode("utf-8")
-    public_id = (
-        f"qaqc-dashboard/activity-logs/{occurred_at:%Y/%m/%d}/{event_id}.json"
-    )
-    result = cloudinary.uploader.upload(
-        content,
-        resource_type="raw",
-        type="authenticated",
-        public_id=public_id,
-        overwrite=False,
-    )
+
+
+def _upload_activity_workbook(records):
+    """Build and overwrite the single authenticated Cloudinary activity workbook."""
+    _configure_cloudinary()
+    public_id = str(
+        get_setting("QAQC_ACTIVITY_WORKBOOK_PUBLIC_ID", DEFAULT_ACTIVITY_WORKBOOK_PUBLIC_ID)
+    ).strip() or DEFAULT_ACTIVITY_WORKBOOK_PUBLIC_ID
+    with tempfile.TemporaryDirectory(prefix="qaqc-activity-") as temp_dir:
+        workbook_path = Path(temp_dir) / "QAQC_Activity_Log.xlsx"
+        workbook_info = build_activity_workbook(records, workbook_path)
+        result = cloudinary.uploader.upload(
+            str(workbook_path),
+            resource_type="raw",
+            type="authenticated",
+            public_id=public_id,
+            overwrite=True,
+            invalidate=True,
+        )
     return {
         "url": result["secure_url"],
         "public_id": result["public_id"],
+        "version": int(result["version"]),
+        "bytes": int(result.get("bytes") or 0),
+        "event_ids": workbook_info["event_ids"],
+        "record_count": workbook_info["record_count"],
+        "sheet_names": workbook_info["sheet_names"],
     }
+
+
+def sync_activity_workbook(collection=None):
+    """Rebuild the Cloudinary workbook from MongoDB, the authoritative audit ledger."""
+    if collection is None:
+        collection = ensure_activity_log()
+    with _ARCHIVE_LOCK:
+        records = list(collection.find({}).sort("occurred_at", 1))
+        archive = _upload_activity_workbook(records)
+        event_ids = archive["event_ids"]
+        if event_ids:
+            collection.update_many(
+                {"event_id": {"$in": event_ids}},
+                {
+                    "$set": {
+                        "cloud_archive_status": "archived",
+                        "cloud_archive_url": archive["url"],
+                        "cloud_archive_public_id": archive["public_id"],
+                        "cloud_archive_version": archive["version"],
+                    },
+                    "$unset": {"cloud_archive_error": ""},
+                },
+            )
+        return archive
 
 
 @lru_cache(maxsize=1)
@@ -97,6 +133,7 @@ def ensure_activity_log():
         [("action", DESCENDING), ("occurred_at", DESCENDING)],
         name="ix_activity_action_time",
     )
+    collection.create_index("event_id", unique=True, name="ux_activity_event_id")
     return collection
 
 
@@ -134,15 +171,7 @@ def record_activity(
         collection = ensure_activity_log()
         result = collection.insert_one(document)
         try:
-            archive = _upload_activity_record(document)
-            collection.update_one(
-                {"_id": result.inserted_id},
-                {"$set": {
-                    "cloud_archive_status": "archived",
-                    "cloud_archive_url": archive["url"],
-                    "cloud_archive_public_id": archive["public_id"],
-                }},
-            )
+            sync_activity_workbook(collection)
         except Exception as exc:
             collection.update_one(
                 {"_id": result.inserted_id},

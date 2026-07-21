@@ -1,10 +1,13 @@
 import json
 from datetime import datetime, time, timedelta, timezone
+from pathlib import Path
+import tempfile
 
 import pandas as pd
 import streamlit as st
 
 import auth
+from database.activity_workbook import build_activity_workbook
 from database.audit_log import activity_filter_values, list_activities
 from utils import inject_global_ui, render_navigation, render_top_nav, render_table
 
@@ -105,12 +108,25 @@ render_table(display, height=560, columns=columns, empty_message="No activities 
 
 if not frame.empty:
     export = display[columns].to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "Download filtered activity log (CSV)",
-        export,
+    with tempfile.TemporaryDirectory(prefix="qaqc-activity-download-") as temp_dir:
+        workbook_path = Path(temp_dir) / "QAQC_Activity_Log.xlsx"
+        build_activity_workbook(records, workbook_path)
+        excel_export = workbook_path.read_bytes()
+    csv_col, excel_col = st.columns(2)
+    csv_col.download_button(
+        "Download filtered activity log (CSV)", export,
         file_name=f"qaqc_activity_log_{start_date}_{end_date}.csv",
-        mime="text/csv",
+        mime="text/csv", use_container_width=True,
+    )
+    excel_col.download_button(
+        "Download filtered activity log (Excel)", excel_export,
+        file_name=f"qaqc_activity_log_{start_date}_{end_date}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
 
-st.caption("Times are recorded and filtered in UTC. Activity records are visible only to administrators.")
+st.caption(
+    "Times are recorded and filtered in UTC. Activity records are visible only to administrators. "
+    "The complete workbook is archived in Cloudinary as "
+    "qaqc-dashboard/activity-logs/QAQC_Activity_Log.xlsx."
+)

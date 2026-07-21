@@ -6,7 +6,7 @@ import streamlit as st
 
 import auth
 from database.audit_log import record_activity
-from database.concrete_records import append_concrete_volume
+from database.concrete_records import append_concrete_volume, list_concrete_projects
 from utils import global_filter_sidebar, inject_global_ui, load_master_data, render_navigation, render_top_nav, render_page_header, render_table, style_chart
 
 
@@ -150,6 +150,11 @@ def clean_receipts(df):
     return frame
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def concrete_project_options():
+    return list_concrete_projects()
+
+
 def material_requirement_from_volume(volume, mix):
     return {
         "Cement": volume * mix["cement_kg_per_m3"] / 1000,
@@ -172,14 +177,31 @@ concrete = filtered_data.get("Concrete Tracker", pd.DataFrame()).copy()
 
 if str(auth.get_role()).lower() == "admin":
     with st.expander("Admin: enter daily concrete volume", expanded=False):
-        st.caption("Manual entries are saved to the QA/QC master workbook and included in activity auditing.")
+        st.caption(
+            "Manual entries update the Cloudinary QA/QC master workbook. Select an existing "
+            "project to keep its canonical name, or add a new project once."
+        )
+        try:
+            project_options = concrete_project_options()
+        except Exception as exc:
+            project_options = []
+            st.warning(f"The current project list could not be loaded: {exc}")
         with st.form("manual_concrete_volume_form", clear_on_submit=True):
             entry_col1, entry_col2 = st.columns(2)
             entry_date = entry_col1.date_input("Consumption date")
             entry_volume = entry_col2.number_input(
                 "Concrete volume consumed (m3)", min_value=0.0, step=0.5, format="%.2f"
             )
-            entry_project = st.text_input("Project")
+            project_choice = st.selectbox(
+                "Project",
+                ["Add a new project"] + project_options,
+                help="Existing project names are reused to prevent duplicate capitalization or spacing variants.",
+            )
+            entry_project = (
+                st.text_input("New project name")
+                if project_choice == "Add a new project"
+                else project_choice
+            )
             entry_location = st.text_input("Location / work area")
             entry_notes = st.text_area("Notes (optional)", max_chars=500)
             entry_submitted = st.form_submit_button(
@@ -205,6 +227,7 @@ if str(auth.get_role()).lower() == "admin":
                         "date": record["Date"], "project": record["Project"],
                         "location": record["Location"], "volume_m3": record["Volume"],
                         "storage": storage,
+                        "project_added_to_register": record["Project_Added_To_Register"],
                     },
                     actor=actor,
                 )

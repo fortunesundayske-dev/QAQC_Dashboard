@@ -122,9 +122,18 @@ link in each requestor's approval email.
 
 Profile-photo changes are uploaded to Cloudinary and their secure URLs are
 stored in each MongoDB user record, so photos follow the account across devices.
-User activity is stored in MongoDB for the admin Activity Log and each event is
-also archived as an immutable JSON file under the dated Cloudinary path
-`qaqc-dashboard/activity-logs/YYYY/MM/DD/`.
+User activity is stored in MongoDB for the admin Activity Log and continuously
+synced to the authenticated Cloudinary workbook
+`qaqc-dashboard/activity-logs/QAQC_Activity_Log.xlsx`. The workbook contains
+one worksheet per UTC date and uses event IDs to prevent duplicate rows.
+
+The six page-background assets are stored under
+`qaqc-dashboard/backgrounds/` in Cloudinary. To republish the local fallback
+copies, run:
+
+```bash
+python scripts/upload_page_backgrounds.py
+```
 
 To upload a timestamped backup of the dashboard application files, run:
 
@@ -155,6 +164,10 @@ python scripts/upload_master_workbook.py
 The deployed dashboard checks Cloudinary for a new workbook version every 60
 seconds. Override the default asset only when needed with
 `QAQC_MASTER_WORKBOOK_PUBLIC_ID`.
+
+Admin concrete-volume entries update the `Concrete Tracker` sheet in this
+Cloudinary workbook. Existing project names are reused case-insensitively, and
+new projects are added once to `Project Register`.
 
 ## Data Source
 

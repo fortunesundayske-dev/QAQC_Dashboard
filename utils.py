@@ -12,7 +12,7 @@ import uuid
 import html
 import inspect
 from urllib import request, error
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from io import BytesIO
 
 from database.cloudinary_storage import DEFAULT_MASTER_WORKBOOK_PUBLIC_ID, get_master_workbook_reference
@@ -36,6 +36,60 @@ TEAMS_NOTIFICATION_LOG_FILE = BASE_DIR / "data" / "teams_notification_log.json"
 ASSETS = BASE_DIR / "assets"
 EVOMEC_LOGO = ASSETS / "evomec_logo.png"
 NLNG_LOGO = ASSETS / "nlng_logo.png"
+BACKGROUND_DIR = ASSETS / "backgrounds"
+BACKGROUND_PUBLIC_IDS = {
+    "quality-ai": "qaqc-dashboard/backgrounds/quality-ai",
+    "quality-wins": "qaqc-dashboard/backgrounds/quality-wins",
+    "quality-growth": "qaqc-dashboard/backgrounds/quality-growth",
+    "quality-assurance": "qaqc-dashboard/backgrounds/quality-assurance",
+    "quality-compliance": "qaqc-dashboard/backgrounds/quality-compliance",
+    "quality-qa": "qaqc-dashboard/backgrounds/quality-qa",
+}
+PAGE_BACKGROUND_ASSETS = {
+    "app": "quality-growth",
+    "Executive_Dashboard": "quality-growth",
+    "Management_Executive_Summary": "quality-growth",
+    "KPI_KRA_Register": "quality-growth",
+    "Daily_Reports": "quality-wins",
+    "Concrete_Tracker": "quality-wins",
+    "ITR_Tracker": "quality-wins",
+    "Audit_Surveillance": "quality-assurance",
+    "Calibration_Log": "quality-assurance",
+    "Activity_Log": "quality-assurance",
+    "CTQ_Dashboard": "quality-compliance",
+    "NCR_Tracker": "quality-compliance",
+    "OBS_Tracker": "quality-compliance",
+    "Defect_Rework_Tracker": "quality-compliance",
+    "Document_Status": "quality-compliance",
+    "Standards_Library": "quality-compliance",
+    "Learning_Academy": "quality-ai",
+    "Lessons_Learned": "quality-ai",
+    "Quality_Tools": "quality-ai",
+    "Customer_Support": "quality-qa",
+    "Access_Admin": "quality-qa",
+    "User_Profile": "quality-qa",
+}
+
+
+def _current_page_name():
+    for frame in inspect.stack():
+        path = Path(frame.filename)
+        if path.suffix.lower() == ".py" and path.parent.name.lower() == "pages":
+            return path.stem
+    return "app"
+
+
+def _page_background_source():
+    asset_name = PAGE_BACKGROUND_ASSETS.get(_current_page_name(), "quality-ai")
+    cloudinary_url = str(get_setting("CLOUDINARY_URL", "")).strip()
+    parsed = urlparse(cloudinary_url) if cloudinary_url else None
+    if parsed and parsed.scheme == "cloudinary" and parsed.hostname:
+        public_id = quote(BACKGROUND_PUBLIC_IDS[asset_name], safe="/")
+        return (
+            f"https://res.cloudinary.com/{parsed.hostname}/image/upload/"
+            f"f_auto,q_auto,w_1920,c_limit/{public_id}"
+        )
+    return _image_data_uri(BACKGROUND_DIR / f"{asset_name}.png")
 
 
 def record_site_activity(action, **kwargs):
@@ -4869,6 +4923,7 @@ def inject_global_ui():
     light_vars = css_variables(LIGHT_THEME)
     system_dark = f"@media (prefers-color-scheme: dark) {{ :root {{ {dark_vars} }} }}" if mode == "System" else ""
     selected_vars = dark_vars if mode == "Dark" else light_vars
+    page_background = _page_background_source()
     st.markdown(
         f"""
     <style>
@@ -5036,6 +5091,17 @@ def inject_global_ui():
             radial-gradient(circle at 16% 0%, rgba(41, 112, 255, 0.22), transparent 30rem),
             radial-gradient(circle at 88% 6%, rgba(14, 165, 233, 0.12), transparent 26rem),
             linear-gradient(135deg, #071426 0%, #0b1f36 52%, #04101f 100%) !important;
+    }}
+
+    .stApp {{
+        background-color: #071426 !important;
+        background-image:
+            linear-gradient(135deg, rgba(3, 12, 25, 0.82), rgba(5, 22, 43, 0.74)),
+            url("{page_background}") !important;
+        background-position: center, center right !important;
+        background-repeat: no-repeat, no-repeat !important;
+        background-size: cover, cover !important;
+        background-attachment: fixed, fixed !important;
     }}
 
     .block-container {{
@@ -5262,7 +5328,70 @@ def inject_global_ui():
         outline-offset: 2px !important;
     }}
 
+    /* Shared hover language across every page and Streamlit surface. */
+    .page-header,
+    .dashboard-hero,
+    .kpi-card,
+    div[data-testid="stMetric"],
+    .exec-panel,
+    .module-card,
+    .tool-card,
+    .standard-card,
+    .learning-card,
+    .security-card,
+    div[data-testid="stVerticalBlockBorderWrapper"],
+    div[data-testid="stExpander"] details,
+    div[data-testid="stDataFrame"] {{
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, filter 0.2s ease !important;
+    }}
+
+    .page-header:hover,
+    .dashboard-hero:hover,
+    .kpi-card:hover,
+    div[data-testid="stMetric"]:hover,
+    .exec-panel:hover,
+    .module-card:hover,
+    .tool-card:hover,
+    .standard-card:hover,
+    .learning-card:hover,
+    .security-card:hover,
+    div[data-testid="stVerticalBlockBorderWrapper"]:hover,
+    div[data-testid="stExpander"] details:hover,
+    div[data-testid="stDataFrame"]:hover {{
+        border-color: color-mix(in srgb, var(--qaqc-blue) 54%, var(--qaqc-line)) !important;
+        box-shadow: 0 18px 38px rgba(2, 12, 27, 0.24) !important;
+        filter: brightness(1.025);
+        transform: translateY(-2px) !important;
+    }}
+
+    .stButton button,
+    .stDownloadButton button,
+    div[data-testid="stPopover"] button,
+    div[data-testid="stTabs"] button[role="tab"],
+    .side-nav-link,
+    .nav-popover-link {{
+        transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease !important;
+    }}
+
+    .stButton button:hover,
+    .stDownloadButton button:hover,
+    div[data-testid="stPopover"] button:hover,
+    div[data-testid="stTabs"] button[role="tab"]:hover,
+    .side-nav-link:hover,
+    .nav-popover-link:hover {{
+        box-shadow: 0 10px 24px rgba(21, 94, 239, 0.28) !important;
+        transform: translateY(-1px) !important;
+    }}
+
+    div[data-testid="stDataFrame"] [role="row"]:hover [role="gridcell"] {{
+        background-color: color-mix(in srgb, var(--qaqc-blue) 10%, var(--qaqc-surface-2)) !important;
+    }}
+
     @media (max-width: 768px) {{
+        .stApp {{
+            background-attachment: scroll, scroll !important;
+        }}
+
         .app-capability-strip {{
             justify-content: flex-start;
             max-width: 100%;

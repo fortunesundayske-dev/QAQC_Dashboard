@@ -1,8 +1,6 @@
-"""Cloudinary file storage used by the customer-support UI."""
+"""Cloudinary file storage used by the QA/QC dashboard."""
 
-import json
 from pathlib import Path
-import uuid
 
 from dotenv import load_dotenv
 
@@ -20,7 +18,7 @@ if cloudinary_url:
     cloudinary.config(cloudinary_url=cloudinary_url)
 
 DEFAULT_MASTER_WORKBOOK_PUBLIC_ID = "qaqc-dashboard/data/QAQC_Master.xlsx"
-ACTIVITY_LOG_FOLDER = "qaqc-dashboard/activity-logs"
+PAGE_BACKGROUND_FOLDER = "qaqc-dashboard/backgrounds"
 
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -107,6 +105,33 @@ def upload_master_workbook(path, public_id=DEFAULT_MASTER_WORKBOOK_PUBLIC_ID):
     }
 
 
+def upload_page_background(path, asset_name):
+    """Upload one public dashboard background with a stable Cloudinary asset ID."""
+    path = Path(path)
+    asset_name = str(asset_name or "").strip().lower()
+    if not path.exists() or path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+        raise ValueError("A valid PNG, JPEG, or WebP background image is required.")
+    if not asset_name or any(character not in "abcdefghijklmnopqrstuvwxyz0123456789-_" for character in asset_name):
+        raise ValueError("Background asset names may contain lowercase letters, numbers, hyphens, and underscores.")
+    result = cloudinary.uploader.upload(
+        str(path),
+        resource_type="image",
+        type="upload",
+        public_id=f"{PAGE_BACKGROUND_FOLDER}/{asset_name}",
+        overwrite=True,
+        invalidate=True,
+    )
+    return {
+        "url": result["secure_url"],
+        "public_id": result["public_id"],
+        "version": int(result["version"]),
+        "bytes": int(result.get("bytes") or path.stat().st_size),
+        "width": int(result.get("width") or 0),
+        "height": int(result.get("height") or 0),
+        "format": result.get("format") or path.suffix.lower().lstrip("."),
+    }
+
+
 def get_master_workbook_reference(public_id=DEFAULT_MASTER_WORKBOOK_PUBLIC_ID):
     result = cloudinary.api.resource(public_id, resource_type="raw")
     return {
@@ -115,30 +140,4 @@ def get_master_workbook_reference(public_id=DEFAULT_MASTER_WORKBOOK_PUBLIC_ID):
         "version": int(result["version"]),
         "bytes": int(result.get("bytes") or 0),
         "updated_at": result.get("updated_at") or result.get("created_at"),
-    }
-
-
-def upload_activity_record(record):
-    """Archive one immutable activity record as JSON in a dated Cloudinary folder."""
-    occurred_at = record["occurred_at"]
-    date_path = occurred_at.strftime("%Y/%m/%d")
-    event_id = str(record.get("event_id") or uuid.uuid4().hex)
-    payload = dict(record)
-    payload["occurred_at"] = occurred_at.isoformat()
-    content = json.dumps(payload, default=str, sort_keys=True, indent=2).encode("utf-8")
-    public_id = f"{ACTIVITY_LOG_FOLDER}/{date_path}/{event_id}.json"
-    result = cloudinary.uploader.upload(
-        content,
-        resource_type="raw",
-        type="authenticated",
-        public_id=public_id,
-        overwrite=False,
-    )
-    return {
-        "url": result["secure_url"],
-        "public_id": result["public_id"],
-        "resource_type": "raw",
-        "delivery_type": "authenticated",
-        "bytes": int(result.get("bytes") or len(content)),
-        "archived_at": result.get("created_at"),
     }
