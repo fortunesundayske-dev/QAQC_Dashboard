@@ -28,6 +28,7 @@ from utils import (
     post_to_teams,
     read_teams_notification_log,
     render_navigation,
+    render_page_header,
     render_top_nav,
     send_calibration_teams_alerts,
     snooze_calibration,
@@ -94,12 +95,16 @@ def render_calibration_page_styles():
     justify-content: flex-end;
 }
 
+.cal-toolbar--status {
+    margin: 0 0 0.75rem;
+}
+
 .cal-chip {
     align-items: center;
-    background: linear-gradient(180deg, rgba(18, 32, 51, 0.96), rgba(8, 17, 31, 0.98));
-    border: 1px solid rgba(96, 165, 250, 0.18);
+    background: var(--qaqc-surface-2);
+    border: 1px solid var(--qaqc-line);
     border-radius: 7px;
-    color: #dbeafe;
+    color: var(--qaqc-text);
     display: inline-flex;
     font-size: 0.72rem;
     font-weight: 750;
@@ -117,10 +122,11 @@ def render_calibration_page_styles():
 
 .cal-metric {
     align-items: center;
-    background: linear-gradient(145deg, rgba(22, 35, 55, 0.98), rgba(12, 23, 39, 0.98));
-    border: 1px solid rgba(96, 165, 250, 0.14);
+    background: var(--qaqc-surface);
+    border: 1px solid var(--qaqc-line);
     border-radius: 8px;
-    box-shadow: 0 15px 34px rgba(0, 0, 0, 0.28);
+    box-shadow: var(--qaqc-shadow);
+    color: var(--qaqc-text);
     display: grid;
     gap: 0.78rem;
     grid-template-columns: auto 1fr;
@@ -143,13 +149,13 @@ def render_calibration_page_styles():
 }
 
 .cal-metric__label {
-    color: #cbd5e1;
+    color: var(--qaqc-muted);
     font-size: 0.72rem;
     font-weight: 850;
 }
 
 .cal-metric__value {
-    color: #ffffff;
+    color: var(--qaqc-navy);
     font-size: 1.65rem;
     font-weight: 950;
     line-height: 1;
@@ -157,7 +163,7 @@ def render_calibration_page_styles():
 }
 
 .cal-metric__sub {
-    color: #94a3b8;
+    color: var(--qaqc-muted);
     font-size: 0.66rem;
     margin-top: 0.28rem;
 }
@@ -189,17 +195,17 @@ def render_calibration_page_styles():
 }
 
 .cal-action-panel {
-    background:
-        linear-gradient(135deg, rgba(17, 30, 48, 0.98), rgba(9, 20, 35, 0.98));
-    border: 1px solid rgba(96, 165, 250, 0.14);
+    background: var(--qaqc-surface);
+    border: 1px solid var(--qaqc-line);
     border-radius: 8px;
-    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+    box-shadow: var(--qaqc-shadow);
+    color: var(--qaqc-text);
     margin: 0.65rem 0;
     padding: 1rem;
 }
 
 .cal-action-panel h3 {
-    color: #dbeafe;
+    color: var(--qaqc-navy);
     font-size: 1rem;
     font-weight: 850;
     margin: 0 0 0.72rem;
@@ -207,15 +213,15 @@ def render_calibration_page_styles():
 
 .cal-action-panel p,
 .cal-table-caption {
-    color: #9fb0c7;
+    color: var(--qaqc-muted);
     font-size: 0.72rem;
     margin: 0;
 }
 
 .cal-table-toolbar {
     align-items: center;
-    background: linear-gradient(180deg, rgba(14, 26, 43, 0.95), rgba(8, 17, 31, 0.95));
-    border: 1px solid rgba(96, 165, 250, 0.12);
+    background: var(--qaqc-surface-2);
+    border: 1px solid var(--qaqc-line);
     border-radius: 8px 8px 0 0;
     display: flex;
     justify-content: space-between;
@@ -225,7 +231,7 @@ def render_calibration_page_styles():
 
 .cal-search-label,
 .cal-table-tools {
-    color: #9fb0c7;
+    color: var(--qaqc-muted);
     font-size: 0.72rem;
 }
 
@@ -235,22 +241,22 @@ def render_calibration_page_styles():
 }
 
 div[data-testid="stTabs"] div[role="tablist"] {
-    border-bottom: 1px solid rgba(96, 165, 250, 0.16);
+    border-bottom: 1px solid var(--qaqc-line);
     gap: 0.35rem;
 }
 
 div[data-testid="stTabs"] button[role="tab"] {
     border-radius: 7px 7px 0 0;
-    color: #cbd5e1;
+    color: var(--qaqc-muted);
     font-size: 0.78rem;
     font-weight: 800;
     min-height: 2.25rem;
 }
 
 div[data-testid="stTabs"] button[aria-selected="true"] {
-    background: linear-gradient(180deg, rgba(37, 99, 235, 0.22), rgba(14, 165, 233, 0.1));
-    border-bottom: 2px solid #0ea5e9;
-    color: #ffffff;
+    background: color-mix(in srgb, var(--qaqc-blue) 14%, var(--qaqc-surface));
+    border-bottom: 2px solid var(--qaqc-blue);
+    color: var(--qaqc-blue);
 }
 
 div[data-testid="stDataFrame"] {
@@ -295,6 +301,12 @@ if not auth.login():
 render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
+
+render_page_header(
+    "Calibration log",
+    "Monitor equipment status, overdue items, upcoming due dates, certificates, and reminder actions.",
+    "Materials and equipment",
+)
 
 DATA_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 CALIBRATION_REPORT_DIR = BASE_DIR / "outputs" / "calibration_reports"
@@ -376,10 +388,11 @@ def render_metric_grid(summary, overdue_count, due_21_count):
     cards = []
     for label, value, sublabel, icon, color, danger in metrics:
         danger_class = " cal-metric--danger" if danger else ""
+        accessible_label = html.escape(f"{label}: {value}", quote=True)
         cards.append(
             f"""
-<div class="cal-metric{danger_class}" style="--metric-color: {color};">
-    <div class="cal-metric__icon">{html.escape(icon)}</div>
+<div class="cal-metric{danger_class}" role="group" aria-label="{accessible_label}" style="--metric-color: {html.escape(color, quote=True)};">
+    <div class="cal-metric__icon" aria-hidden="true">{html.escape(icon)}</div>
     <div>
         <div class="cal-metric__label">{html.escape(label)}</div>
         <div class="cal-metric__value">{html.escape(str(value))}</div>
@@ -414,7 +427,7 @@ def render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix):
                 data=pdf_bytes,
                 file_name=pdf_path.name,
                 mime="application/pdf",
-                use_container_width=True,
+                width="stretch",
                 key=f"{key_prefix}_dialog_download_pdf",
             )
             st.caption("The PDF is saved in outputs/calibration_reports and can be opened from your browser downloads.")
@@ -435,13 +448,13 @@ def render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix):
                 data=email_draft_bytes(recipient, cc, subject, body, pdf_path),
                 file_name=f"{pdf_path.stem}_email_draft.eml",
                 mime="message/rfc822",
-                use_container_width=True,
+                width="stretch",
                 key=f"{key_prefix}_download_eml_draft",
             )
             st.caption("Open the downloaded email draft in Outlook or another mail app; the PDF is already attached inside the draft file.")
             st.warning("The direct email-app link below cannot attach files. Use the email draft download above when you want the PDF attached through your Exchange email application.")
             if recipient.strip() or cc.strip():
-                st.link_button("Open Email App", mailto_url(recipient, cc, subject, body), use_container_width=True)
+                st.link_button("Open Email App", mailto_url(recipient, cc, subject, body), width="stretch")
             else:
                 st.info("Enter a recipient or keep registered account emails in CC to open your email app.")
 
@@ -462,7 +475,7 @@ def render_calibration_report_actions(records, title, key_prefix):
         action_cols = st.columns([1, 1, 2.2])
 
         with action_cols[0]:
-            if st.button("▣  Create PDF", use_container_width=True, key=f"{key_prefix}_create_pdf"):
+            if st.button("▣  Create PDF", width="stretch", key=f"{key_prefix}_create_pdf"):
                 try:
                     pdf_path = generate_calibration_pdf(records, report_title=f"{title} Calibration Report")
                     st.success(f"PDF created: {pdf_path.name}")
@@ -471,13 +484,13 @@ def render_calibration_report_actions(records, title, key_prefix):
                         data=pdf_path.read_bytes(),
                         file_name=pdf_path.name,
                         mime="application/pdf",
-                        use_container_width=True,
+                        width="stretch",
                         key=f"{key_prefix}_download_pdf",
                     )
                 except Exception as exc:
                     st.error(f"PDF could not be created: {exc}")
         with action_cols[1]:
-            if st.button("✉  Create PDF and Email", use_container_width=True, key=f"{key_prefix}_email_pdf"):
+            if st.button("✉  Create PDF and Email", width="stretch", key=f"{key_prefix}_email_pdf"):
                 try:
                     report_title = f"{title} Calibration Report"
                     pdf_path = generate_calibration_pdf(records, report_title=report_title)
@@ -624,12 +637,12 @@ def render_teams_settings(records, is_admin=False):
                 type="password",
                 placeholder="https://...",
             )
-            save_clicked = st.form_submit_button("Save Teams Webhook", use_container_width=True)
+            save_clicked = st.form_submit_button("Save Teams Webhook", width="stretch")
         if save_clicked:
             write_teams_config(webhook_input)
             st.success("Teams webhook settings saved.")
             st.rerun()
-        if st.button("Send Teams Connection Test", disabled=not bool(webhook_url), use_container_width=True):
+        if st.button("Send Teams Connection Test", disabled=not bool(webhook_url), width="stretch"):
             ok, test_result = post_to_teams(
                 webhook_url,
                 "**QAQC Calibration Notification Test**\n\n"
@@ -654,9 +667,9 @@ def render_teams_settings(records, is_admin=False):
         result_rows = result.get("results") or []
         if is_admin and result_rows:
             with st.expander("Teams delivery details", expanded=bool(result.get("failed"))):
-                st.dataframe(dataframe_for_display(pd.DataFrame(result_rows)), use_container_width=True, hide_index=True)
+                st.dataframe(dataframe_for_display(pd.DataFrame(result_rows)), width="stretch", hide_index=True)
 
-    if st.button("Send Teams Alerts Now", use_container_width=True):
+    if st.button("Send Teams Alerts Now", width="stretch"):
         result = send_calibration_teams_alerts(records, force=True)
         st.session_state["calibration_teams_result"] = result
         if not result.get("configured"):
@@ -685,7 +698,7 @@ def render_teams_settings(records, is_admin=False):
         "record_id",
     ]
     visible_columns = [column for column in visible_columns if column in log_df.columns]
-    st.dataframe(dataframe_for_display(log_df[visible_columns].sort_values("sent_at", ascending=False)), use_container_width=True, hide_index=True)
+    st.dataframe(dataframe_for_display(log_df[visible_columns].sort_values("sent_at", ascending=False)), width="stretch", hide_index=True)
 
 
 CALIBRATION_STATUS_OPTIONS = [
@@ -789,7 +802,7 @@ def render_admin_calibration_update(records, key_prefix):
         submitted = st.form_submit_button(
             "Save calibration update",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         )
 
     if not submitted:
@@ -868,18 +881,11 @@ display_cols = [
     "Snoozed_Until",
 ]
 
-st.markdown('<div class="calibration-shell">', unsafe_allow_html=True)
 st.markdown(
-    """
-<div class="cal-title-row">
-    <div class="cal-title">
-        <h1>Calibration Log <span class="cal-title__info">i</span></h1>
-        <p>Monitor equipment calibration status, overdue items, and reminder actions.</p>
-    </div>
-    <div class="cal-toolbar">
-        <span class="cal-chip">Filter</span>
-        <span class="cal-chip">May 1 – Jun 2, 2026</span>
-    </div>
+    f"""
+<div class="cal-toolbar cal-toolbar--status" role="status">
+    <span class="cal-chip">Live workbook</span>
+    <span class="cal-chip">Reviewed {date.today():%d %b %Y}</span>
 </div>
 """,
     unsafe_allow_html=True,
@@ -908,7 +914,7 @@ with tab_alerts:
         render_calibration_report_actions(filtered_reminders, "Reminder report actions", "due")
         st.markdown("#### Active reminders")
         render_table_toolbar(len(filtered_reminders))
-        st.dataframe(dataframe_for_display(filtered_reminders[display_cols]), use_container_width=True, hide_index=True)
+        st.dataframe(dataframe_for_display(filtered_reminders[display_cols]), width="stretch", hide_index=True)
 
         st.markdown("#### Acknowledge or snooze")
         if filtered_reminders.empty:
@@ -926,14 +932,14 @@ with tab_alerts:
             with action_cols[2]:
                 st.write("")
                 st.write("")
-                if st.button("Acknowledge", use_container_width=True):
+                if st.button("Acknowledge", width="stretch"):
                     acknowledge_calibration(selected_id)
                     st.success("Reminder acknowledged.")
                     st.rerun()
             with action_cols[3]:
                 st.write("")
                 st.write("")
-                if st.button("Snooze", use_container_width=True):
+                if st.button("Snooze", width="stretch"):
                     snooze_calibration(selected_id, snooze_days)
                     st.success(f"Reminder snoozed for {snooze_days} day(s).")
                     st.rerun()
@@ -941,7 +947,7 @@ with tab_alerts:
             selected_row = filtered_reminders[filtered_reminders["Calibration_ID"].astype(str) == str(selected_id)].head(1)
             if not selected_row.empty:
                 st.markdown("#### Selected equipment")
-                st.dataframe(dataframe_for_display(selected_row[display_cols]), use_container_width=True, hide_index=True)
+                st.dataframe(dataframe_for_display(selected_row[display_cols]), width="stretch", hide_index=True)
 
 with tab_overdue:
     if overdue.empty:
@@ -951,7 +957,7 @@ with tab_overdue:
         filtered_overdue = filter_calibration_records(overdue, "overdue", include_status=False)
         render_calibration_report_actions(filtered_overdue, "Overdue report actions", "overdue")
         render_table_toolbar(len(filtered_overdue))
-        st.dataframe(dataframe_for_display(filtered_overdue[display_cols]), use_container_width=True, hide_index=True)
+        st.dataframe(dataframe_for_display(filtered_overdue[display_cols]), width="stretch", hide_index=True)
         if is_admin:
             render_admin_calibration_update(filtered_overdue, "overdue")
 
@@ -959,7 +965,7 @@ with tab_all:
     visible = filter_calibration_records(log, "all")
 
     render_table_toolbar(len(visible))
-    st.dataframe(dataframe_for_display(visible[display_cols]), use_container_width=True, hide_index=True, height=520)
+    st.dataframe(dataframe_for_display(visible[display_cols]), width="stretch", hide_index=True, height=520)
     if is_admin:
         render_admin_calibration_update(visible, "all")
     else:

@@ -1343,16 +1343,16 @@ def render_header():
         <div>
             <div class="app-bar__eyebrow">Enterprise Quality Management System</div>
             <div class="app-bar__title">EVOMEC QMS</div>
-            <div class="app-bar__project">QA/QC command centre for desktop, tablet, and mobile</div>
+            <div class="app-bar__project">Quality performance, compliance, and field records</div>
         </div>
     </div>
     <div class="app-bar__right">
         <div class="app-capability-strip">
-            <span>Modern</span>
-            <span>Professional</span>
-            <span>Responsive</span>
-            <span>Accessible</span>
-            <span>Data Driven</span>
+            <span>Portfolio</span>
+            <span>Quality Records</span>
+            <span>Calibration</span>
+            <span>Audit Trail</span>
+            <span>Role Access</span>
             <span>Secure</span>
         </div>
         <div class="app-logo-img app-logo-img--evomec">{evomec_logo}</div>
@@ -1470,7 +1470,7 @@ div[data-baseweb="popover"]:has(.st-key-account_menu_panel) [data-testid="stCapt
                     unsafe_allow_html=True,
                 )
         with menu_col:
-            with st.popover(account_button_label, use_container_width=True):
+            with st.popover(account_button_label, width="stretch"):
                 with st.container(key="account_menu_panel"):
                     if photo_src:
                         st.image(photo_src, width=72)
@@ -1482,8 +1482,8 @@ div[data-baseweb="popover"]:has(.st-key-account_menu_panel) [data-testid="stCapt
                     st.markdown(f"**{html.escape(account_name)}**")
                     st.caption(f"{account_role} · {account_discipline}")
                     st.divider()
-                    st.page_link("pages/User_Profile.py", label="User Profile", use_container_width=True)
-                    if st.button("Sign out", key="header_account_sign_out", use_container_width=True, type="primary"):
+                    st.page_link("pages/User_Profile.py", label="User Profile", width="stretch")
+                    if st.button("Sign out", key="header_account_sign_out", width="stretch", type="primary"):
                         import auth
 
                         auth.sign_out()
@@ -2035,7 +2035,7 @@ def render_navigation():
                             expanded=bool(query or section_is_current),
                         ):
                             for label, page in visible_items:
-                                st.page_link(page, label=label, use_container_width=True)
+                                st.page_link(page, label=label, width="stretch")
                                 matches += 1
                     if not matches:
                         st.caption("No pages match your search.")
@@ -2115,7 +2115,7 @@ def render_top_nav():
 """,
             unsafe_allow_html=True,
         )
-        if st.sidebar.button("Sign out", key="global_sidebar_sign_out", use_container_width=True):
+        if st.sidebar.button("Sign out", key="global_sidebar_sign_out", width="stretch"):
             import auth
 
             auth.sign_out()
@@ -2128,7 +2128,7 @@ def render_top_nav():
     for group, items in grouped_pages:
         st.sidebar.markdown(f'<div class="side-nav-group">{html.escape(group)}</div>', unsafe_allow_html=True)
         for label, page in items:
-            st.sidebar.page_link(page, label=label, use_container_width=True)
+            st.sidebar.page_link(page, label=label, width="stretch")
 
     st.sidebar.markdown(
         f"""
@@ -2181,7 +2181,7 @@ def render_drilldown(df, id_col="ID"):
 
     st.dataframe(
         selected_row.head(1),
-        use_container_width=True
+        width="stretch"
     )
 
 def project_filter_sidebar(projects, page="main"):
@@ -3927,13 +3927,11 @@ def inject_global_ui():
     .exec-panel,
     .module-card,
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        background: linear-gradient(145deg, rgba(31, 41, 55, 0.96), rgba(17, 24, 39, 0.9)) !important;
-        border: 1px solid rgba(96, 165, 250, 0.16) !important;
+        background: var(--qaqc-surface) !important;
+        border: 1px solid var(--qaqc-line) !important;
         border-radius: 8px !important;
-        box-shadow:
-            0 1px 0 rgba(255, 255, 255, 0.08) inset,
-            0 14px 34px rgba(0, 0, 0, 0.28) !important;
-        color: #e5edf8 !important;
+        box-shadow: var(--qaqc-shadow) !important;
+        color: var(--qaqc-text) !important;
     }
 
     .exec-metric {
@@ -3967,7 +3965,7 @@ def inject_global_ui():
 
     .native-panel-title {
         align-items: center;
-        color: #f8fafc !important;
+        color: var(--qaqc-navy) !important;
         display: flex;
         font-size: 0.82rem;
         font-weight: 900;
@@ -3976,7 +3974,7 @@ def inject_global_ui():
     }
 
     .native-panel-title span {
-        color: #94a3b8 !important;
+        color: var(--qaqc-muted) !important;
         font-weight: 900;
     }
 
@@ -3987,25 +3985,25 @@ def inject_global_ui():
     }
 
     .exec-metric__label {
-        color: #f8fafc !important;
+        color: var(--qaqc-muted) !important;
         font-size: 0.72rem !important;
         font-weight: 880 !important;
     }
 
     .exec-metric__value {
-        color: #ffffff !important;
+        color: var(--qaqc-navy) !important;
         font-size: 1.65rem !important;
         margin-top: 0.3rem !important;
     }
 
     .exec-metric__sub,
     .exec-metric__delta {
-        color: #cbd5e1 !important;
+        color: var(--qaqc-muted) !important;
         font-size: 0.66rem !important;
     }
 
     .exec-metric__delta {
-        color: #22c55e !important;
+        color: var(--qaqc-blue) !important;
         font-weight: 800;
         margin-top: 0.18rem;
     }
@@ -4192,13 +4190,13 @@ def inject_global_ui():
     }
 
     .module-card__stat {
-        background: rgba(15, 23, 42, 0.6);
-        border-color: rgba(148, 163, 184, 0.16) !important;
-        color: #cbd5e1 !important;
+        background: var(--qaqc-surface-2);
+        border-color: var(--qaqc-line) !important;
+        color: var(--qaqc-muted) !important;
     }
 
     .module-card__stat strong {
-        color: #ffffff !important;
+        color: var(--qaqc-navy) !important;
     }
 
     .quick-access-panel {
@@ -4351,16 +4349,17 @@ def inject_global_ui():
     .analytics-metric-grid {
         display: grid;
         gap: 0.65rem;
-        grid-template-columns: repeat(8, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
         margin-bottom: 0.7rem;
     }
 
     .analytics-metric {
         align-items: center;
-        background: linear-gradient(145deg, rgba(31, 41, 55, 0.96), rgba(17, 24, 39, 0.9));
-        border: 1px solid rgba(96, 165, 250, 0.16);
+        background: var(--qaqc-surface);
+        border: 1px solid var(--qaqc-line);
         border-radius: 8px;
-        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+        box-shadow: var(--qaqc-shadow);
+        color: var(--qaqc-text);
         display: flex;
         gap: 0.65rem;
         min-height: 5.45rem;
@@ -4382,13 +4381,13 @@ def inject_global_ui():
     }
 
     .analytics-metric__label {
-        color: #f8fafc;
+        color: var(--qaqc-muted);
         font-size: 0.68rem;
         font-weight: 900;
     }
 
     .analytics-metric__value {
-        color: #ffffff;
+        color: var(--qaqc-navy);
         font-size: 1.45rem;
         font-weight: 950;
         line-height: 1;
@@ -4397,13 +4396,13 @@ def inject_global_ui():
 
     .analytics-metric__sub,
     .analytics-metric__trend {
-        color: #cbd5e1;
+        color: var(--qaqc-muted);
         font-size: 0.62rem;
         margin-top: 0.2rem;
     }
 
     .analytics-metric__trend {
-        color: #22c55e;
+        color: var(--qaqc-blue);
         font-weight: 850;
     }
 
@@ -4413,7 +4412,7 @@ def inject_global_ui():
 
     .analytics-panel-title {
         align-items: center;
-        color: #f8fafc;
+        color: var(--qaqc-navy);
         display: flex;
         font-size: 0.78rem;
         font-weight: 900;
@@ -4422,7 +4421,7 @@ def inject_global_ui():
     }
 
     .analytics-panel-title span {
-        color: #94a3b8 !important;
+        color: var(--qaqc-muted) !important;
     }
 
     div[data-testid="stDataFrame"] {
@@ -5685,9 +5684,12 @@ def inject_global_ui():
 
     .stButton button:focus-visible,
     .stDownloadButton button:focus-visible,
+    div[data-testid="stTabs"] button[role="tab"]:focus-visible,
+    div[data-testid="stExpander"] summary:focus-visible,
+    div[data-baseweb="select"]:focus-within,
     a:focus-visible,
-    input:focus,
-    textarea:focus {{
+    input:focus-visible,
+    textarea:focus-visible {{
         outline: 3px solid color-mix(in srgb, var(--qaqc-blue) 48%, transparent) !important;
         outline-offset: 2px !important;
     }}
@@ -5703,6 +5705,9 @@ def inject_global_ui():
     .standard-card,
     .learning-card,
     .security-card,
+    .analytics-metric,
+    .cal-metric,
+    .cal-action-panel,
     div[data-testid="stVerticalBlockBorderWrapper"],
     div[data-testid="stExpander"] details,
     div[data-testid="stDataFrame"] {{
@@ -5722,6 +5727,9 @@ def inject_global_ui():
     .standard-card,
     .learning-card,
     .security-card,
+    .analytics-metric,
+    .cal-metric,
+    .cal-action-panel,
     div[data-testid="stExpander"] details {{
         background-color: color-mix(in srgb, var(--qaqc-surface) 84%, transparent) !important;
     }}
@@ -5736,6 +5744,9 @@ def inject_global_ui():
     .standard-card:hover,
     .learning-card:hover,
     .security-card:hover,
+    .analytics-metric:hover,
+    .cal-metric:hover,
+    .cal-action-panel:hover,
     div[data-testid="stVerticalBlockBorderWrapper"]:hover,
     div[data-testid="stExpander"] details:hover,
     div[data-testid="stDataFrame"]:hover {{
@@ -5783,7 +5794,11 @@ def inject_global_ui():
 
         [data-testid="stMainBlockContainer"] > div > div,
         .page-header,
-        .dashboard-hero {{
+        .dashboard-hero,
+        .exec-metric,
+        .analytics-metric,
+        .cal-metric,
+        .cal-action-panel {{
             animation: qaqc-scroll-reveal both linear;
             animation-range: entry 0% cover 22%;
             animation-timeline: view();
@@ -6004,14 +6019,8 @@ def inject_global_ui():
         }}
     }}
 
-    @media (prefers-reduced-motion: reduce) {{
-        *, *::before, *::after {{
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            scroll-behavior: auto !important;
-            transition-duration: 0.01ms !important;
-        }}
-
+    @media (hover: none), (pointer: coarse) {{
+        .exec-metric:hover,
         .page-header:hover,
         .dashboard-hero:hover,
         .kpi-card:hover,
@@ -6022,6 +6031,41 @@ def inject_global_ui():
         .standard-card:hover,
         .learning-card:hover,
         .security-card:hover,
+        .analytics-metric:hover,
+        .cal-metric:hover,
+        .cal-action-panel:hover,
+        div[data-testid="stVerticalBlockBorderWrapper"]:hover,
+        div[data-testid="stExpander"] details:hover,
+        div[data-testid="stDataFrame"]:hover,
+        .stButton button:hover,
+        .stDownloadButton button:hover,
+        div[data-testid="stPopover"] button:hover {{
+            transform: none !important;
+        }}
+    }}
+
+    @media (prefers-reduced-motion: reduce) {{
+        *, *::before, *::after {{
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+            transition-duration: 0.01ms !important;
+        }}
+
+        .exec-metric:hover,
+        .page-header:hover,
+        .dashboard-hero:hover,
+        .kpi-card:hover,
+        div[data-testid="stMetric"]:hover,
+        .exec-panel:hover,
+        .module-card:hover,
+        .tool-card:hover,
+        .standard-card:hover,
+        .learning-card:hover,
+        .security-card:hover,
+        .analytics-metric:hover,
+        .cal-metric:hover,
+        .cal-action-panel:hover,
         div[data-testid="stVerticalBlockBorderWrapper"]:hover,
         div[data-testid="stExpander"] details:hover,
         div[data-testid="stDataFrame"]:hover,
@@ -6077,7 +6121,7 @@ def render_line_chart(df, x, y, title="Trend"):
     fig = px.line(df, x=x, y=y, title=title, markers=True)
     fig.update_traces(line=dict(color="#38bdf8", width=3), marker=dict(size=7))
     style_chart(fig)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_bar_chart(df, x, y, title="Bar Chart"):
@@ -6088,7 +6132,7 @@ def render_bar_chart(df, x, y, title="Bar Chart"):
     fig = px.bar(df, x=x, y=y, title=title)
     fig.update_traces(marker_color="#22c55e")
     style_chart(fig)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_pie_chart(df, names, values, title="Distribution"):
@@ -6101,7 +6145,7 @@ def render_pie_chart(df, names, values, title="Distribution"):
         marker=dict(colors=["#38bdf8", "#22c55e", "#f59e0b", "#ef4444", "#a78bfa"])
     )
     style_chart(fig)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 # =========================

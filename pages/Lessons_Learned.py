@@ -44,14 +44,14 @@ st.markdown("---")
 if "Discipline" in lessons.columns:
     discipline_data = lessons["Discipline"].value_counts().reset_index()
     discipline_data.columns = ["Discipline", "Count"]
-    st.plotly_chart(style_chart(px.bar(discipline_data, x="Discipline", y="Count", title="Lessons by Discipline")), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(discipline_data, x="Discipline", y="Count", title="Lessons by Discipline")), width="stretch")
 
 if "Project" in lessons.columns:
     project_data = lessons["Project"].value_counts().reset_index()
     project_data.columns = ["Project", "Count"]
-    st.plotly_chart(style_chart(px.bar(project_data, x="Project", y="Count", title="Lessons by Project")), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(project_data, x="Project", y="Count", title="Lessons by Project")), width="stretch")
 
 if "Category" in lessons.columns:
     category_data = lessons["Category"].value_counts().reset_index()
     category_data.columns = ["Category", "Count"]
-    st.plotly_chart(style_chart(px.bar(category_data, x="Category", y="Count", title="Lessons by Category")), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(category_data, x="Category", y="Count", title="Lessons by Category")), width="stretch")

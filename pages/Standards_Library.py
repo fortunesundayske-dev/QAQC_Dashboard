@@ -176,7 +176,7 @@ else:
                 data=pdf_bytes,
                 file_name=pdf_path.name,
                 mime="application/pdf",
-                use_container_width=True,
+                width="stretch",
             )
             if selected_pdf["Size MB"] <= PDF_EMBED_LIMIT_MB:
                 pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
@@ -258,7 +258,7 @@ else:
                 data=selected_path.read_bytes(),
                 file_name=selected_path.name,
                 mime="application/pdf",
-                use_container_width=True,
+                width="stretch",
                 key="download_selected_dep_pdf",
             )
         else:

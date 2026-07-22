@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 
 # =========================
 # CONFIG (MUST BE FIRST)
@@ -81,9 +81,10 @@ def metric_delta(current, total):
 
 def metric_card(label, value, subtitle, accent, mark, delta=None):
     delta_html = f'<div class="exec-metric__delta">{html.escape(str(delta))}</div>' if delta else ""
+    accessible_label = html.escape(f"{label}: {value}", quote=True)
     return f"""
-<div class="exec-metric" style="--metric-color: {html.escape(str(accent), quote=True)};">
-    <div class="exec-metric__icon">{html.escape(str(mark))}</div>
+<div class="exec-metric" role="group" aria-label="{accessible_label}" style="--metric-color: {html.escape(str(accent), quote=True)};">
+    <div class="exec-metric__icon" aria-hidden="true">{html.escape(str(mark))}</div>
     <div>
         <div class="exec-metric__label">{html.escape(str(label))}</div>
         <div class="exec-metric__value">{html.escape(str(value))}</div>
@@ -639,7 +640,7 @@ if home_search:
         st.page_link(
             str(search_results.loc[result_index, "_Page"]),
             label="Open selected module",
-            use_container_width=True,
+            width="stretch",
         )
 
 ncr = filtered_data.get("NCR Log", pd.DataFrame())
@@ -692,21 +693,21 @@ chart_col1, chart_col2, chart_col3 = st.columns(3)
 with chart_col1:
     with st.container(border=True):
         panel_title("Monthly Concrete Volume (m3)")
-        st.plotly_chart(concrete_volume_fig(concrete_monthly, concrete_counts), use_container_width=True, key="home_concrete_volume_trend")
+        st.plotly_chart(concrete_volume_fig(concrete_monthly, concrete_counts), width="stretch", key="home_concrete_volume_trend")
 with chart_col2:
     with st.container(border=True):
         panel_title("NCR Trend")
-        st.plotly_chart(ncr_trend_fig(ncr_status_monthly), use_container_width=True, key="home_ncr_trend")
+        st.plotly_chart(ncr_trend_fig(ncr_status_monthly), width="stretch", key="home_ncr_trend")
 with chart_col3:
     with st.container(border=True):
         panel_title("Material Receipt Trend")
-        st.plotly_chart(material_receipt_fig(material_trend), use_container_width=True, key="home_material_receipt_trend")
+        st.plotly_chart(material_receipt_fig(material_trend), width="stretch", key="home_material_receipt_trend")
 
 bottom_col1, bottom_col2 = st.columns([1, 2])
 with bottom_col1:
     with st.container(border=True):
         panel_title("OBS by Category")
-        st.plotly_chart(obs_category_fig(obs_categories), use_container_width=True, key="home_obs_category")
+        st.plotly_chart(obs_category_fig(obs_categories), width="stretch", key="home_obs_category")
 with bottom_col2:
     with st.container(border=True):
         panel_title("Recent NCRs")
@@ -745,8 +746,8 @@ st.markdown(
 quick_columns = st.columns(4)
 for index, (label, path, _color, mark) in enumerate(quick_links):
     with quick_columns[index % len(quick_columns)]:
-        st.page_link(path, label=f"{mark}  {label}", use_container_width=True)
-st.page_link("app.py", label="View all tools", use_container_width=True)
+        st.page_link(path, label=f"{mark}  {label}", width="stretch")
+st.page_link("app.py", label="View all tools", width="stretch")
 st.markdown(
     '<div class="dashboard-security-strip"><span>Secure</span><span>Compliant</span><span>Reliable</span></div>',
     unsafe_allow_html=True,

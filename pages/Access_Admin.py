@@ -64,7 +64,7 @@ c4.metric("Rejected requests", len(rejected))
 c5.metric("Admin users", sum(1 for user in approved.values() if user.get("role") == "admin"))
 
 st.caption("User store: secured application data store")
-if st.button("Refresh access requests", use_container_width=True):
+if st.button("Refresh access requests", width="stretch"):
     st.rerun()
 
 st.markdown('<div class="section-heading">Pending Registration Requests</div>', unsafe_allow_html=True)
@@ -85,19 +85,19 @@ else:
                 key=f"top_role_{username}",
             )
             c_approve, c_reject, c_delete = st.columns(3)
-            if c_approve.button("Approve access", key=f"top_approve_{username}", use_container_width=True):
+            if c_approve.button("Approve access", key=f"top_approve_{username}", width="stretch"):
                 ok, message = approve_user(username, role)
                 if ok:
                     st.success(message)
                     st.rerun()
                 else:
                     st.error(message)
-            if c_reject.button("Reject", key=f"top_reject_{username}", use_container_width=True):
+            if c_reject.button("Reject", key=f"top_reject_{username}", width="stretch"):
                 if reject_user(username):
                     st.warning("Registration rejected.")
                     st.rerun()
             confirm_delete = c_delete.checkbox("Confirm delete", key=f"top_confirm_delete_pending_{username}")
-            if c_delete.button("Delete request", key=f"top_delete_pending_{username}", use_container_width=True, disabled=not confirm_delete):
+            if c_delete.button("Delete request", key=f"top_delete_pending_{username}", width="stretch", disabled=not confirm_delete):
                 ok, message = delete_user(username)
                 if ok:
                     st.warning(message)
@@ -164,19 +164,19 @@ with st.container(border=True):
         if status == "pending":
             role = st.selectbox("Role on approval", ["user", "viewer", "admin"], key=f"control_role_{username}")
             approve_col, reject_col, delete_col = st.columns(3)
-            if approve_col.button("Approve", key=f"control_approve_{username}", use_container_width=True):
+            if approve_col.button("Approve", key=f"control_approve_{username}", width="stretch"):
                 ok, message = approve_user(username, role)
                 if ok:
                     st.success(message)
                     st.rerun()
                 else:
                     st.error(message)
-            if reject_col.button("Reject", key=f"control_reject_{username}", use_container_width=True):
+            if reject_col.button("Reject", key=f"control_reject_{username}", width="stretch"):
                 if reject_user(username):
                     st.warning("Registration rejected.")
                     st.rerun()
             confirm_delete = delete_col.checkbox("Confirm delete", key=f"control_confirm_delete_pending_{username}")
-            if delete_col.button("Delete", key=f"control_delete_pending_{username}", use_container_width=True, disabled=not confirm_delete):
+            if delete_col.button("Delete", key=f"control_delete_pending_{username}", width="stretch", disabled=not confirm_delete):
                 ok, message = delete_user(username)
                 if ok:
                     st.warning(message)
@@ -196,7 +196,7 @@ with st.container(border=True):
             if st.button(
                 "Save role",
                 key=f"control_save_role_{username}",
-                use_container_width=True,
+                width="stretch",
                 disabled=is_self or new_role == current_role,
             ):
                 ok, message = change_user_role(username, new_role)
@@ -206,7 +206,7 @@ with st.container(border=True):
                 else:
                     st.error(message)
             restrict_col, delete_col = st.columns(2)
-            if restrict_col.button("Restrict", key=f"control_restrict_{username}", use_container_width=True, disabled=is_self):
+            if restrict_col.button("Restrict", key=f"control_restrict_{username}", width="stretch", disabled=is_self):
                 ok, message = restrict_user(username)
                 if ok:
                     st.warning(message)
@@ -214,7 +214,7 @@ with st.container(border=True):
                 else:
                     st.error(message)
             confirm_delete = delete_col.checkbox("Confirm delete", key=f"control_confirm_delete_approved_{username}", disabled=is_self)
-            if delete_col.button("Delete", key=f"control_delete_approved_{username}", use_container_width=True, disabled=is_self or not confirm_delete):
+            if delete_col.button("Delete", key=f"control_delete_approved_{username}", width="stretch", disabled=is_self or not confirm_delete):
                 ok, message = delete_user(username)
                 if ok:
                     st.warning(message)
@@ -235,7 +235,7 @@ with st.container(border=True):
             if st.button(
                 "Save role",
                 key=f"control_save_role_restricted_{username}",
-                use_container_width=True,
+                width="stretch",
                 disabled=new_role == current_role,
             ):
                 ok, message = change_user_role(username, new_role)
@@ -245,7 +245,7 @@ with st.container(border=True):
                 else:
                     st.error(message)
             unrestrict_col, delete_col = st.columns(2)
-            if unrestrict_col.button("Unrestrict", key=f"control_unrestrict_{username}", use_container_width=True):
+            if unrestrict_col.button("Unrestrict", key=f"control_unrestrict_{username}", width="stretch"):
                 ok, message = unrestrict_user(username)
                 if ok:
                     st.success(message)
@@ -253,7 +253,7 @@ with st.container(border=True):
                 else:
                     st.error(message)
             confirm_delete = delete_col.checkbox("Confirm delete", key=f"control_confirm_delete_restricted_{username}")
-            if delete_col.button("Delete", key=f"control_delete_restricted_{username}", use_container_width=True, disabled=not confirm_delete):
+            if delete_col.button("Delete", key=f"control_delete_restricted_{username}", width="stretch", disabled=not confirm_delete):
                 ok, message = delete_user(username)
                 if ok:
                     st.warning(message)
@@ -263,7 +263,7 @@ with st.container(border=True):
         elif status == "rejected":
             role = st.selectbox("Role on approval", ["user", "viewer", "admin"], key=f"control_role_rejected_{username}")
             approve_col, delete_col = st.columns(2)
-            if approve_col.button("Approve rejected request", key=f"control_approve_rejected_{username}", use_container_width=True):
+            if approve_col.button("Approve rejected request", key=f"control_approve_rejected_{username}", width="stretch"):
                 ok, message = approve_user(username, role)
                 if ok:
                     st.success(message)
@@ -271,7 +271,7 @@ with st.container(border=True):
                 else:
                     st.error(message)
             confirm_delete = delete_col.checkbox("Confirm delete", key=f"control_confirm_delete_rejected_{username}")
-            if delete_col.button("Delete rejected request", key=f"control_delete_rejected_{username}", use_container_width=True, disabled=not confirm_delete):
+            if delete_col.button("Delete rejected request", key=f"control_delete_rejected_{username}", width="stretch", disabled=not confirm_delete):
                 ok, message = delete_user(username)
                 if ok:
                     st.warning(message)

@@ -71,7 +71,7 @@ with c2:
     )
     custom_discipline = st.text_input("Custom discipline", value=saved_discipline if saved_discipline not in discipline_options else "")
     uploaded = st.file_uploader("Profile photo", type=["png", "jpg", "jpeg"])
-    saved = st.button("Save profile", type="primary", use_container_width=True)
+    saved = st.button("Save profile", type="primary", width="stretch")
 
     if saved:
         discipline = custom_discipline.strip() if discipline_choice == "Other / custom" else discipline_choice

@@ -152,7 +152,7 @@ def _load_users():
                 "the deployed app, then reboot the Streamlit app."
             )
         st.caption(f"Connection error type: {error_name}")
-        if st.button("Retry database connection", use_container_width=True):
+        if st.button("Retry database connection", width="stretch"):
             get_database.cache_clear()
             st.rerun()
         st.stop()
@@ -524,7 +524,7 @@ def login():
                 placeholder="Enter your password", max_chars=256,
             )
 
-            if st.button("Sign in", type="primary", use_container_width=True):
+            if st.button("Sign in", type="primary", width="stretch"):
                 login_identifier = username
                 users = _load_users()
                 username, user = _find_user_by_login(users, username)
@@ -616,7 +616,7 @@ def login():
                 )
                 password = st.text_input("Password", type="password", max_chars=256)
                 confirm = st.text_input("Confirm password", type="password", max_chars=256)
-                submitted = st.form_submit_button("Submit for approval", use_container_width=True)
+                submitted = st.form_submit_button("Submit for approval", width="stretch")
 
             if submitted:
                 name = " ".join(name.strip().split())
@@ -692,7 +692,7 @@ def login():
 
 
 def logout():
-    if st.sidebar.button("Sign out", use_container_width=True):
+    if st.sidebar.button("Sign out", width="stretch"):
         _set_logged_out(reason="user_sign_out")
         st.rerun()
 
@@ -721,7 +721,7 @@ def require_role(roles):
         current = str(role or "not signed in").title()
         st.error(f"This module is restricted to: {allowed}. Your current role is: {current}.")
         st.info("To approve or manage users, sign out and sign in with an admin account.")
-        if st.button("Sign out and switch account", use_container_width=True, key="role_guard_sign_out"):
+        if st.button("Sign out and switch account", width="stretch", key="role_guard_sign_out"):
             _set_logged_out(reason="role_access_denied")
             st.rerun()
         st.stop()

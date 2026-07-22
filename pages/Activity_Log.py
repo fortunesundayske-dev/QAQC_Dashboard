@@ -121,7 +121,7 @@ with export_col:
         file_name=f"qaqc_activity_logs_{start_date}_{end_date}.csv",
         mime="text/csv",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         disabled=result_page["total"] == 0,
         help="Downloads all records matching the filters.",
     )
@@ -137,7 +137,7 @@ render_table(
 previous_col, position_col, next_col = st.columns([1, 2, 1])
 with previous_col:
     if st.button(
-        "← Previous", disabled=not result_page["has_previous"], use_container_width=True,
+        "← Previous", disabled=not result_page["has_previous"], width="stretch",
     ):
         st.session_state.activity_page -= 1
         st.rerun()
@@ -150,7 +150,7 @@ with position_col:
         unsafe_allow_html=True,
     )
 with next_col:
-    if st.button("Next →", disabled=not result_page["has_next"], use_container_width=True):
+    if st.button("Next →", disabled=not result_page["has_next"], width="stretch"):
         st.session_state.activity_page += 1
         st.rerun()
 

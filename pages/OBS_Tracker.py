@@ -55,15 +55,15 @@ st.markdown("---")
 status_counts = obs["Status"].str.title().value_counts().reset_index()
 status_counts.columns = ["Status", "Count"]
 sub1, sub2 = st.columns(2)
-sub1.plotly_chart(style_chart(px.pie(status_counts, values="Count", names="Status", title="OBS Status")), use_container_width=True)
+sub1.plotly_chart(style_chart(px.pie(status_counts, values="Count", names="Status", title="OBS Status")), width="stretch")
 
 if "Due_Date" in obs.columns:
     obs["Aging Days"] = (pd.to_datetime("today") - obs["Due_Date"]).dt.days
     aging = obs.groupby("Project")["Aging Days"].mean().reset_index()
-    sub2.plotly_chart(style_chart(px.bar(aging, x="Project", y="Aging Days", title="OBS Aging Analysis")), use_container_width=True)
+    sub2.plotly_chart(style_chart(px.bar(aging, x="Project", y="Aging Days", title="OBS Aging Analysis")), width="stretch")
 
 trend = obs.copy()
 if "Date_Raised" in trend.columns:
     trend["Month"] = trend["Date_Raised"].dt.to_period("M").dt.to_timestamp()
     trend = trend.groupby(["Month", "Status"]).size().reset_index(name="Count")
-    st.plotly_chart(style_chart(px.line(trend, x="Month", y="Count", color="Status", title="OBS Trend")), use_container_width=True)
+    st.plotly_chart(style_chart(px.line(trend, x="Month", y="Count", color="Status", title="OBS Trend")), width="stretch")

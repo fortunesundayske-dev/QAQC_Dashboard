@@ -200,7 +200,7 @@ if str(auth.get_role()).lower() == "admin":
             entry_location = st.text_input("Location / work area")
             entry_notes = st.text_area("Notes (optional)", max_chars=500)
             entry_submitted = st.form_submit_button(
-                "Save daily concrete volume", type="primary", use_container_width=True
+                "Save daily concrete volume", type="primary", width="stretch"
             )
         if entry_submitted:
             actor = auth.current_user() or {}
@@ -327,13 +327,13 @@ with tab_overview:
     with c1:
         if not monthly_volume.empty:
             fig = px.line(monthly_volume, x="Month", y="Volume", markers=True, title="Monthly concrete volume")
-            st.plotly_chart(style_chart(fig), use_container_width=True)
+            st.plotly_chart(style_chart(fig), width="stretch")
         else:
             st.info("No dated valid pours available for trend analysis.")
     with c2:
         if not project_volume.empty:
             fig = px.bar(project_volume, x="Project", y="Volume", title="Concrete volume by project")
-            st.plotly_chart(style_chart(fig), use_container_width=True)
+            st.plotly_chart(style_chart(fig), width="stretch")
         else:
             st.info("No project volume distribution available.")
 
@@ -355,7 +355,7 @@ with tab_forecast:
             ignore_index=True,
         )
         fig = px.line(chart_df, x="Month", y="Volume", color="Type", markers=True, title="Actual vs forecast concrete volume")
-        st.plotly_chart(style_chart(fig), use_container_width=True)
+        st.plotly_chart(style_chart(fig), width="stretch")
 
         next_month = forecast_materials.iloc[0]
         f1, f2, f3, f4 = st.columns(4)
@@ -467,7 +467,7 @@ with tab_stock:
         value_name="Tonnes",
     )
     fig = px.bar(chart_df, x="Material", y="Tonnes", color="Measure", barmode="group", title="Stock, reorder point, and order recommendation")
-    st.plotly_chart(style_chart(fig), use_container_width=True)
+    st.plotly_chart(style_chart(fig), width="stretch")
 
     critical = stock_plan[stock_plan["Status"].isin(["Critical", "Order now"])]
     if critical.empty:
@@ -492,7 +492,7 @@ with tab_receipts:
         c1, c2 = st.columns(2)
         with c1:
             fig = px.bar(receipt_summary, x="Material", y="Quantity (t)", title="Material receipts by material")
-            st.plotly_chart(style_chart(fig), use_container_width=True)
+            st.plotly_chart(style_chart(fig), width="stretch")
         with c2:
             if "Date" in inflow.columns:
                 receipt_timeline = (
@@ -502,7 +502,7 @@ with tab_receipts:
                     .sum()
                 )
                 fig = px.line(receipt_timeline, x="Month", y="Quantity (t)", color="Material", markers=True, title="Receipt trend")
-                st.plotly_chart(style_chart(fig), use_container_width=True)
+                st.plotly_chart(style_chart(fig), width="stretch")
         render_table(inflow, empty_message="No material receipt records are available.")
 
 with tab_records:

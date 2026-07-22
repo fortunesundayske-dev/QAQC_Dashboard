@@ -44,7 +44,7 @@ st.markdown("---")
 if not audit.empty:
     planned_actual = audit["Status"].value_counts().reset_index()
     planned_actual.columns = ["Status", "Count"]
-    st.plotly_chart(style_chart(px.bar(planned_actual, x="Status", y="Count", title="Audit Planned vs Actual")), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(planned_actual, x="Status", y="Count", title="Audit Planned vs Actual")), width="stretch")
 
 st.markdown("---")
 st.subheader("Surveillance Performance")
@@ -63,4 +63,4 @@ selected_surv = render_table_with_details(surveillance, id_col=id_col_surv, tabl
 if not surveillance.empty:
     planned_actual = surveillance["Status"].value_counts().reset_index()
     planned_actual.columns = ["Status", "Count"]
-    st.plotly_chart(style_chart(px.bar(planned_actual, x="Status", y="Count", title="Surveillance Planned vs Actual")), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(planned_actual, x="Status", y="Count", title="Surveillance Planned vs Actual")), width="stretch")

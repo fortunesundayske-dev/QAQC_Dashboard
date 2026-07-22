@@ -65,22 +65,22 @@ trend = defects.copy()
 if "Date Identified" in trend.columns:
     trend["Month"] = trend["Date Identified"].dt.to_period("M").dt.to_timestamp()
     monthly = trend.groupby("Month").size().reset_index(name="Count")
-    st.plotly_chart(style_chart(px.line(monthly, x="Month", y="Count", title="Monthly Defect Trend", markers=True)), use_container_width=True)
+    st.plotly_chart(style_chart(px.line(monthly, x="Month", y="Count", title="Monthly Defect Trend", markers=True)), width="stretch")
 
 project_counts = defects["Project"].value_counts().reset_index()
 project_counts.columns = ["Project", "Count"]
-st.plotly_chart(style_chart(px.bar(project_counts, x="Project", y="Count", title="Defects by Project")), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(project_counts, x="Project", y="Count", title="Defects by Project")), width="stretch")
 
 discipline_counts = defects["Discipline"].value_counts().reset_index()
 discipline_counts.columns = ["Discipline", "Count"]
-st.plotly_chart(style_chart(px.bar(discipline_counts, x="Discipline", y="Count", title="Defects by Discipline")), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(discipline_counts, x="Discipline", y="Count", title="Defects by Discipline")), width="stretch")
 
 root_causes = defects["Root Cause"].value_counts().reset_index().head(10)
 root_causes.columns = ["Root Cause", "Count"]
-st.plotly_chart(style_chart(px.bar(root_causes, x="Root Cause", y="Count", title="Defects by Root Cause")), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(root_causes, x="Root Cause", y="Count", title="Defects by Root Cause")), width="stretch")
 
 aging = defects.groupby("Project")["Aging Days"].mean().reset_index()
-st.plotly_chart(style_chart(px.bar(aging, x="Project", y="Aging Days", title="Defect Aging Analysis")), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(aging, x="Project", y="Aging Days", title="Defect Aging Analysis")), width="stretch")
 
 defects["Date Identified"] = pd.to_datetime(defects["Date Identified"], errors="coerce")
 
@@ -92,8 +92,8 @@ cost_trend = (
     .reset_index()
 )
 cost_trend.columns = ["Month", "Rework Cost"]
-st.plotly_chart(style_chart(px.line(cost_trend, x="Month", y="Rework Cost", title="Rework Cost Trend", markers=True)), use_container_width=True)
+st.plotly_chart(style_chart(px.line(cost_trend, x="Month", y="Rework Cost", title="Rework Cost Trend", markers=True)), width="stretch")
 
 repeat_defects = defects["Description"].value_counts().reset_index().head(10)
 repeat_defects.columns = ["Description", "Count"]
-st.plotly_chart(style_chart(px.bar(repeat_defects, x="Description", y="Count", title="Top 10 Recurring Defects")), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(repeat_defects, x="Description", y="Count", title="Top 10 Recurring Defects")), width="stretch")

@@ -155,5 +155,5 @@ else:
             title="KPI/KRA Actual vs Planned",
             hover_data=["KRA"],
         )),
-        use_container_width=True,
+        width="stretch",
     )

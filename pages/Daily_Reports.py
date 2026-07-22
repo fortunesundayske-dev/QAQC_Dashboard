@@ -54,7 +54,7 @@ if "Report_Date" in reports.columns:
     trend = reports.copy()
     trend["Month"] = trend["Report_Date"].dt.to_period("M").dt.to_timestamp()
     trend = trend.groupby("Month").size().reset_index(name="Reports")
-    st.plotly_chart(style_chart(px.line(trend, x="Month", y="Reports", title="Daily Report Submission Trend", markers=True)), use_container_width=True)
+    st.plotly_chart(style_chart(px.line(trend, x="Month", y="Reports", title="Daily Report Submission Trend", markers=True)), width="stretch")
 
 if "Project" in reports.columns:
-    st.plotly_chart(style_chart(px.bar(project_counts, x="Project", y="Count", title="Daily Reports by Project")), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(project_counts, x="Project", y="Count", title="Daily Reports by Project")), width="stretch")

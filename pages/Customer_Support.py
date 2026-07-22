@@ -37,7 +37,7 @@ with st.form("support_ticket_form", clear_on_submit=True):
         type=ALLOWED_ATTACHMENT_TYPES,
         help="Attach a screenshot, PDF, document, spreadsheet, CSV, or text file.",
     )
-    submitted = st.form_submit_button("Submit support request", type="primary", use_container_width=True)
+    submitted = st.form_submit_button("Submit support request", type="primary", width="stretch")
 
 if submitted:
     if len(subject.strip()) < 3 or len(message.strip()) < 10:
@@ -120,7 +120,7 @@ else:
             st.caption(f"{entry.get('sender', 'Support')} · {entry.get('created_at', '')}")
 
     if not is_admin and not active_ticket.get("escalated"):
-        if st.button("Request live admin", type="primary", use_container_width=True):
+        if st.button("Request live admin", type="primary", width="stretch"):
             if escalate_ticket(active_ticket["ticket_id"], username):
                 record_activity(
                     "escalate_support_ticket", category="support", page="Customer Support",
@@ -167,7 +167,7 @@ if is_admin and tickets:
     selected = labels[selected_label]
     statuses = ["open", "in_progress", "resolved", "closed"]
     status = st.selectbox("Status", statuses, index=statuses.index(selected.get("status", "open")))
-    if st.button("Update ticket status", use_container_width=True):
+    if st.button("Update ticket status", width="stretch"):
         if update_ticket_status(selected["ticket_id"], status, username):
             record_activity(
                 "update_support_ticket_status", category="support", page="Customer Support",

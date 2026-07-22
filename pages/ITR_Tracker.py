@@ -94,10 +94,10 @@ st.markdown("---")
 status_counts = itr["Status"].str.title().value_counts().reset_index()
 status_counts.columns = ["Status", "Count"]
 col1, col2 = st.columns(2)
-col1.plotly_chart(style_chart(px.pie(status_counts, values="Count", names="Status", title="ITR Pass vs Fail / Completion")), use_container_width=True)
+col1.plotly_chart(style_chart(px.pie(status_counts, values="Count", names="Status", title="ITR Pass vs Fail / Completion")), width="stretch")
 
 trend = itr.copy()
 if "Date" in trend.columns:
     trend["Month"] = trend["Date"].dt.to_period("M").dt.to_timestamp()
     trend = trend.groupby(["Month", "Status"]).size().reset_index(name="Count")
-    col2.plotly_chart(style_chart(px.line(trend, x="Month", y="Count", color="Status", title="ITR Monthly Trend")), use_container_width=True)
+    col2.plotly_chart(style_chart(px.line(trend, x="Month", y="Count", color="Status", title="ITR Monthly Trend")), width="stretch")

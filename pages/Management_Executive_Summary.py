@@ -100,4 +100,4 @@ st.write(f"- Overdue CTQ Actions: {overdue_ctq}")
 st.markdown("---")
 if not ncr.empty and "Project" in ncr.columns:
     issue_counts = ncr["Project"].value_counts().rename_axis("Project").reset_index(name="Count")
-    st.plotly_chart(style_chart(px.bar(issue_counts, x="Project", y="Count", title="Open Quality Issues by Project")), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(issue_counts, x="Project", y="Count", title="Open Quality Issues by Project")), width="stretch")

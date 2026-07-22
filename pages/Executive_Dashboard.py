@@ -13,7 +13,9 @@ from utils import (
     inject_global_ui,
     load_master_data,
     render_navigation,
+    render_page_header,
     render_top_nav,
+    style_chart,
 )
 
 
@@ -54,16 +56,16 @@ def pct(numerator, denominator):
     return int((numerator / denominator) * 100) if denominator else 0
 
 
-def metric_tile(label, value, sub, color, mark, trend="+ 50% vs last month", down=False):
-    trend_class = "analytics-metric__trend analytics-metric__trend--down" if down else "analytics-metric__trend"
+def metric_tile(label, value, sub, color, mark, context):
+    accessible_label = html.escape(f"{label}: {value}", quote=True)
     return f"""
-<div class="analytics-metric" style="--metric-color:{color};">
-    <div class="analytics-metric__icon">{html.escape(mark)}</div>
+<div class="analytics-metric" role="group" aria-label="{accessible_label}" style="--metric-color:{html.escape(color, quote=True)};">
+    <div class="analytics-metric__icon" aria-hidden="true">{html.escape(mark)}</div>
     <div class="analytics-metric__body">
         <div class="analytics-metric__label">{html.escape(label)}</div>
         <div class="analytics-metric__value">{html.escape(str(value))}</div>
         <div class="analytics-metric__sub">{html.escape(sub)}</div>
-        <div class="{trend_class}">{html.escape(trend)}</div>
+        <div class="analytics-metric__trend">{html.escape(context)}</div>
     </div>
 </div>
 """
@@ -74,18 +76,13 @@ def panel_title(title):
 
 
 def dark_fig(fig, height=250):
+    style_chart(fig)
     fig.update_layout(
-        template="plotly_dark",
         height=height,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#dbeafe", family="Inter, Segoe UI, sans-serif", size=10),
         margin=dict(l=28, r=16, t=28, b=28),
         legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=10)),
-        title=dict(font=dict(size=1, color="rgba(0,0,0,0)")),
+        title=dict(font=dict(size=1)),
     )
-    fig.update_xaxes(gridcolor="rgba(148,163,184,.12)", zeroline=False, linecolor="rgba(148,163,184,.16)")
-    fig.update_yaxes(gridcolor="rgba(148,163,184,.12)", zeroline=False, linecolor="rgba(148,163,184,.16)")
     return fig
 
 
@@ -96,8 +93,8 @@ def donut_frame(open_value, closed_value):
 def donut_chart(rows, title, colors=("#60a5fa", "#2563eb"), height=245):
     total = int(rows["Count"].sum()) if not rows.empty else 0
     fig = px.pie(rows, values="Count", names="Status", hole=0.58, color_discrete_sequence=list(colors))
-    fig.update_traces(textinfo="percent", textfont_size=10, marker=dict(line=dict(color="rgba(15,23,42,.75)", width=2)))
-    fig.add_annotation(text=f"<b>Total</b><br>{total:,}", x=0.5, y=0.5, showarrow=False, font=dict(size=13, color="#ffffff"))
+    fig.update_traces(textinfo="percent", textfont_size=10, marker=dict(line=dict(color="rgba(148,163,184,.35)", width=2)))
+    fig.add_annotation(text=f"<b>Total</b><br>{total:,}", x=0.5, y=0.5, showarrow=False, font=dict(size=13))
     return dark_fig(fig, height=height)
 
 
@@ -130,7 +127,7 @@ def recent_ncr_table(df):
         rows = rows.sort_values("Date Raised", ascending=False)
         rows["Date Raised"] = rows["Date Raised"].dt.strftime("%d %b %Y").fillna("")
     rows = rows.head(5).rename(columns={"NCR_ID": "NCR ID"})
-    st.dataframe(rows, use_container_width=True, hide_index=True, height=178)
+    st.dataframe(rows, width="stretch", hide_index=True, height=178)
 
 
 filters = global_filter_sidebar(load_master_data(DATA_FILE))
@@ -152,28 +149,21 @@ closed_obs = closed_count(obs)
 open_itr = count_status(itr, "Open")
 closed_itr = closed_count(itr)
 
-st.markdown(
-    """
-<div class="analytics-hero">
-    <div class="analytics-hero__logo">NLNG</div>
-    <div>
-        <h1>Executive Analytics</h1>
-        <p>Management-level insights and performance overview</p>
-    </div>
-</div>
-""",
-    unsafe_allow_html=True,
+render_page_header(
+    "Executive analytics",
+    "Review management-level quality performance, closeout rates, trends, and project risk indicators.",
+    "Portfolio intelligence",
 )
 
 metrics = [
-    metric_tile("Total Projects", len(projects), "Active work fronts", "#2563eb", "□", "+ 8% vs last month"),
-    metric_tile("Daily Reports", len(daily), "Reports submitted", "#7c3aed", "▣", "+ 28% vs last month"),
-    metric_tile("Open NCR", open_ncr, "Requires action", "#ef4444", "△", "+ 50% vs last month"),
-    metric_tile("Closed NCR", closed_ncr, "Closed records", "#22c55e", "✓", "+ 50% vs last month"),
-    metric_tile("Open OBS", open_obs, "Field observations", "#f97316", "⊙", "+ 100% vs last month"),
-    metric_tile("Closed OBS", closed_obs, "Closed records", "#10b981", "✓", "No change"),
-    metric_tile("Open ITR", open_itr, "In progress", "#2563eb", "□", "- 5% vs last month", down=True),
-    metric_tile("Closed ITR", compact(closed_itr), "Completed", "#0891b2", "✓", "+ 12% vs last month"),
+    metric_tile("Total Projects", len(projects), "Active work fronts", "#2563eb", "□", "Current portfolio"),
+    metric_tile("Daily Reports", len(daily), "Reports submitted", "#7c3aed", "▣", "Current selection"),
+    metric_tile("Open NCR", open_ncr, "Requires action", "#ef4444", "△", f"{pct(open_ncr, open_ncr + closed_ncr)}% of NCR records"),
+    metric_tile("Closed NCR", closed_ncr, "Closed records", "#22c55e", "✓", f"{pct(closed_ncr, open_ncr + closed_ncr)}% closure"),
+    metric_tile("Open OBS", open_obs, "Field observations", "#f97316", "⊙", f"{pct(open_obs, open_obs + closed_obs)}% of OBS records"),
+    metric_tile("Closed OBS", closed_obs, "Closed records", "#10b981", "✓", f"{pct(closed_obs, open_obs + closed_obs)}% closure"),
+    metric_tile("Open ITR", open_itr, "In progress", "#2563eb", "□", f"{pct(open_itr, open_itr + closed_itr)}% of ITR records"),
+    metric_tile("Closed ITR", compact(closed_itr), "Completed", "#0891b2", "✓", f"{pct(closed_itr, open_itr + closed_itr)}% closure"),
 ]
 st.markdown('<div class="analytics-metric-grid">' + "".join(metrics) + "</div>", unsafe_allow_html=True)
 
@@ -184,7 +174,7 @@ with top_left:
         if not obs.empty and "Project" in obs.columns:
             obs_cat = obs["Project"].fillna("Unassigned").value_counts().reset_index()
             obs_cat.columns = ["Project", "Records"]
-            st.plotly_chart(dark_fig(px.bar(obs_cat, x="Records", y="Project", orientation="h", text="Records", color_discrete_sequence=["#2563eb"]), 210), use_container_width=True)
+            st.plotly_chart(dark_fig(px.bar(obs_cat, x="Records", y="Project", orientation="h", text="Records", color_discrete_sequence=["#2563eb"]), 210), width="stretch")
         else:
             st.info("No OBS data available.")
 with top_right:
@@ -196,15 +186,15 @@ donut_1, donut_2, donut_3 = st.columns(3)
 with donut_1:
     with st.container(border=True):
         panel_title("NCR Status")
-        st.plotly_chart(donut_chart(donut_frame(open_ncr, closed_ncr), "NCR Status"), use_container_width=True)
+        st.plotly_chart(donut_chart(donut_frame(open_ncr, closed_ncr), "NCR Status"), width="stretch")
 with donut_2:
     with st.container(border=True):
         panel_title("OBS Status")
-        st.plotly_chart(donut_chart(donut_frame(open_obs, closed_obs), "OBS Status"), use_container_width=True)
+        st.plotly_chart(donut_chart(donut_frame(open_obs, closed_obs), "OBS Status"), width="stretch")
 with donut_3:
     with st.container(border=True):
         panel_title("ITR Closeout Status")
-        st.plotly_chart(donut_chart(pd.DataFrame({"Status": ["Closed", "Open"], "Count": [closed_itr, open_itr]}), "ITR Closeout"), use_container_width=True)
+        st.plotly_chart(donut_chart(pd.DataFrame({"Status": ["Closed", "Open"], "Count": [closed_itr, open_itr]}), "ITR Closeout"), width="stretch")
 
 audit_summary = audit["Status"].value_counts().reindex(["Planned", "Completed"], fill_value=0).rename_axis("Status").reset_index(name="Count") if not audit.empty and "Status" in audit.columns else pd.DataFrame({"Status": ["Planned", "Completed"], "Count": [0, 0]})
 surv_summary = surveillance["Status"].value_counts().reindex(["Planned", "Completed"], fill_value=0).rename_axis("Status").reset_index(name="Count") if not surveillance.empty and "Status" in surveillance.columns else pd.DataFrame({"Status": ["Planned", "Completed"], "Count": [0, 0]})
@@ -215,21 +205,21 @@ row = st.columns(4)
 with row[0]:
     with st.container(border=True):
         panel_title("Audit Planned vs Actual")
-        st.plotly_chart(bar_status_chart(audit_summary, "Audit", {"Planned": "#2563eb", "Completed": "#60a5fa"}), use_container_width=True)
+        st.plotly_chart(bar_status_chart(audit_summary, "Audit", {"Planned": "#2563eb", "Completed": "#60a5fa"}), width="stretch")
 with row[1]:
     with st.container(border=True):
         panel_title("Surveillance Planned vs Actual")
-        st.plotly_chart(bar_status_chart(surv_summary, "Surveillance", {"Planned": "#22c55e", "Completed": "#16a34a"}), use_container_width=True)
+        st.plotly_chart(bar_status_chart(surv_summary, "Surveillance", {"Planned": "#22c55e", "Completed": "#16a34a"}), width="stretch")
 with row[2]:
     with st.container(border=True):
         panel_title("Daily Report Submission Trend")
         fig = px.line(reports_trend, x="Month", y="Reports", markers=True, color_discrete_sequence=["#8b5cf6"]) if not reports_trend.empty else go.Figure()
-        st.plotly_chart(dark_fig(fig, 230), use_container_width=True)
+        st.plotly_chart(dark_fig(fig, 230), width="stretch")
 with row[3]:
     with st.container(border=True):
         panel_title("Concrete Placement Trend")
         fig = px.line(concrete_trend, x="Month", y="Pours", markers=True, color_discrete_sequence=["#22c55e"]) if not concrete_trend.empty else go.Figure()
-        st.plotly_chart(dark_fig(fig, 230), use_container_width=True)
+        st.plotly_chart(dark_fig(fig, 230), width="stretch")
 
 bottom = st.columns([1, 1, 1.45])
 project_heat = ncr.groupby("Project").size().reset_index(name="NCR Count") if not ncr.empty and "Project" in ncr.columns else pd.DataFrame(columns=["Project", "NCR Count"])
@@ -237,14 +227,14 @@ with bottom[0]:
     with st.container(border=True):
         panel_title("Project Quality Performance Ranking")
         fig = px.bar(project_heat.sort_values("NCR Count").tail(8), x="NCR Count", y="Project", orientation="h", text="NCR Count", color_discrete_sequence=["#3b82f6"]) if not project_heat.empty else go.Figure()
-        st.plotly_chart(dark_fig(fig, 250), use_container_width=True)
+        st.plotly_chart(dark_fig(fig, 250), width="stretch")
 with bottom[1]:
     with st.container(border=True):
         panel_title("Discipline Performance Comparison")
         discipline_source = pd.concat([ncr.assign(Type="NCR"), itr.assign(Type="ITR")], ignore_index=True) if not ncr.empty or not itr.empty else pd.DataFrame()
         disc = discipline_source.groupby("Discipline").size().reset_index(name="Count") if not discipline_source.empty and "Discipline" in discipline_source.columns else pd.DataFrame(columns=["Discipline", "Count"])
         fig = px.bar(disc, x="Discipline", y="Count", text="Count", color_discrete_sequence=["#2563eb"]) if not disc.empty else go.Figure()
-        st.plotly_chart(dark_fig(fig, 250), use_container_width=True)
+        st.plotly_chart(dark_fig(fig, 250), width="stretch")
 with bottom[2]:
     with st.container(border=True):
         panel_title("Quality Heat Map: Project vs NCR Count")
@@ -254,6 +244,6 @@ with bottom[2]:
             heat["Value"] = 1
             matrix = heat.pivot_table(index="Project", columns="Band", values="Value", aggfunc="sum", fill_value=0, observed=False)
             fig = px.imshow(matrix, color_continuous_scale=["#0f766e", "#facc15", "#f97316", "#ef4444"], aspect="auto", text_auto=True)
-            st.plotly_chart(dark_fig(fig, 250), use_container_width=True)
+            st.plotly_chart(dark_fig(fig, 250), width="stretch")
         else:
             st.info("Quality heat map requires NCR project data.")

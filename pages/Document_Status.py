@@ -54,9 +54,9 @@ selected = render_table_with_details(docs, id_col=id_col, table_columns=table_co
 st.markdown("---")
 pie_data = docs["Document_Type"].value_counts().reset_index()
 pie_data.columns = ["Document_Type", "Count"]
-st.plotly_chart(style_chart(px.pie(pie_data, values="Count", names="Document_Type", title="Document Status Breakdown")), use_container_width=True)
+st.plotly_chart(style_chart(px.pie(pie_data, values="Count", names="Document_Type", title="Document Status Breakdown")), width="stretch")
 
 if "Project" in docs.columns:
     project_docs = docs["Project"].value_counts().reset_index()
     project_docs.columns = ["Project", "Count"]
-    st.plotly_chart(style_chart(px.bar(project_docs, x="Project", y="Count", title="Documents by Project")), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(project_docs, x="Project", y="Count", title="Documents by Project")), width="stretch")

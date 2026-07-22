@@ -44,16 +44,16 @@ else:
 status_counts = ctq["Status"].str.title().value_counts().reset_index()
 status_counts.columns = ["Status", "Count"]
 col1, col2 = st.columns(2)
-col1.plotly_chart(style_chart(px.pie(status_counts, values="Count", names="Status", title="CTQ Pass vs Fail")), use_container_width=True)
+col1.plotly_chart(style_chart(px.pie(status_counts, values="Count", names="Status", title="CTQ Pass vs Fail")), width="stretch")
 
 if "Project" in ctq.columns:
     project_compliance = ctq.groupby("Project").apply(lambda x: int((x["Status"].str.lower() == "passed").sum() / max(1, len(x)) * 100)).reset_index(name="Compliance %")
-    col2.plotly_chart(style_chart(px.bar(project_compliance, x="Project", y="Compliance %", title="CTQ Compliance by Project")), use_container_width=True)
+    col2.plotly_chart(style_chart(px.bar(project_compliance, x="Project", y="Compliance %", title="CTQ Compliance by Project")), width="stretch")
 
 if "Discipline" in ctq.columns:
     discipline_compliance = ctq.groupby("Discipline").apply(lambda x: int((x["Status"].str.lower() == "passed").sum() / max(1, len(x)) * 100)).reset_index(name="Compliance %")
-    st.plotly_chart(style_chart(px.bar(discipline_compliance, x="Discipline", y="Compliance %", title="CTQ Compliance by Discipline")), use_container_width=True)
+    st.plotly_chart(style_chart(px.bar(discipline_compliance, x="Discipline", y="Compliance %", title="CTQ Compliance by Discipline")), width="stretch")
 
 failure_pareto = ctq[ctq["Status"].str.lower() == "failed"]["CTQ Description"].value_counts().reset_index().head(10)
 failure_pareto.columns = ["Category", "Count"]
-st.plotly_chart(style_chart(px.bar(failure_pareto, x="Category", y="Count", title="CTQ Failure Pareto Chart")), use_container_width=True)
+st.plotly_chart(style_chart(px.bar(failure_pareto, x="Category", y="Count", title="CTQ Failure Pareto Chart")), width="stretch")

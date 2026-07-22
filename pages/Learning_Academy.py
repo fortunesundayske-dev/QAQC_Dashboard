@@ -127,7 +127,7 @@ with tab_quiz:
         "For welding inspection, the inspector should verify:",
         ["WPS, welder qualification, consumable control, and inspection acceptance", "Only final paint colour", "Only the delivery note"],
     )
-    if st.button("Score knowledge check", use_container_width=True):
+    if st.button("Score knowledge check", width="stretch"):
         score = int(q1.startswith("Approved")) + int(q2.startswith("The verified")) + int(q3.startswith("WPS"))
         st.metric("Score", f"{score}/3")
         if score == 3:
@@ -142,7 +142,7 @@ with tab_records:
     course = st.selectbox("Course", [item["Path"] for item in learning_paths])
     status = st.selectbox("Status", ["Planned", "In progress", "Completed", "Needs reassessment"])
     evidence = st.text_area("Evidence / assessor comments")
-    if st.button("Create training record preview", use_container_width=True):
+    if st.button("Create training record preview", width="stretch"):
         render_table(
             pd.DataFrame(
                 [{"Trainee": name, "Discipline": discipline, "Course": course, "Status": status, "Evidence": evidence}]
