@@ -24,10 +24,14 @@ user = getattr(auth, "current_user", lambda: None)()
 def render_profile_avatar(user_record):
     photo = user_record.get("profile_photo_asset") or user_record.get("profile_photo")
     if isinstance(photo, dict):
-        try:
-            photo = private_asset_url(photo, expires_in=300)
-        except Exception:
-            photo = ""
+        saved_url = str(photo.get("url") or photo.get("secure_url") or "").strip()
+        if saved_url.startswith(("https://", "http://")):
+            photo = saved_url
+        else:
+            try:
+                photo = private_asset_url(photo, expires_in=300)
+            except Exception:
+                photo = ""
     if photo and (str(photo).startswith(("https://", "http://")) or Path(str(photo)).exists()):
         st.image(str(photo), width=180)
         return

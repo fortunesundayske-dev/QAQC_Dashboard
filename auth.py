@@ -14,7 +14,6 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from database.mongo_users import get_database, load_users, save_users
 from database.cloudinary_storage import delete_attachment, upload_profile_photo
@@ -22,6 +21,7 @@ from database.settings import get_setting
 from database.audit_log import record_activity
 from security import (
     ACCOUNT_LOCK_MINUTES,
+    INACTIVITY_TIMEOUT_SECONDS,
     MAX_FAILED_ATTEMPTS,
     MIN_PASSWORD_LENGTH,
     PBKDF2_ITERATIONS,
@@ -29,6 +29,7 @@ from security import (
     SecurityConfigurationError,
     account_is_locked,
     hash_password,
+    inactivity_expired,
     password_needs_upgrade,
     session_is_active,
     utc_now,
@@ -45,7 +46,6 @@ DATA_DIR = BASE_DIR / "data"
 PROFILE_DIR = DATA_DIR / "profile_photos"
 LOGO_FILE = BASE_DIR / "assets" / "evomec_logo.png"
 SESSION_TOKEN_PARAM = "auth_token"
-INACTIVITY_TIMEOUT_SECONDS = 120
 DISCIPLINES = ["Civil", "Mechanical", "Piping", "Welding", "Electrical", "Instrumentation", "NDT", "Quality Management"]
 DEFAULT_ADMIN_EMAIL = "fortune.kpakue@evomeclimited.com"
 MICROSOFT_GRAPH_ROOT = "https://graph.microsoft.com/v1.0"
@@ -406,17 +406,26 @@ def _enforce_inactivity_timeout():
         return False
     now = time.time()
     last_activity = float(st.session_state.get("auth_last_activity", now))
-    if now - last_activity >= INACTIVITY_TIMEOUT_SECONDS:
+    if inactivity_expired(last_activity, now):
         _set_logged_out(reason="inactivity_timeout")
         st.session_state.auth_timeout_message = "You were signed out after 2 minutes of inactivity."
         return True
     st.session_state.auth_last_activity = now
-    components.html(
-        f"<script>setTimeout(function(){{window.parent.location.reload();}}, {INACTIVITY_TIMEOUT_SECONDS * 1000});</script>",
-        height=0,
-        width=0,
-    )
     return False
+
+
+@st.fragment(run_every=INACTIVITY_TIMEOUT_SECONDS)
+def _inactivity_watchdog():
+    """Re-check inactivity without reloading the browser or losing session state."""
+    auth_state = st.session_state.get("auth") or {}
+    if not auth_state.get("logged_in"):
+        return
+    now = time.time()
+    last_activity = st.session_state.get("auth_last_activity", now)
+    if inactivity_expired(last_activity, now):
+        _set_logged_out(reason="inactivity_timeout")
+        st.session_state.auth_timeout_message = "You were signed out after 2 minutes of inactivity."
+        st.rerun()
 
 
 def _set_logged_out(reason="user_sign_out"):
@@ -453,6 +462,7 @@ def login():
             st.session_state.auth_timeout_message = "Your secure session expired or was revoked. Sign in again."
         elif not _enforce_inactivity_timeout():
             _set_logged_in(st.session_state.auth["username"], live_user)
+            _inactivity_watchdog()
             return True
 
     timeout_message = st.session_state.pop("auth_timeout_message", None)

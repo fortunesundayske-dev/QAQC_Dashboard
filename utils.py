@@ -117,6 +117,10 @@ def _image_data_uri(path):
 
 def _profile_photo_src(photo):
     if isinstance(photo, dict):
+        for key in ("url", "secure_url"):
+            saved_url = str(photo.get(key) or "").strip()
+            if saved_url.startswith(("https://", "http://")):
+                return saved_url
         try:
             return private_asset_url(photo, expires_in=300)
         except Exception:
@@ -1365,6 +1369,7 @@ def _render_account_menu(user):
     account_discipline = str(user.get("discipline") or "QA/QC")
     account_button_label = f"{account_name}\nEVOMEC - Nigeria LNG"
     photo_src = _profile_photo_src(user.get("profile_photo"))
+    initials = "".join(part[:1] for part in account_name.split()[:2]).upper() or "U"
     st.markdown(
         """
 <style>
@@ -1382,6 +1387,21 @@ def _render_account_menu(user):
     justify-content: center; overflow: hidden; width: 2.72rem;
 }
 .header-account-avatar img { height: 100%; object-fit: cover; width: 100%; }
+.st-key-navigation_account [data-testid="stImage"] {
+    align-items: center;
+    display: flex;
+    height: 2.72rem;
+    margin: 0 !important;
+    width: 2.72rem;
+}
+.st-key-navigation_account [data-testid="stImage"] img {
+    border: 2px solid rgba(255,255,255,.72);
+    border-radius: 999px;
+    height: 2.72rem !important;
+    max-width: none !important;
+    object-fit: cover;
+    width: 2.72rem !important;
+}
 .st-key-navigation_account div[data-testid="stHorizontalBlock"] { align-items: center; gap: .35rem; }
 .st-key-navigation_account div[data-testid="stPopover"] { max-width: none !important; width: 100% !important; }
 .st-key-navigation_account div[data-testid="stPopover"] button {
@@ -1443,17 +1463,22 @@ div[data-baseweb="popover"]:has(.st-key-account_menu_panel) [data-testid="stCapt
         avatar_col, menu_col = st.columns([0.52, 2.48], gap="small")
         with avatar_col:
             if photo_src:
-                avatar_content = f'<img src="{photo_src}" alt="Profile photo">'
+                st.image(photo_src, width=48)
             else:
-                avatar_content = html.escape("".join(part[:1] for part in account_name.split()[:2]).upper() or "U")
-            st.markdown(f'<div class="header-account-avatar">{avatar_content}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="header-account-avatar">{html.escape(initials)}</div>',
+                    unsafe_allow_html=True,
+                )
         with menu_col:
             with st.popover(account_button_label, use_container_width=True):
                 with st.container(key="account_menu_panel"):
                     if photo_src:
                         st.image(photo_src, width=72)
                     else:
-                        st.markdown(f'<div class="header-account-avatar">{avatar_content}</div>', unsafe_allow_html=True)
+                        st.markdown(
+                            f'<div class="header-account-avatar">{html.escape(initials)}</div>',
+                            unsafe_allow_html=True,
+                        )
                     st.markdown(f"**{html.escape(account_name)}**")
                     st.caption(f"{account_role} · {account_discipline}")
                     st.divider()
@@ -1570,6 +1595,17 @@ NAVIGATION_GROUPS = {
     "Audits and Reports": ["Audit & Surveillance", "Daily Reports", "Lessons Learned"],
     "Knowledge and Tools": ["Standards Library", "Learning Academy", "Quality Tools"],
     "Account and Administration": ["User Profile", "Customer Support", "Access Admin", "Activity Log"],
+}
+
+NAVIGATION_GROUP_ICONS = {
+    "Overview": "⌂",
+    "Quality Records": "▦",
+    "Engineering": "⚙",
+    "Materials and Equipment": "⬡",
+    "Audits and Reports": "▤",
+    "Knowledge and Tools": "◆",
+    "Account and Administration": "●",
+    "Other": "•",
 }
 
 
@@ -1855,15 +1891,20 @@ def extract_projects(data):
 # NAV (FULL)
 # =========================
 
-def render_navigation():
+def _render_navigation_legacy():
     _record_page_access()
     grouped_pages = grouped_navigation_pages()
 
     with st.container(key="primary_navigation_row"):
         user = st.session_state.get("auth") or {}
-        nav_col, tool_col, account_col = st.columns([0.24, 0.46, 0.30], gap="small")
+        nav_col, tool_col, account_col = st.columns([0.07, 0.63, 0.30], gap="small")
         with nav_col:
-            with st.popover("›  Page Navigation", use_container_width=True):
+            with st.popover(
+                "Open page navigation",
+                icon=":material/menu:",
+                help="Open page navigation",
+                key="page_navigation_popover",
+            ):
                 query = (
                     st.text_input(
                         "Search pages",
@@ -1900,7 +1941,10 @@ def render_navigation():
                     open_attr = " open" if query or section_is_current else ""
                     sections.append(
                         f'<details class="nav-popover-section"{open_attr}>'
-                        f'<summary>{html.escape(group)}</summary>'
+                        f'<summary><span class="nav-popover-section__title">'
+                        f'<span class="nav-popover-section__icon">'
+                        f'{html.escape(NAVIGATION_GROUP_ICONS.get(group, "•"))}</span>'
+                        f'{html.escape(group)}</span></summary>'
                         f'<div class="nav-popover-section__links">{"".join(link_markup)}</div>'
                         f'</details>'
                     )
@@ -1943,6 +1987,66 @@ def render_navigation():
             st.switch_page(page)
 
  
+
+
+def render_navigation():
+    """Render session-preserving navigation for every dashboard page."""
+    _record_page_access()
+    grouped_pages = grouped_navigation_pages()
+
+    with st.container(key="primary_navigation_row"):
+        user = st.session_state.get("auth") or {}
+        nav_col, tool_col, account_col = st.columns([0.07, 0.63, 0.30], gap="small")
+        with nav_col:
+            with st.popover(
+                "Open page navigation",
+                icon=":material/menu:",
+                help="Open page navigation",
+                key="page_navigation_popover",
+            ):
+                with st.container(key="nav_popover_menu"):
+                    query = (
+                        st.text_input(
+                            "Search pages",
+                            placeholder="Search",
+                            label_visibility="collapsed",
+                            icon=":material/search:",
+                            key=f"page_navigation_search_{_current_page_name()}",
+                        )
+                        or ""
+                    ).strip().casefold()
+                    current_page = _current_page_name()
+                    matches = 0
+                    for group, items in grouped_pages:
+                        visible_items = [
+                            (label, page)
+                            for label, page in items
+                            if not query or query in label.casefold() or query in group.casefold()
+                        ]
+                        if not visible_items:
+                            continue
+                        section_is_current = any(
+                            ("app" if page == "app.py" else Path(page).stem) == current_page
+                            for _, page in visible_items
+                        )
+                        group_icon = NAVIGATION_GROUP_ICONS.get(group, "•")
+                        with st.expander(
+                            f"{group_icon}  {group}",
+                            expanded=bool(query or section_is_current),
+                        ):
+                            for label, page in visible_items:
+                                st.page_link(page, label=label, use_container_width=True)
+                                matches += 1
+                    if not matches:
+                        st.caption("No pages match your search.")
+        with tool_col:
+            st.markdown(
+                '<div class="command-tools command-tools--compact"><span>⌕</span><span>•</span><span>● Online</span></div>',
+                unsafe_allow_html=True,
+            )
+        with account_col:
+            if user.get("logged_in"):
+                _render_account_menu(user)
 
 
 def _record_page_access():
@@ -3814,7 +3918,7 @@ def inject_global_ui():
     }
 
     .metric-grid--six {
-        grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
         gap: 0.7rem !important;
         margin-bottom: 0.7rem !important;
     }
@@ -5383,53 +5487,125 @@ def inject_global_ui():
         text-transform: uppercase !important;
     }}
 
-    .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"]
-    > div[data-testid="column"]:first-child div[data-testid="stPopover"] {{
-        max-width: 15rem !important;
-        width: 100% !important;
+    .st-key-page_navigation_popover {{
+        max-width: 3rem !important;
+        width: 3rem !important;
     }}
 
-    .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"]
-    > div[data-testid="column"]:first-child div[data-testid="stPopover"] button {{
+    .st-key-page_navigation_popover div[data-testid="stPopover"] {{
+        max-width: 3rem !important;
+        width: 3rem !important;
+    }}
+
+    .st-key-page_navigation_popover div[data-testid="stPopover"] button {{
         background: #60a5fa !important;
         border: 1px solid rgba(147, 197, 253, 0.68) !important;
         box-shadow: 0 10px 24px rgba(30, 64, 175, 0.25) !important;
         color: #ffffff !important;
-        font-size: 0.84rem !important;
-        font-weight: 800 !important;
-        justify-content: space-between !important;
-        max-width: 15rem !important;
-        min-height: 2.8rem !important;
-        width: 100% !important;
+        justify-content: center !important;
+        max-width: 3rem !important;
+        min-height: 3rem !important;
+        min-width: 3rem !important;
+        padding: 0 !important;
+        width: 3rem !important;
     }}
 
-    div[data-baseweb="popover"]:has(.nav-popover-menu) > div {{
+    .st-key-page_navigation_popover div[data-testid="stPopover"] button p {{
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        height: 1px;
+        overflow: hidden;
+        position: absolute;
+        white-space: nowrap;
+        width: 1px;
+    }}
+
+    .st-key-page_navigation_popover div[data-testid="stPopover"] button svg {{
+        display: none !important;
+    }}
+
+    .st-key-page_navigation_popover [data-testid="stIconMaterial"] {{
+        color: #ffffff !important;
+        font-size: 1.65rem !important;
+    }}
+
+    div[data-baseweb="popover"]:has(.nav-popover-menu) > div,
+    div[data-baseweb="popover"]:has(.st-key-nav_popover_menu) > div {{
         background: #031326 !important;
         border: 1px solid rgba(96, 165, 250, 0.30) !important;
         border-radius: 9px !important;
         box-shadow: 0 20px 48px rgba(0, 0, 0, 0.42) !important;
-        min-width: 17rem !important;
+        min-width: 21.25rem !important;
     }}
 
-    div[data-baseweb="popover"]:has(.nav-popover-menu) [data-testid="stTextInput"] input {{
+    div[data-baseweb="popover"]:has(.nav-popover-menu) [data-testid="stTextInput"] input,
+    div[data-baseweb="popover"]:has(.st-key-nav_popover_menu) [data-testid="stTextInput"] input {{
         background: #020c19 !important;
         border-color: rgba(148, 163, 184, 0.24) !important;
         color: #ffffff !important;
     }}
 
-    div[data-baseweb="popover"]:has(.nav-popover-menu) [data-testid="stTextInput"] input::placeholder {{
+    div[data-baseweb="popover"]:has(.nav-popover-menu) [data-testid="stTextInput"] input::placeholder,
+    div[data-baseweb="popover"]:has(.st-key-nav_popover_menu) [data-testid="stTextInput"] input::placeholder {{
         color: #cbd5e1 !important;
+    }}
+
+    .st-key-nav_popover_menu {{
+        max-height: 30rem;
+        min-width: 20.25rem;
+        overflow-y: auto;
+        padding: 0.08rem;
+        width: 20.25rem;
+    }}
+
+    .st-key-nav_popover_menu div[data-testid="stExpander"] details {{
+        background: #06182e !important;
+        border: 1px solid rgba(96, 165, 250, 0.18) !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        overflow: hidden;
+    }}
+
+    .st-key-nav_popover_menu div[data-testid="stExpander"] summary {{
+        background: #07284c !important;
+        min-height: 3.15rem !important;
+        padding: 0.55rem 0.7rem !important;
+    }}
+
+    .st-key-nav_popover_menu div[data-testid="stExpander"] summary p,
+    .st-key-nav_popover_menu div[data-testid="stExpander"] summary span,
+    .st-key-nav_popover_menu div[data-testid="stExpander"] summary svg {{
+        color: #ffffff !important;
+        fill: #ffffff !important;
+        font-size: 0.9rem !important;
+        font-weight: 850 !important;
+    }}
+
+    .st-key-nav_popover_menu a[data-testid="stPageLink-NavLink"] {{
+        background: #020c19 !important;
+        border: 1px solid rgba(148, 163, 184, 0.14) !important;
+        border-radius: 6px !important;
+        color: #dbeafe !important;
+        margin: 0.16rem 0 !important;
+        min-height: 2.35rem !important;
+        padding: 0.45rem 0.65rem !important;
+    }}
+
+    .st-key-nav_popover_menu a[data-testid="stPageLink-NavLink"]:hover {{
+        background: #155eef !important;
+        border-color: #60a5fa !important;
+        color: #ffffff !important;
     }}
 
     .nav-popover-menu {{
         display: grid;
         gap: 0.38rem;
         max-height: 24rem;
-        max-width: 16rem;
-        min-width: 15rem;
+        max-width: 20.25rem;
+        min-width: 20.25rem;
         overflow-y: auto;
         padding: 0.12rem;
-        width: 16rem;
+        width: 20.25rem;
     }}
 
     .nav-popover-section {{
@@ -5454,6 +5630,15 @@ def inject_global_ui():
     }}
 
     .nav-popover-section summary::-webkit-details-marker {{ display: none; }}
+    .nav-popover-section__title {{ align-items: center; display: flex; gap: 0.55rem; }}
+    .nav-popover-section__icon {{
+        align-items: center;
+        color: #ffffff !important;
+        display: inline-flex;
+        font-size: 1rem;
+        justify-content: center;
+        width: 1.15rem;
+    }}
     .nav-popover-section summary::after {{
         color: #bfdbfe;
         content: "⌄";
@@ -5522,7 +5707,9 @@ def inject_global_ui():
     div[data-testid="stExpander"] details,
     div[data-testid="stDataFrame"] {{
         backdrop-filter: blur(12px) saturate(118%);
+        transform-style: preserve-3d;
         transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, filter 0.2s ease !important;
+        will-change: transform;
     }}
 
     .page-header,
@@ -5553,9 +5740,9 @@ def inject_global_ui():
     div[data-testid="stExpander"] details:hover,
     div[data-testid="stDataFrame"]:hover {{
         border-color: color-mix(in srgb, var(--qaqc-blue) 54%, var(--qaqc-line)) !important;
-        box-shadow: 0 18px 38px rgba(2, 12, 27, 0.24) !important;
+        box-shadow: 0 24px 46px rgba(2, 12, 27, 0.30), 0 10px 22px color-mix(in srgb, var(--qaqc-blue) 16%, transparent) !important;
         filter: brightness(1.025);
-        transform: translateY(-2px) !important;
+        transform: perspective(950px) translateY(-5px) rotateX(1.25deg) rotateY(-0.7deg) !important;
     }}
 
     .stButton button,
@@ -5574,11 +5761,33 @@ def inject_global_ui():
     .side-nav-link:hover,
     .nav-popover-link:hover {{
         box-shadow: 0 10px 24px rgba(21, 94, 239, 0.28) !important;
-        transform: translateY(-1px) !important;
+        transform: perspective(700px) translateY(-2px) rotateX(2deg) !important;
     }}
 
     div[data-testid="stDataFrame"] [role="row"]:hover [role="gridcell"] {{
         background-color: color-mix(in srgb, var(--qaqc-blue) 10%, var(--qaqc-surface-2)) !important;
+    }}
+
+    /* Progressive scroll-entry motion; unsupported browsers keep the static layout. */
+    @supports (animation-timeline: view()) {{
+        @keyframes qaqc-scroll-reveal {{
+            from {{
+                opacity: 0.35;
+                transform: perspective(950px) translateY(24px) rotateX(2deg);
+            }}
+            to {{
+                opacity: 1;
+                transform: perspective(950px) translateY(0) rotateX(0);
+            }}
+        }}
+
+        [data-testid="stMainBlockContainer"] > div > div,
+        .page-header,
+        .dashboard-hero {{
+            animation: qaqc-scroll-reveal both linear;
+            animation-range: entry 0% cover 22%;
+            animation-timeline: view();
+        }}
     }}
 
     @media (max-width: 768px) {{
@@ -5695,12 +5904,12 @@ def inject_global_ui():
 
         .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"] {{
             align-items: stretch !important;
-            flex-wrap: wrap !important;
+            flex-wrap: nowrap !important;
         }}
 
         .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:first-child {{
-            flex: 1 1 42% !important;
-            width: 42% !important;
+            flex: 0 0 3rem !important;
+            width: 3rem !important;
         }}
 
         .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {{
@@ -5708,8 +5917,8 @@ def inject_global_ui():
         }}
 
         .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:last-child {{
-            flex: 1 1 55% !important;
-            width: 55% !important;
+            flex: 1 1 auto !important;
+            width: auto !important;
         }}
 
         .st-key-navigation_account div[data-testid="stHorizontalBlock"] {{
@@ -5728,6 +5937,11 @@ def inject_global_ui():
             min-height: 2.45rem !important;
             padding-left: 0.55rem !important;
             padding-right: 0.55rem !important;
+        }}
+
+        .st-key-page_navigation_popover div[data-testid="stPopover"] button {{
+            min-height: 3rem !important;
+            padding: 0 !important;
         }}
 
         .page-header,
@@ -5770,7 +5984,52 @@ def inject_global_ui():
         .app-brand-lockup {{ gap: 0.5rem !important; }}
         .app-bar__title {{ font-size: 0.82rem !important; }}
         .st-key-navigation_account div[data-testid="stPopover"] button {{ font-size: 0.7rem !important; }}
-        .nav-popover-menu {{ max-height: 65vh; overflow-y: auto; }}
+        div[data-baseweb="popover"]:has(.nav-popover-menu) > div,
+        div[data-baseweb="popover"]:has(.st-key-nav_popover_menu) > div {{
+            max-width: calc(100vw - 1rem) !important;
+            min-width: calc(100vw - 1rem) !important;
+            width: calc(100vw - 1rem) !important;
+        }}
+        .st-key-nav_popover_menu {{
+            max-height: 65vh;
+            min-width: 0;
+            width: 100%;
+        }}
+        .nav-popover-menu {{
+            max-height: 65vh;
+            max-width: none;
+            min-width: 0;
+            overflow-y: auto;
+            width: 100%;
+        }}
+    }}
+
+    @media (prefers-reduced-motion: reduce) {{
+        *, *::before, *::after {{
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+            transition-duration: 0.01ms !important;
+        }}
+
+        .page-header:hover,
+        .dashboard-hero:hover,
+        .kpi-card:hover,
+        div[data-testid="stMetric"]:hover,
+        .exec-panel:hover,
+        .module-card:hover,
+        .tool-card:hover,
+        .standard-card:hover,
+        .learning-card:hover,
+        .security-card:hover,
+        div[data-testid="stVerticalBlockBorderWrapper"]:hover,
+        div[data-testid="stExpander"] details:hover,
+        div[data-testid="stDataFrame"]:hover,
+        .stButton button:hover,
+        .stDownloadButton button:hover,
+        div[data-testid="stPopover"] button:hover {{
+            transform: none !important;
+        }}
     }}
     </style>
     """,

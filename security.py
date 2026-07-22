@@ -16,6 +16,7 @@ MAX_PASSWORD_LENGTH = 256
 MAX_FAILED_ATTEMPTS = 5
 ACCOUNT_LOCK_MINUTES = 15
 SESSION_TTL_HOURS = 8
+INACTIVITY_TIMEOUT_SECONDS = 120
 
 USERNAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{2,31}$")
 EMAIL_PATTERN = re.compile(
@@ -107,3 +108,11 @@ def session_is_active(user: dict, now: datetime | None = None) -> bool:
         and expires_at
         and expires_at > (now or utc_now())
     )
+
+
+def inactivity_expired(last_activity, now, timeout_seconds=INACTIVITY_TIMEOUT_SECONDS) -> bool:
+    try:
+        elapsed = float(now) - float(last_activity)
+    except (TypeError, ValueError):
+        return True
+    return elapsed >= max(1, int(timeout_seconds))

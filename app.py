@@ -5,7 +5,7 @@
 # =========================
 st.set_page_config(
     page_title="Evomec QA/QC Executive Dashboard",
-    page_icon="QA",
+    page_icon="✅",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -23,6 +23,7 @@ from utils import (
     global_filter_sidebar,
     inject_enterprise_theme,
     load_master_data,
+    render_page_header,
     render_table,
     render_top_nav,
     get_navigation_pages,
@@ -74,19 +75,19 @@ def compact_number(value):
 
 def metric_delta(current, total):
     if not total:
-        return "0%"
-    return f"{max(1, pct(current, total))}%"
+        return "No records"
+    return f"{pct(current, total)}% of records"
 
 
 def metric_card(label, value, subtitle, accent, mark, delta=None):
-    delta_html = f'<div class="exec-metric__delta">+ {html.escape(str(delta))}</div>' if delta else ""
+    delta_html = f'<div class="exec-metric__delta">{html.escape(str(delta))}</div>' if delta else ""
     return f"""
-<div class="exec-metric" style="--metric-color: {accent};">
-    <div class="exec-metric__icon">{mark}</div>
+<div class="exec-metric" style="--metric-color: {html.escape(str(accent), quote=True)};">
+    <div class="exec-metric__icon">{html.escape(str(mark))}</div>
     <div>
-        <div class="exec-metric__label">{label}</div>
+        <div class="exec-metric__label">{html.escape(str(label))}</div>
         <div class="exec-metric__value">{html.escape(str(value))}</div>
-        <div class="exec-metric__sub">{subtitle}</div>
+        <div class="exec-metric__sub">{html.escape(str(subtitle))}</div>
         {delta_html}
     </div>
 </div>
@@ -530,7 +531,7 @@ def project_performance(data):
 def search_dashboard_records(data, query, max_results=25):
     query = str(query or "").strip().lower()
     if not query:
-        return pd.DataFrame(columns=["Module", "Record", "Match", "Open"])
+        return pd.DataFrame(columns=["Module", "Record", "Match", "_Page"])
 
     module_pages = {
         "NCR Log": ("NCR Register", "pages/NCR_Tracker.py"),
@@ -577,7 +578,7 @@ def search_dashboard_records(data, query, max_results=25):
                     "Module": module_label,
                     "Record": record,
                     "Match": " | ".join(matched_values[:2])[:180],
-                    "Open": "/" if page_path == "app.py" else f"/{Path(page_path).stem}",
+                    "_Page": page_path,
                 }
             )
             if len(rows) >= max_results:
@@ -592,6 +593,12 @@ if not auth.login():
 render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
+
+render_page_header(
+    "Executive command centre",
+    "Monitor portfolio quality, closeout performance, field activity, and calibration readiness from one view.",
+    "Portfolio overview",
+)
 
 try:
     data = load_master_data(EXCEL_FILE)
@@ -616,7 +623,24 @@ if home_search:
         st.info("No dashboard records match your search.")
     else:
         st.caption(f"{len(search_results)} result(s) found")
-        render_table(search_results, height=260, empty_message="No matching records were found.")
+        render_table(
+            search_results,
+            height=260,
+            columns=["Module", "Record", "Match"],
+            empty_message="No matching records were found.",
+        )
+        result_index = st.selectbox(
+            "Open a matching module",
+            list(search_results.index),
+            format_func=lambda index: (
+                f"{search_results.loc[index, 'Module']} — {search_results.loc[index, 'Record']}"
+            ),
+        )
+        st.page_link(
+            str(search_results.loc[result_index, "_Page"]),
+            label="Open selected module",
+            use_container_width=True,
+        )
 
 ncr = filtered_data.get("NCR Log", pd.DataFrame())
 obs = filtered_data.get("OBS Log", pd.DataFrame())
@@ -646,12 +670,12 @@ quality_score = pct(
 )
 
 metric_html = [
-    metric_card("Total Projects", len(projects), "Active work fronts", "#2563eb", "P", "8% vs last month"),
+    metric_card("Total Projects", len(projects), "Active work fronts", "#2563eb", "P", "Current portfolio"),
     metric_card("Open NCRs", open_ncr, "Requires action", "#ef4444", "!", metric_delta(open_ncr, open_ncr + closed_ncr)),
     metric_card("Closed NCRs", closed_ncr, "Closed records", "#22c55e", "C", metric_delta(closed_ncr, open_ncr + closed_ncr)),
     metric_card("Open OBS", open_obs, "Field observations", "#f97316", "O", metric_delta(open_obs, open_obs + closed_obs)),
-    metric_card("Daily Reports", len(daily), "Records loaded", "#7c3aed", "R", "28% vs last month"),
-    metric_card("Concrete Volume (m3)", compact_number(concrete_volume_total), "Actual tracker total", "#0ea5e9", "C", "Concrete page"),
+    metric_card("Daily Reports", len(daily), "Records loaded", "#7c3aed", "R", "Current selection"),
+    metric_card("Concrete Volume (m3)", compact_number(concrete_volume_total), "Actual tracker total", "#0ea5e9", "C", "Concrete tracker"),
     metric_card("Calibration Alerts", calibration_summary.get("reminders", 0), "Due within 21 days", "#dc2626", "!", f"{calibration_summary.get('overdue', 0)} overdue"),
 ]
 

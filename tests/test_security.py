@@ -1,15 +1,19 @@
 from datetime import timedelta
+import inspect
 from io import BytesIO
 from types import SimpleNamespace
 
 from PIL import Image
 import pytest
 
+import auth
+import utils
 from database import cloudinary_storage
 from security import (
     MIN_PASSWORD_LENGTH,
     account_is_locked,
     hash_password,
+    inactivity_expired,
     password_needs_upgrade,
     session_is_active,
     utc_now,
@@ -30,6 +34,13 @@ class Upload:
 
     def getvalue(self):
         return self._data
+
+
+class SessionState(dict):
+    __getattr__ = dict.get
+
+    def __setattr__(self, key, value):
+        self[key] = value
 
 
 def test_password_policy_and_legacy_hash_upgrade():
@@ -69,6 +80,36 @@ def test_identity_validation_and_time_controls():
         },
         now,
     )
+    assert not inactivity_expired(1_000, 1_119)
+    assert inactivity_expired(1_000, 1_120)
+
+
+def test_page_transition_keeps_existing_session_token(monkeypatch):
+    session_state = SessionState(
+        auth={"auth_token": "existing-secure-token"},
+        auth_last_activity=1_000,
+    )
+    monkeypatch.setattr(auth.st, "session_state", session_state)
+
+    auth._set_logged_in(
+        "quality.user",
+        {
+            "name": "Quality User",
+            "role": "user",
+            "email": "quality@example.com",
+            "discipline": "Quality Management",
+        },
+    )
+
+    assert session_state.auth["auth_token"] == "existing-secure-token"
+    assert session_state.logged_in is True
+
+
+def test_primary_navigation_uses_session_preserving_page_links():
+    source = inspect.getsource(utils.render_navigation)
+
+    assert "st.page_link" in source
+    assert "href=" not in source
 
 
 def test_upload_validation_rejects_extension_spoofing():
