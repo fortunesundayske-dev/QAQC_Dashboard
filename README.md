@@ -230,8 +230,11 @@ A SQLite schema is available at `database/schema.sql`. Use `database/init_db.py`
 - Remote `mongodb://` connections must explicitly enable TLS; Atlas
   `mongodb+srv://` connections use TLS unless explicitly disabled. Restrict Atlas
   network access and use a least-privilege database user.
-- Authentication sessions are server-side, expire after eight hours, time out
-  after inactivity, and are never placed in URLs. Five failed attempts lock an
+- Authentication sessions are server-side, expire after eight hours, and time
+  out after two minutes of inactivity. A strict same-site browser-session cookie
+  restores the session after navigation or a brief connection reset; it contains
+  only a random credential, never a password, and is never placed in a URL. Keep
+  `QAQC_COOKIE_SECURE=true` on HTTPS deployments. Five failed attempts lock an
   account for 15 minutes. Password hashes are upgraded to 600,000-iteration
   PBKDF2 on successful login.
 - New support attachments and profile photos are content-validated, stored as

@@ -13,7 +13,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from database.audit_log import activity_csv, paginate_activities
 from database.mongo_users import ensure_user_schema
 from database.settings import get_setting
-from security import session_is_active
+from security import session_is_active, utc_timestamp
 
 
 ADMIN_ROLE = "admin"
@@ -73,7 +73,8 @@ def require_admin(
             headers={"WWW-Authenticate": "Bearer"},
         )
     token_hash = hashlib.sha256(credentials.credentials.encode("utf-8")).hexdigest()
-    user = ensure_user_schema().find_one({"session_token_hash": token_hash})
+    collection = ensure_user_schema()
+    user = collection.find_one({"session_token_hash": token_hash})
     if not user or not session_is_active(user):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -82,6 +83,13 @@ def require_admin(
         )
     if str(user.get("role", "")).strip().lower() != ADMIN_ROLE:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator access required")
+    try:
+        collection.update_one(
+            {"username": user["username"], "session_token_hash": token_hash},
+            {"$set": {"session_last_activity_at": utc_timestamp()}},
+        )
+    except Exception:
+        pass
     return user
 
 

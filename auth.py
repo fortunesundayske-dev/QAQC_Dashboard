@@ -2,7 +2,6 @@ import base64
 import hashlib
 import hmac
 import json
-import os
 import secrets
 import smtplib
 import time
@@ -14,8 +13,9 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 import streamlit as st
+import streamlit.components.v1 as components
 
-from database.mongo_users import get_database, load_users, save_users
+from database.mongo_users import get_database, load_users, save_users, touch_user_session
 from database.cloudinary_storage import delete_attachment, upload_profile_photo
 from database.settings import get_setting
 from database.audit_log import record_activity
@@ -46,6 +46,8 @@ DATA_DIR = BASE_DIR / "data"
 PROFILE_DIR = DATA_DIR / "profile_photos"
 LOGO_FILE = BASE_DIR / "assets" / "evomec_logo.png"
 SESSION_TOKEN_PARAM = "auth_token"
+SESSION_COOKIE_NAME = "__Host-qaqc_session"
+SESSION_TOUCH_INTERVAL_SECONDS = 15
 DISCIPLINES = ["Civil", "Mechanical", "Piping", "Welding", "Electrical", "Instrumentation", "NDT", "Quality Management"]
 DEFAULT_ADMIN_EMAIL = "fortune.kpakue@evomeclimited.com"
 MICROSOFT_GRAPH_ROOT = "https://graph.microsoft.com/v1.0"
@@ -176,6 +178,37 @@ def _hash_password(password, salt):
 
 def _hash_session_token(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _secure_cookie_enabled():
+    return str(get_setting("QAQC_COOKIE_SECURE", "true")).strip().lower() in {"1", "true", "yes"}
+
+
+def _session_cookie_name():
+    return SESSION_COOKIE_NAME if _secure_cookie_enabled() else "qaqc_session_dev"
+
+
+def _browser_session_token():
+    try:
+        return str(st.context.cookies.get(_session_cookie_name()) or "").strip()
+    except Exception:
+        return ""
+
+
+def _write_session_cookie(token=None):
+    """Synchronize a same-site browser-session cookie without putting tokens in URLs."""
+    cookie_name = _session_cookie_name()
+    if token:
+        attributes = "; Path=/; SameSite=Strict" + ("; Secure" if _secure_cookie_enabled() else "")
+        cookie = f"{cookie_name}={token}{attributes}"
+    else:
+        attributes = "; Path=/; Max-Age=0; SameSite=Strict" + ("; Secure" if _secure_cookie_enabled() else "")
+        cookie = f"{cookie_name}={attributes}"
+    components.html(
+        f"<script>document.cookie = {json.dumps(cookie)};</script>",
+        height=0,
+        width=0,
+    )
 
 
 def _clear_query_token():
@@ -379,11 +412,26 @@ def _clear_local_session():
     }
     for key in [
         "logged_in", "username", "name", "role", "email", "discipline",
-        "profile_photo", "auth_token", "auth_last_activity",
+        "profile_photo", "auth_token", "auth_last_activity", "auth_server_touch",
     ]:
         st.session_state.pop(key, None)
     st.session_state.logged_in = False
+    _write_session_cookie()
     _clear_query_token()
+
+
+def _touch_server_session(username, token, *, force=False):
+    now = time.time()
+    previous_touch = float(st.session_state.get("auth_server_touch", 0) or 0)
+    if not force and now - previous_touch < SESSION_TOUCH_INTERVAL_SECONDS:
+        return True
+    try:
+        touched = touch_user_session(username, _hash_session_token(str(token)), _utc_now())
+    except Exception:
+        return False
+    if touched:
+        st.session_state.auth_server_touch = now
+    return touched
 
 
 def _server_session_user():
@@ -399,6 +447,32 @@ def _server_session_user():
     if not hmac.compare_digest(str(user.get("session_token_hash")), _hash_session_token(str(token))):
         return None
     return user
+
+
+def _restore_from_session_cookie():
+    token = _browser_session_token()
+    if not 32 <= len(token) <= 128:
+        if token:
+            _write_session_cookie()
+        return False
+    token_hash = _hash_session_token(token)
+    users = _load_users()
+    for username, user in users.items():
+        saved_hash = str(user.get("session_token_hash") or "")
+        if saved_hash and hmac.compare_digest(saved_hash, token_hash) and session_is_active(user):
+            if not _touch_server_session(username, token, force=True):
+                _write_session_cookie()
+                return False
+            _set_logged_in(username, user, session_token=token)
+            _write_session_cookie(token)
+            _inactivity_watchdog()
+            record_activity(
+                "restore_session", category="authentication", page="Sign in",
+                details={"source": "secure_cookie"}, actor=user,
+            )
+            return True
+    _write_session_cookie()
+    return False
 
 
 def _enforce_inactivity_timeout():
@@ -439,6 +513,7 @@ def _set_logged_out(reason="user_sign_out"):
             users[username].pop("session_token_hash", None)
             users[username].pop("session_expires_at", None)
             users[username].pop("session_created_at", None)
+            users[username].pop("session_last_activity_at", None)
             _try_save_users(users)
         record_activity(
             "sign_out",
@@ -462,12 +537,18 @@ def login():
             st.session_state.auth_timeout_message = "Your secure session expired or was revoked. Sign in again."
         elif not _enforce_inactivity_timeout():
             _set_logged_in(st.session_state.auth["username"], live_user)
+            token = st.session_state.auth.get("auth_token")
+            _touch_server_session(st.session_state.auth["username"], token)
+            _write_session_cookie(token)
             _inactivity_watchdog()
             return True
 
     timeout_message = st.session_state.pop("auth_timeout_message", None)
     if timeout_message:
         st.warning(timeout_message)
+
+    if _restore_from_session_cookie():
+        return True
 
     logo_src = _image_data_uri(LOGO_FILE)
     st.markdown('<div class="auth-page">', unsafe_allow_html=True)
@@ -584,6 +665,7 @@ def login():
                 user["session_expires_at"] = utc_timestamp(
                     utc_now() + timedelta(hours=SESSION_TTL_HOURS)
                 )
+                user["session_last_activity_at"] = _utc_now()
                 user["failed_attempts"] = 0
                 user["locked_until"] = None
                 user["last_login"] = _utc_now()
@@ -597,6 +679,7 @@ def login():
                     st.error("Sign-in could not establish a secure server session. Try again shortly.")
                     return False
                 _set_logged_in(username, user, session_token=session_token)
+                _write_session_cookie(session_token)
                 record_activity("sign_in", category="authentication", page="Sign in", actor=user)
                 st.rerun()
 

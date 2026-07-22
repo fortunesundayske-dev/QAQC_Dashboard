@@ -1,7 +1,6 @@
 from datetime import timedelta
 import inspect
 from io import BytesIO
-from types import SimpleNamespace
 
 from PIL import Image
 import pytest
@@ -69,6 +68,7 @@ def test_identity_validation_and_time_controls():
             "status": "approved",
             "session_token_hash": "hash",
             "session_expires_at": utc_timestamp(now + timedelta(minutes=1)),
+            "session_last_activity_at": utc_timestamp(now - timedelta(seconds=1)),
         },
         now,
     )
@@ -77,6 +77,16 @@ def test_identity_validation_and_time_controls():
             "status": "approved",
             "session_token_hash": "hash",
             "session_expires_at": utc_timestamp(now - timedelta(seconds=1)),
+            "session_last_activity_at": utc_timestamp(now - timedelta(seconds=1)),
+        },
+        now,
+    )
+    assert not session_is_active(
+        {
+            "status": "approved",
+            "session_token_hash": "hash",
+            "session_expires_at": utc_timestamp(now + timedelta(minutes=1)),
+            "session_last_activity_at": utc_timestamp(now - timedelta(seconds=120)),
         },
         now,
     )
@@ -103,6 +113,62 @@ def test_page_transition_keeps_existing_session_token(monkeypatch):
 
     assert session_state.auth["auth_token"] == "existing-secure-token"
     assert session_state.logged_in is True
+
+
+def test_browser_cookie_restores_a_live_server_session(monkeypatch):
+    token = "x" * 43
+    now = utc_now()
+    user = {
+        "username": "quality.user",
+        "name": "Quality User",
+        "role": "user",
+        "email": "quality@example.com",
+        "discipline": "Quality Management",
+        "status": "approved",
+        "session_token_hash": auth._hash_session_token(token),
+        "session_expires_at": utc_timestamp(now + timedelta(hours=1)),
+        "session_last_activity_at": utc_timestamp(now - timedelta(seconds=1)),
+    }
+    session_state = SessionState()
+    captured = {}
+
+    monkeypatch.setattr(auth.st, "session_state", session_state)
+    monkeypatch.setattr(auth, "_browser_session_token", lambda: token)
+    monkeypatch.setattr(auth, "_load_users", lambda: {"quality.user": user})
+    monkeypatch.setattr(
+        auth,
+        "_touch_server_session",
+        lambda username, value, force=False: captured.update(
+            username=username, token=value, force=force
+        ) or True,
+    )
+    monkeypatch.setattr(auth, "_write_session_cookie", lambda value=None: None)
+    monkeypatch.setattr(auth, "_inactivity_watchdog", lambda: None)
+    monkeypatch.setattr(auth, "record_activity", lambda *args, **kwargs: None)
+
+    assert auth._restore_from_session_cookie()
+    assert session_state.logged_in is True
+    assert session_state.auth["auth_token"] == token
+    assert captured == {"username": "quality.user", "token": token, "force": True}
+
+
+def test_session_cookie_has_strict_secure_attributes(monkeypatch):
+    captured = {}
+
+    monkeypatch.setattr(auth, "get_setting", lambda key, default=None: "true")
+    monkeypatch.setattr(
+        auth.components,
+        "html",
+        lambda markup, **kwargs: captured.update(markup=markup, **kwargs),
+    )
+
+    auth._write_session_cookie("x" * 43)
+
+    assert "__Host-qaqc_session=" in captured["markup"]
+    assert "Path=/" in captured["markup"]
+    assert "SameSite=Strict" in captured["markup"]
+    assert "Secure" in captured["markup"]
+    assert "Max-Age" not in captured["markup"]
 
 
 def test_primary_navigation_uses_session_preserving_page_links():

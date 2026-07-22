@@ -37,6 +37,7 @@ USER_VALIDATOR = {
             "password_iterations": {"bsonType": ["int", "null"], "minimum": 260000},
             "session_created_at": {"bsonType": ["string", "null"]},
             "session_expires_at": {"bsonType": ["string", "null"]},
+            "session_last_activity_at": {"bsonType": ["string", "null"]},
         },
         "additionalProperties": True,
     }
@@ -120,6 +121,19 @@ def load_users():
         document.pop("_id", None)
         users[document["username"]] = document
     return users
+
+
+def touch_user_session(username, token_hash, activity_at):
+    """Atomically refresh one validated session without rewriting user records."""
+    result = ensure_user_schema().update_one(
+        {
+            "username": str(username or "").strip().lower(),
+            "session_token_hash": str(token_hash or ""),
+            "status": "approved",
+        },
+        {"$set": {"session_last_activity_at": str(activity_at)}},
+    )
+    return result.matched_count == 1
 
 
 def save_users(users):

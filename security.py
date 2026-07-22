@@ -101,12 +101,20 @@ def account_is_locked(user: dict, now: datetime | None = None) -> bool:
 
 
 def session_is_active(user: dict, now: datetime | None = None) -> bool:
+    current_time = now or utc_now()
     expires_at = parse_utc_timestamp(user.get("session_expires_at"))
+    last_activity_at = parse_utc_timestamp(user.get("session_last_activity_at"))
+    inactivity_seconds = (
+        (current_time - last_activity_at).total_seconds()
+        if last_activity_at else INACTIVITY_TIMEOUT_SECONDS
+    )
     return bool(
         user.get("status") == "approved"
         and user.get("session_token_hash")
         and expires_at
-        and expires_at > (now or utc_now())
+        and expires_at > current_time
+        and last_activity_at
+        and 0 <= inactivity_seconds < INACTIVITY_TIMEOUT_SECONDS
     )
 
 

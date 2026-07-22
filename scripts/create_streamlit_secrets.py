@@ -30,6 +30,7 @@ SECRET_DEFAULTS = {
     "QAQC_ENV": "development",
     "QAQC_ALLOWED_HOSTS": "localhost,127.0.0.1",
     "QAQC_FORCE_HTTPS": "false",
+    "QAQC_COOKIE_SECURE": "false",
     "QAQC_GMAIL_ADDRESS": "fortunesundayske@gmail.com",
     "QAQC_GMAIL_APP_PASSWORD": "",
     "QAQC_EXCHANGE_TENANT_ID": "",
