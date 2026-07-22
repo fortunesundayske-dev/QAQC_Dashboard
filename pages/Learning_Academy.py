@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 import auth
-from utils import inject_global_ui, render_navigation, render_top_nav, render_table
+from utils import inject_global_ui, render_navigation, render_page_header, render_top_nav, render_table
 
 
 st.set_page_config(page_title="Learning Academy", layout="wide")
@@ -15,15 +15,10 @@ render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
-st.markdown(
-    """
-<div class="dashboard-hero">
-    <div class="hero-eyebrow">Inspection competence centre</div>
-    <h1>QA/QC Learning Academy</h1>
-    <p>Structured learning paths for civil works inspection, NDT, Barcol hardness, piping, welding, CWI, SCWI, document control, and quality leadership.</p>
-</div>
-""",
-    unsafe_allow_html=True,
+render_page_header(
+    "QA/QC Learning Academy",
+    "Structured learning paths for civil works inspection, NDT, Barcol hardness, piping, welding, CWI, SCWI, document control, and quality leadership.",
+    "Inspection Competence Centre",
 )
 
 learning_paths = [
@@ -115,19 +110,22 @@ with tab_matrix:
 
 with tab_quiz:
     st.subheader("Quick Knowledge Check")
-    q1 = st.radio(
-        "Before a concrete pour, which item should be confirmed first?",
-        ["Paint DFT report", "Approved ITP/drawings and pour readiness", "Final dossier index"],
-    )
-    q2 = st.radio(
-        "A root cause statement should normally describe:",
-        ["The symptom only", "The verified system/process cause", "The person to blame"],
-    )
-    q3 = st.radio(
-        "For welding inspection, the inspector should verify:",
-        ["WPS, welder qualification, consumable control, and inspection acceptance", "Only final paint colour", "Only the delivery note"],
-    )
-    if st.button("Score knowledge check", width="stretch"):
+    st.caption("Answer all three questions, then submit once to receive a scored result.")
+    with st.form("academy_knowledge_check", border=True):
+        q1 = st.radio(
+            "Before a concrete pour, which item should be confirmed first?",
+            ["Paint DFT report", "Approved ITP/drawings and pour readiness", "Final dossier index"],
+        )
+        q2 = st.radio(
+            "A root cause statement should normally describe:",
+            ["The symptom only", "The verified system/process cause", "The person to blame"],
+        )
+        q3 = st.radio(
+            "For welding inspection, the inspector should verify:",
+            ["WPS, welder qualification, consumable control, and inspection acceptance", "Only final paint colour", "Only the delivery note"],
+        )
+        score_submitted = st.form_submit_button("Score knowledge check", type="primary", width="stretch")
+    if score_submitted:
         score = int(q1.startswith("Approved")) + int(q2.startswith("The verified")) + int(q3.startswith("WPS"))
         st.metric("Score", f"{score}/3")
         if score == 3:
@@ -137,14 +135,23 @@ with tab_quiz:
 
 with tab_records:
     st.subheader("Training Record Builder")
-    name = st.text_input("Trainee name")
-    discipline = st.selectbox("Discipline", ["Civil", "Concrete", "NDT", "Piping", "Welding", "Coating", "E&I", "Quality"])
-    course = st.selectbox("Course", [item["Path"] for item in learning_paths])
-    status = st.selectbox("Status", ["Planned", "In progress", "Completed", "Needs reassessment"])
-    evidence = st.text_area("Evidence / assessor comments")
-    if st.button("Create training record preview", width="stretch"):
-        render_table(
-            pd.DataFrame(
-                [{"Trainee": name, "Discipline": discipline, "Course": course, "Status": status, "Evidence": evidence}]
+    st.caption("Build a review-ready record before transferring it to the controlled competency register.")
+    with st.form("academy_training_record", border=True):
+        identity_col, training_col = st.columns(2)
+        with identity_col:
+            name = st.text_input("Trainee name")
+            discipline = st.selectbox("Discipline", ["Civil", "Concrete", "NDT", "Piping", "Welding", "Coating", "E&I", "Quality"])
+        with training_col:
+            course = st.selectbox("Course", [item["Path"] for item in learning_paths])
+            status = st.selectbox("Status", ["Planned", "In progress", "Completed", "Needs reassessment"])
+        evidence = st.text_area("Evidence / assessor comments")
+        preview_submitted = st.form_submit_button("Create training record preview", type="primary", width="stretch")
+    if preview_submitted:
+        if not name.strip():
+            st.warning("Enter the trainee name before creating the record preview.")
+        else:
+            render_table(
+                pd.DataFrame(
+                    [{"Trainee": name, "Discipline": discipline, "Course": course, "Status": status, "Evidence": evidence}]
+                )
             )
-        )

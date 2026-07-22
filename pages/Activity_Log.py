@@ -6,7 +6,7 @@ import streamlit as st
 
 import auth
 from database.audit_log import activity_csv, activity_filter_values, paginate_activities
-from utils import inject_global_ui, render_navigation, render_top_nav, render_table
+from utils import inject_global_ui, render_navigation, render_page_header, render_top_nav, render_table
 
 
 st.set_page_config(page_title="Activity Log", page_icon="🛡️", layout="wide")
@@ -19,15 +19,10 @@ auth.require_role(["admin"])
 render_navigation()
 render_top_nav()
 
-st.markdown(
-    """
-<div class="dashboard-hero">
-    <div class="hero-eyebrow">Security · Administration · Traceability</div>
-    <h1>Activity logs</h1>
-    <p>Investigate account and system activity, narrow the timeline, and export exactly what you need.</p>
-</div>
-""",
-    unsafe_allow_html=True,
+render_page_header(
+    "Activity Log",
+    "Investigate account and system activity, narrow the timeline, and export exactly what you need.",
+    "Security · Administration · Traceability",
 )
 
 today = datetime.now(timezone.utc).date()

@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 import auth
-from utils import inject_global_ui, render_navigation, render_top_nav, render_table
+from utils import inject_global_ui, render_navigation, render_page_header, render_top_nav, render_table
 
 
 st.set_page_config(page_title="Quality Tools", layout="wide")
@@ -17,15 +17,10 @@ render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
-st.markdown(
-    """
-<div class="dashboard-hero">
-    <div class="hero-eyebrow">Quality engineering toolkit</div>
-    <h1>Advanced QA/QC Tools</h1>
-    <p>Structured field and management tools for Lean Six Sigma, root cause analysis, concrete planning, inspection readiness, and corrective action control.</p>
-</div>
-""",
-    unsafe_allow_html=True,
+render_page_header(
+    "Advanced QA/QC Tools",
+    "Structured field and management tools for Lean Six Sigma, root cause analysis, concrete planning, inspection readiness, and corrective action control.",
+    "Quality Engineering Toolkit",
 )
 
 st.markdown(
@@ -104,19 +99,22 @@ with tab_pdca:
 
 with tab_rca:
     st.subheader("Root Cause Analysis")
-    incident = st.text_area("Nonconformance / issue description")
-    why_values = []
-    for index in range(1, 6):
-        why_values.append(st.text_input(f"Why {index}", key=f"why_{index}"))
+    st.caption("Move from the observed problem to a verified process or system cause; avoid personal blame statements.")
+    with st.container(border=True):
+        incident = st.text_area("Nonconformance / issue description")
+        why_values = []
+        for index in range(1, 6):
+            why_values.append(st.text_input(f"Why {index}", key=f"why_{index}"))
 
     st.markdown("#### Fishbone categories")
+    fishbone_left, fishbone_right = st.columns(2)
     fishbone = {
-        "Manpower": st.text_input("People / competency"),
-        "Method": st.text_input("Procedure / work method"),
-        "Machine": st.text_input("Equipment / tools"),
-        "Material": st.text_input("Material / consumables"),
-        "Measurement": st.text_input("Inspection / testing / calibration"),
-        "Environment": st.text_input("Weather / access / site condition"),
+        "Manpower": fishbone_left.text_input("People / competency"),
+        "Method": fishbone_left.text_input("Procedure / work method"),
+        "Machine": fishbone_left.text_input("Equipment / tools"),
+        "Material": fishbone_right.text_input("Material / consumables"),
+        "Measurement": fishbone_right.text_input("Inspection / testing / calibration"),
+        "Environment": fishbone_right.text_input("Weather / access / site condition"),
     }
     rca_df = pd.DataFrame(
         [{"Category": key, "Possible cause": value or "To be assessed"} for key, value in fishbone.items()]
@@ -130,21 +128,30 @@ with tab_rca:
 
 with tab_concrete:
     st.subheader("Concrete Volume Calculator")
-    shape = st.selectbox("Element type", ["Slab / rectangular footing", "Column / cylinder", "Wall / beam"])
-    waste = st.slider("Waste allowance (%)", min_value=0, max_value=20, value=5)
+    basis_col, allowance_col = st.columns(2)
+    with basis_col:
+        shape = st.selectbox("Element type", ["Slab / rectangular footing", "Column / cylinder", "Wall / beam"])
+    with allowance_col:
+        waste = st.slider("Waste allowance (%)", min_value=0, max_value=20, value=5)
 
     if shape == "Column / cylinder":
-        diameter = st.number_input("Diameter (m)", min_value=0.0, value=0.6, step=0.05)
-        height = st.number_input("Height (m)", min_value=0.0, value=3.0, step=0.1)
+        diameter_col, height_col = st.columns(2)
+        diameter = diameter_col.number_input("Diameter (m)", min_value=0.0, value=0.6, step=0.05)
+        height = height_col.number_input("Height (m)", min_value=0.0, value=3.0, step=0.1)
         volume = math.pi * (diameter / 2) ** 2 * height
     else:
-        length = st.number_input("Length (m)", min_value=0.0, value=10.0, step=0.1)
-        width = st.number_input("Width / thickness (m)", min_value=0.0, value=0.25, step=0.05)
-        depth = st.number_input("Depth / height (m)", min_value=0.0, value=0.3, step=0.05)
+        length_col, width_col, depth_col = st.columns(3)
+        length = length_col.number_input("Length (m)", min_value=0.0, value=10.0, step=0.1)
+        width = width_col.number_input("Width / thickness (m)", min_value=0.0, value=0.25, step=0.05)
+        depth = depth_col.number_input("Depth / height (m)", min_value=0.0, value=0.3, step=0.05)
         volume = length * width * depth
 
     adjusted = volume * (1 + waste / 100)
-    cement_content = st.number_input("Cement content (kg/m3)", min_value=250, max_value=600, value=380, step=5)
+    cement_col, guidance_col = st.columns([1, 2])
+    with cement_col:
+        cement_content = st.number_input("Cement content (kg/m3)", min_value=250, max_value=600, value=380, step=5)
+    with guidance_col:
+        st.info("Use the approved project mix design for cement content; this calculator is a planning aid, not a batching instruction.")
     cement_tonnes = adjusted * cement_content / 1000
     bags_50kg = cement_tonnes * 1000 / 50
     c1, c2, c3 = st.columns(3)
@@ -156,9 +163,10 @@ with tab_concrete:
 with tab_risk:
     st.subheader("Failure Mode Risk Priority Number")
     failure_mode = st.text_input("Failure mode", placeholder="Example: Unapproved welding consumable used")
-    severity = st.slider("Severity", 1, 10, 7)
-    occurrence = st.slider("Occurrence", 1, 10, 4)
-    detection = st.slider("Detection difficulty", 1, 10, 5)
+    severity_col, occurrence_col, detection_col = st.columns(3)
+    severity = severity_col.slider("Severity", 1, 10, 7)
+    occurrence = occurrence_col.slider("Occurrence", 1, 10, 4)
+    detection = detection_col.slider("Detection difficulty", 1, 10, 5)
     rpn = severity * occurrence * detection
     band = "Low" if rpn < 80 else "Medium" if rpn < 200 else "High"
     st.metric("Risk Priority Number", rpn, band)
@@ -168,13 +176,14 @@ with tab_risk:
 
 with tab_checklist:
     st.subheader("Inspection Readiness Checklist")
+    checklist_left, checklist_right = st.columns(2)
     checks = {
-        "Approved ITP and latest drawing available": st.checkbox("Approved ITP and latest drawing available"),
-        "Material certificates and traceability verified": st.checkbox("Material certificates and traceability verified"),
-        "Calibrated equipment available": st.checkbox("Calibrated equipment available"),
-        "Qualified inspector / technician assigned": st.checkbox("Qualified inspector / technician assigned"),
-        "Hold/witness points notified": st.checkbox("Hold/witness points notified"),
-        "Acceptance criteria confirmed": st.checkbox("Acceptance criteria confirmed"),
+        "Approved ITP and latest drawing available": checklist_left.checkbox("Approved ITP and latest drawing available"),
+        "Material certificates and traceability verified": checklist_left.checkbox("Material certificates and traceability verified"),
+        "Calibrated equipment available": checklist_left.checkbox("Calibrated equipment available"),
+        "Qualified inspector / technician assigned": checklist_right.checkbox("Qualified inspector / technician assigned"),
+        "Hold/witness points notified": checklist_right.checkbox("Hold/witness points notified"),
+        "Acceptance criteria confirmed": checklist_right.checkbox("Acceptance criteria confirmed"),
     }
     score = sum(checks.values())
     st.metric("Readiness", f"{score}/{len(checks)}")

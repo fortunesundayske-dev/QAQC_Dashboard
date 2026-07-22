@@ -427,6 +427,7 @@ def render_calibration_pdf_email_popup(pdf_path, report_title, key_prefix):
                 data=pdf_bytes,
                 file_name=pdf_path.name,
                 mime="application/pdf",
+                type="primary",
                 width="stretch",
                 key=f"{key_prefix}_dialog_download_pdf",
             )
@@ -475,7 +476,7 @@ def render_calibration_report_actions(records, title, key_prefix):
         action_cols = st.columns([1, 1, 2.2])
 
         with action_cols[0]:
-            if st.button("▣  Create PDF", width="stretch", key=f"{key_prefix}_create_pdf"):
+            if st.button("▣  Create PDF", type="primary", width="stretch", key=f"{key_prefix}_create_pdf"):
                 try:
                     pdf_path = generate_calibration_pdf(records, report_title=f"{title} Calibration Report")
                     st.success(f"PDF created: {pdf_path.name}")
@@ -484,6 +485,7 @@ def render_calibration_report_actions(records, title, key_prefix):
                         data=pdf_path.read_bytes(),
                         file_name=pdf_path.name,
                         mime="application/pdf",
+                        type="primary",
                         width="stretch",
                         key=f"{key_prefix}_download_pdf",
                     )
@@ -637,7 +639,7 @@ def render_teams_settings(records, is_admin=False):
                 type="password",
                 placeholder="https://...",
             )
-            save_clicked = st.form_submit_button("Save Teams Webhook", width="stretch")
+            save_clicked = st.form_submit_button("Save Teams Webhook", type="primary", width="stretch")
         if save_clicked:
             write_teams_config(webhook_input)
             st.success("Teams webhook settings saved.")
@@ -669,7 +671,7 @@ def render_teams_settings(records, is_admin=False):
             with st.expander("Teams delivery details", expanded=bool(result.get("failed"))):
                 st.dataframe(dataframe_for_display(pd.DataFrame(result_rows)), width="stretch", hide_index=True)
 
-    if st.button("Send Teams Alerts Now", width="stretch"):
+    if st.button("Send Teams Alerts Now", type="primary", width="stretch"):
         result = send_calibration_teams_alerts(records, force=True)
         st.session_state["calibration_teams_result"] = result
         if not result.get("configured"):
@@ -932,7 +934,7 @@ with tab_alerts:
             with action_cols[2]:
                 st.write("")
                 st.write("")
-                if st.button("Acknowledge", width="stretch"):
+                if st.button("Acknowledge", type="primary", width="stretch"):
                     acknowledge_calibration(selected_id)
                     st.success("Reminder acknowledged.")
                     st.rerun()

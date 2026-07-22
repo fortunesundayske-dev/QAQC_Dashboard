@@ -167,7 +167,7 @@ if is_admin and tickets:
     selected = labels[selected_label]
     statuses = ["open", "in_progress", "resolved", "closed"]
     status = st.selectbox("Status", statuses, index=statuses.index(selected.get("status", "open")))
-    if st.button("Update ticket status", width="stretch"):
+    if st.button("Update ticket status", type="primary", width="stretch"):
         if update_ticket_status(selected["ticket_id"], status, username):
             record_activity(
                 "update_support_ticket_status", category="support", page="Customer Support",

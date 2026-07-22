@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 import auth
-from utils import inject_global_ui, render_navigation, render_top_nav, render_table
+from utils import inject_global_ui, render_navigation, render_page_header, render_top_nav, render_table
 
 
 st.set_page_config(page_title="Access Admin", layout="wide")
@@ -16,15 +16,10 @@ render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
-st.markdown(
-    """
-<div class="dashboard-hero">
-    <div class="hero-eyebrow">Security administration</div>
-    <h1>User Approval Centre</h1>
-    <p>Review registration requests, approve access, assign roles, and maintain controlled entry to the QA/QC dashboard.</p>
-</div>
-""",
-    unsafe_allow_html=True,
+render_page_header(
+    "User Approval Centre",
+    "Review registration requests, approve access, assign roles, and maintain controlled entry to the QA/QC dashboard.",
+    "Security Administration",
 )
 
 pending_users = getattr(auth, "pending_users", lambda: {})
@@ -63,9 +58,12 @@ c3.metric("Restricted users", len(restricted))
 c4.metric("Rejected requests", len(rejected))
 c5.metric("Admin users", sum(1 for user in approved.values() if user.get("role") == "admin"))
 
-st.caption("User store: secured application data store")
-if st.button("Refresh access requests", width="stretch"):
-    st.rerun()
+store_col, refresh_col = st.columns([3, 1])
+with store_col:
+    st.caption("User store: secured application data store")
+with refresh_col:
+    if st.button("Refresh access requests", width="stretch"):
+        st.rerun()
 
 st.markdown('<div class="section-heading">Pending Registration Requests</div>', unsafe_allow_html=True)
 if not pending:
@@ -85,7 +83,7 @@ else:
                 key=f"top_role_{username}",
             )
             c_approve, c_reject, c_delete = st.columns(3)
-            if c_approve.button("Approve access", key=f"top_approve_{username}", width="stretch"):
+            if c_approve.button("Approve access", key=f"top_approve_{username}", type="primary", width="stretch"):
                 ok, message = approve_user(username, role)
                 if ok:
                     st.success(message)
@@ -164,7 +162,7 @@ with st.container(border=True):
         if status == "pending":
             role = st.selectbox("Role on approval", ["user", "viewer", "admin"], key=f"control_role_{username}")
             approve_col, reject_col, delete_col = st.columns(3)
-            if approve_col.button("Approve", key=f"control_approve_{username}", width="stretch"):
+            if approve_col.button("Approve", key=f"control_approve_{username}", type="primary", width="stretch"):
                 ok, message = approve_user(username, role)
                 if ok:
                     st.success(message)
@@ -196,6 +194,7 @@ with st.container(border=True):
             if st.button(
                 "Save role",
                 key=f"control_save_role_{username}",
+                type="primary",
                 width="stretch",
                 disabled=is_self or new_role == current_role,
             ):
@@ -235,6 +234,7 @@ with st.container(border=True):
             if st.button(
                 "Save role",
                 key=f"control_save_role_restricted_{username}",
+                type="primary",
                 width="stretch",
                 disabled=new_role == current_role,
             ):
@@ -245,7 +245,7 @@ with st.container(border=True):
                 else:
                     st.error(message)
             unrestrict_col, delete_col = st.columns(2)
-            if unrestrict_col.button("Unrestrict", key=f"control_unrestrict_{username}", width="stretch"):
+            if unrestrict_col.button("Unrestrict", key=f"control_unrestrict_{username}", type="primary", width="stretch"):
                 ok, message = unrestrict_user(username)
                 if ok:
                     st.success(message)
@@ -263,7 +263,7 @@ with st.container(border=True):
         elif status == "rejected":
             role = st.selectbox("Role on approval", ["user", "viewer", "admin"], key=f"control_role_rejected_{username}")
             approve_col, delete_col = st.columns(2)
-            if approve_col.button("Approve rejected request", key=f"control_approve_rejected_{username}", width="stretch"):
+            if approve_col.button("Approve rejected request", key=f"control_approve_rejected_{username}", type="primary", width="stretch"):
                 ok, message = approve_user(username, role)
                 if ok:
                     st.success(message)

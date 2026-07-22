@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 import auth
 from utils import inject_global_ui, render_navigation, render_top_nav, render_page_header, render_table
@@ -176,20 +175,15 @@ else:
                 data=pdf_bytes,
                 file_name=pdf_path.name,
                 mime="application/pdf",
+                type="primary",
                 width="stretch",
             )
             if selected_pdf["Size MB"] <= PDF_EMBED_LIMIT_MB:
                 pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
-                components.html(
-                    f"""
-<iframe
-    src="data:application/pdf;base64,{pdf_b64}#toolbar=1&navpanes=1"
-    width="100%"
-    height="760"
-    style="border: 1px solid rgba(148, 163, 184, 0.24); border-radius: 8px; background: white;"
-></iframe>
-""",
-                    height=790,
+                st.iframe(
+                    f"data:application/pdf;base64,{pdf_b64}#toolbar=1&navpanes=1",
+                    width="stretch",
+                    height=760,
                 )
             else:
                 st.info(
@@ -258,6 +252,7 @@ else:
                 data=selected_path.read_bytes(),
                 file_name=selected_path.name,
                 mime="application/pdf",
+                type="primary",
                 width="stretch",
                 key="download_selected_dep_pdf",
             )

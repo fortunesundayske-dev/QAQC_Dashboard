@@ -5223,12 +5223,52 @@ def inject_global_ui():
         opacity: 0.78;
     }}
 
+    /* Action hierarchy: secondary is the safe default; only explicit primary
+       actions carry the strong brand fill. This keeps toolbars and forms calm. */
     .stButton button,
-    div[data-testid="stPopover"] button,
-    .stDownloadButton button {{
-        background: var(--qaqc-blue) !important;
+    .stDownloadButton button,
+    .stLinkButton a,
+    div[data-testid="stFormSubmitButton"] button {{
+        background: color-mix(in srgb, var(--qaqc-surface) 94%, var(--qaqc-blue)) !important;
+        border: 1px solid color-mix(in srgb, var(--qaqc-line) 78%, var(--qaqc-blue)) !important;
+        color: var(--qaqc-text) !important;
+    }}
+
+    button[kind="primary"],
+    [data-testid="stBaseButton-primary"],
+    .stLinkButton a[kind="primary"] {{
+        background: linear-gradient(135deg, var(--qaqc-blue), var(--qaqc-blue-2)) !important;
         border-color: color-mix(in srgb, var(--qaqc-blue) 72%, #0f172a) !important;
         color: #ffffff !important;
+        box-shadow: 0 8px 18px color-mix(in srgb, var(--qaqc-blue) 22%, transparent) !important;
+    }}
+
+    button:disabled,
+    [data-testid^="stBaseButton-"]:disabled {{
+        background: color-mix(in srgb, var(--qaqc-surface-2) 90%, var(--qaqc-line)) !important;
+        border-color: var(--qaqc-line) !important;
+        box-shadow: none !important;
+        color: var(--qaqc-muted) !important;
+        cursor: not-allowed !important;
+        opacity: 0.68 !important;
+        transform: none !important;
+    }}
+
+    /* Streamlit exposes widget keys as stable st-key-* classes. Destructive
+       account actions remain unmistakable without introducing unsafe HTML. */
+    [class*="st-key-"][class*="delete"] button:not(:disabled),
+    [class*="st-key-"][class*="reject"] button:not(:disabled) {{
+        background: color-mix(in srgb, var(--qaqc-danger) 11%, var(--qaqc-surface)) !important;
+        border-color: color-mix(in srgb, var(--qaqc-danger) 48%, var(--qaqc-line)) !important;
+        color: var(--qaqc-danger) !important;
+        box-shadow: none !important;
+    }}
+
+    [class*="st-key-"][class*="restrict"] button:not(:disabled) {{
+        background: color-mix(in srgb, var(--qaqc-warning) 11%, var(--qaqc-surface)) !important;
+        border-color: color-mix(in srgb, var(--qaqc-warning) 48%, var(--qaqc-line)) !important;
+        color: var(--qaqc-warning) !important;
+        box-shadow: none !important;
     }}
 
     .status-badge--open,
@@ -5682,6 +5722,52 @@ def inject_global_ui():
         font-size: 0.82rem !important;
     }}
 
+    /* Consistent control geometry and readable data density. */
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="select"] > div,
+    div[data-testid="stDateInput"] > div > div,
+    .stButton button,
+    .stDownloadButton button,
+    .stLinkButton a,
+    div[data-testid="stFormSubmitButton"] button {{
+        min-height: 2.72rem !important;
+    }}
+
+    div[data-testid="stWidgetLabel"] p {{
+        color: var(--qaqc-text) !important;
+        font-size: 0.82rem !important;
+        font-weight: 750 !important;
+        letter-spacing: 0.005em;
+    }}
+
+    div[data-testid="stForm"],
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
+        border-color: color-mix(in srgb, var(--qaqc-line) 84%, var(--qaqc-blue)) !important;
+        border-radius: 9px !important;
+    }}
+
+    div[data-testid="stTabs"] div[role="tablist"] {{
+        overflow-x: auto !important;
+        overscroll-behavior-inline: contain;
+        scrollbar-width: thin;
+    }}
+
+    div[data-testid="stTabs"] button[role="tab"] {{
+        flex: 0 0 auto !important;
+        white-space: nowrap !important;
+    }}
+
+    /* Plotly tools stay available without competing with the chart itself. */
+    .js-plotly-plot .modebar {{
+        opacity: 0;
+        transition: opacity 0.18s ease;
+    }}
+
+    .js-plotly-plot:hover .modebar,
+    .js-plotly-plot:focus-within .modebar {{
+        opacity: 1;
+    }}
+
     .stButton button:focus-visible,
     .stDownloadButton button:focus-visible,
     div[data-testid="stTabs"] button[role="tab"]:focus-visible,
@@ -5758,6 +5844,7 @@ def inject_global_ui():
 
     .stButton button,
     .stDownloadButton button,
+    .stLinkButton a,
     div[data-testid="stPopover"] button,
     div[data-testid="stTabs"] button[role="tab"],
     .side-nav-link,
@@ -5767,12 +5854,31 @@ def inject_global_ui():
 
     .stButton button:hover,
     .stDownloadButton button:hover,
+    .stLinkButton a:hover,
     div[data-testid="stPopover"] button:hover,
     div[data-testid="stTabs"] button[role="tab"]:hover,
     .side-nav-link:hover,
     .nav-popover-link:hover {{
         box-shadow: 0 10px 24px rgba(21, 94, 239, 0.28) !important;
         transform: perspective(700px) translateY(-2px) rotateX(2deg) !important;
+    }}
+
+    button[kind="secondary"]:hover,
+    [data-testid="stBaseButton-secondary"]:hover,
+    .stDownloadButton button:not([kind="primary"]):hover,
+    .stLinkButton a:not([kind="primary"]):hover {{
+        background: color-mix(in srgb, var(--qaqc-blue) 8%, var(--qaqc-surface)) !important;
+        border-color: color-mix(in srgb, var(--qaqc-blue) 64%, var(--qaqc-line)) !important;
+        box-shadow: 0 10px 22px rgba(2, 12, 27, 0.16) !important;
+        color: var(--qaqc-blue) !important;
+    }}
+
+    [class*="st-key-"][class*="delete"] button:not(:disabled):hover,
+    [class*="st-key-"][class*="reject"] button:not(:disabled):hover {{
+        background: color-mix(in srgb, var(--qaqc-danger) 17%, var(--qaqc-surface)) !important;
+        border-color: var(--qaqc-danger) !important;
+        box-shadow: 0 10px 22px color-mix(in srgb, var(--qaqc-danger) 18%, transparent) !important;
+        color: var(--qaqc-danger) !important;
     }}
 
     div[data-testid="stDataFrame"] [role="row"]:hover [role="gridcell"] {{
@@ -5890,6 +5996,17 @@ def inject_global_ui():
         .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"] {{
             gap: 0.5rem !important;
         }}
+
+        /* Dense KPI/filter rows become a balanced two-column grid on tablets. */
+        [data-testid="stMainBlockContainer"] div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(4)) {{
+            flex-wrap: wrap !important;
+        }}
+
+        [data-testid="stMainBlockContainer"] div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(4)) > div[data-testid="column"] {{
+            flex: 1 1 calc(50% - 0.5rem) !important;
+            min-width: min(100%, 18rem) !important;
+            width: auto !important;
+        }}
     }}
 
     @media (max-width: 768px) {{
@@ -5941,6 +6058,19 @@ def inject_global_ui():
             flex-wrap: nowrap !important;
         }}
 
+        /* Content columns stack to a useful reading width on phones. The two
+           navigation rows are deliberately excluded and retain their toolbar. */
+        [data-testid="stMainBlockContainer"] div[data-testid="stHorizontalBlock"]:not(:has(.header-account-avatar)):not(:has(.st-key-page_navigation_popover)) {{
+            align-items: stretch !important;
+            flex-wrap: wrap !important;
+        }}
+
+        [data-testid="stMainBlockContainer"] div[data-testid="stHorizontalBlock"]:not(:has(.header-account-avatar)):not(:has(.st-key-page_navigation_popover)) > div[data-testid="column"] {{
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+            width: 100% !important;
+        }}
+
         .header-account-avatar {{
             height: 2.25rem !important;
             width: 2.25rem !important;
@@ -5982,6 +6112,7 @@ def inject_global_ui():
 
         .stButton button,
         .stDownloadButton button,
+        .stLinkButton a,
         div[data-testid="stFormSubmitButton"] button {{
             min-height: 2.75rem !important;
         }}
@@ -6039,6 +6170,7 @@ def inject_global_ui():
         div[data-testid="stDataFrame"]:hover,
         .stButton button:hover,
         .stDownloadButton button:hover,
+        .stLinkButton a:hover,
         div[data-testid="stPopover"] button:hover {{
             transform: none !important;
         }}
@@ -6071,6 +6203,7 @@ def inject_global_ui():
         div[data-testid="stDataFrame"]:hover,
         .stButton button:hover,
         .stDownloadButton button:hover,
+        .stLinkButton a:hover,
         div[data-testid="stPopover"] button:hover {{
             transform: none !important;
         }}
