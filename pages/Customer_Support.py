@@ -5,7 +5,12 @@ import streamlit as st
 
 import auth
 from database.audit_log import record_activity
-from database.cloudinary_storage import ALLOWED_ATTACHMENT_TYPES, MAX_ATTACHMENT_BYTES, upload_support_attachment
+from database.cloudinary_storage import (
+    ALLOWED_ATTACHMENT_TYPES,
+    MAX_ATTACHMENT_BYTES,
+    private_asset_url,
+    upload_support_attachment,
+)
 from database.mongo_support import add_ticket_message, create_ticket, escalate_ticket, list_tickets, update_ticket_status
 from database.support_ai import automatic_reply
 from database.settings import get_setting
@@ -64,7 +69,8 @@ if submitted:
                     support_email,
                     f"[{ticket['ticket_id']}] {ticket['subject']}",
                     f"Support request from {username} ({email})\nCategory: {category}\n"
-                    f"Attachment: {(attachment or {}).get('url', 'None')}\n\n{message}",
+                    f"Attachment (link expires shortly): "
+                    f"{private_asset_url(attachment) if attachment else 'None'}\n\n{message}",
                 )
             auth.send_email(email, f"Support request received: {ticket['ticket_id']}", f"We received your request and will respond as soon as possible.\n\nSubject: {subject}")
         except Exception:
@@ -84,7 +90,11 @@ else:
     ticket_rows = []
     for item in tickets:
         row = dict(item)
-        row["attachment_url"] = (row.pop("attachment", None) or {}).get("url", "")
+        stored_attachment = row.pop("attachment", None) or {}
+        try:
+            row["attachment_url"] = private_asset_url(stored_attachment) if stored_attachment else ""
+        except Exception:
+            row["attachment_url"] = "Unavailable"
         ticket_rows.append(row)
     render_table(pd.DataFrame(ticket_rows), include_internal=True)
 
@@ -131,6 +141,10 @@ else:
 
     chat_message = st.chat_input("Reply as admin..." if is_admin else "Message support...")
     if chat_message:
+        chat_message = chat_message.strip()
+        if not chat_message or len(chat_message) > 4_000:
+            st.error("Messages must contain 1-4,000 characters.")
+            st.stop()
         sender_role = "admin" if is_admin else "user"
         add_ticket_message(active_ticket["ticket_id"], username, sender_role, chat_message)
         record_activity(

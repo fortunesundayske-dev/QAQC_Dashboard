@@ -15,7 +15,11 @@ from urllib import request, error
 from urllib.parse import quote, urlparse
 from io import BytesIO
 
-from database.cloudinary_storage import DEFAULT_MASTER_WORKBOOK_PUBLIC_ID, get_master_workbook_reference
+from database.cloudinary_storage import (
+    DEFAULT_MASTER_WORKBOOK_PUBLIC_ID,
+    get_master_workbook_reference,
+    private_asset_url,
+)
 from database.settings import get_setting
 
 from ui_theme import (
@@ -112,6 +116,11 @@ def _image_data_uri(path):
 
 
 def _profile_photo_src(photo):
+    if isinstance(photo, dict):
+        try:
+            return private_asset_url(photo, expires_in=300)
+        except Exception:
+            return ""
     value = str(photo or "").strip()
     if value.startswith(("https://", "http://")):
         return value
@@ -1548,15 +1557,9 @@ def render_mobile_nav():
 
 
 def _auth_query_suffix():
-    token = st.session_state.get("auth", {}).get("auth_token") or st.session_state.get("auth_token")
-    if not token:
-        try:
-            token = st.query_params.get("auth_token")
-        except Exception:
-            token = None
-    if isinstance(token, list):
-        token = token[0] if token else None
-    return f"?auth_token={quote(str(token))}" if token else ""
+    # Authentication material must never be copied into URLs, browser history,
+    # referrer headers, screenshots, or proxy access logs.
+    return ""
 
 
 NAVIGATION_GROUPS = {
@@ -2009,41 +2012,19 @@ def render_top_nav():
             unsafe_allow_html=True,
         )
         if st.sidebar.button("Sign out", key="global_sidebar_sign_out", use_container_width=True):
-            st.session_state.auth = {
-                "logged_in": False,
-                "username": None,
-                "name": None,
-                "role": None,
-                "email": None,
-                "discipline": "QA/QC",
-                "profile_photo": None,
-                "auth_token": None,
-            }
-            for key in ["logged_in", "username", "name", "role", "email", "discipline", "profile_photo", "auth_token"]:
-                st.session_state.pop(key, None)
-            try:
-                if "auth_token" in st.query_params:
-                    del st.query_params["auth_token"]
-            except Exception:
-                pass
+            import auth
+
+            auth.sign_out()
             st.rerun()
 
     st.sidebar.markdown('<div class="side-menu-title">Appearance</div>', unsafe_allow_html=True)
     render_theme_selector()
     st.sidebar.markdown('<div class="side-menu-title">Menu</div>', unsafe_allow_html=True)
 
-    suffix = _auth_query_suffix()
     for group, items in grouped_pages:
         st.sidebar.markdown(f'<div class="side-nav-group">{html.escape(group)}</div>', unsafe_allow_html=True)
         for label, page in items:
-            if page == "app.py":
-                href = "/" + suffix
-            else:
-                href = "/" + quote(Path(page).stem) + suffix
-            st.sidebar.markdown(
-                f'<a class="side-nav-link" href="{href}" target="_self">{html.escape(label)}</a>',
-                unsafe_allow_html=True,
-            )
+            st.sidebar.page_link(page, label=label, use_container_width=True)
 
     st.sidebar.markdown(
         f"""

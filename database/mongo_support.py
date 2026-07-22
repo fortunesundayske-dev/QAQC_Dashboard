@@ -48,13 +48,21 @@ def ensure_support_schema():
 
 
 def create_ticket(username, email, subject, category, message, attachment=None):
+    username = str(username or "").strip().lower()
+    email = str(email or "").strip().lower()
+    subject = str(subject or "").strip()
+    message = str(message or "").strip()
+    if not username or not 3 <= len(subject) <= 140 or not 10 <= len(message) <= 4_000:
+        raise ValueError("Invalid support ticket content.")
+    if category not in {"Account access", "Technical issue", "Data issue", "Feature request", "Other"}:
+        raise ValueError("Invalid support ticket category.")
     ticket = {
         "ticket_id": f"SUP-{datetime.now(timezone.utc):%Y%m%d}-{secrets.token_hex(3).upper()}",
         "username": username,
-        "email": email.strip().lower(),
-        "subject": subject.strip(),
+        "email": email,
+        "subject": subject,
         "category": category,
-        "message": message.strip(),
+        "message": message,
         "status": "open",
         "created_at": _utc_now(),
         "updated_at": _utc_now(),
@@ -63,7 +71,7 @@ def create_ticket(username, email, subject, category, message, attachment=None):
             {
                 "sender": username,
                 "sender_role": "user",
-                "message": message.strip(),
+                "message": message,
                 "created_at": _utc_now(),
             }
         ],
@@ -91,10 +99,13 @@ def update_ticket_status(ticket_id, status, updated_by):
 
 
 def add_ticket_message(ticket_id, sender, sender_role, message, is_ai=False):
+    message = str(message or "").strip()
+    if sender_role not in {"user", "admin", "assistant"} or not 1 <= len(message) <= 4_000:
+        raise ValueError("Invalid support message.")
     entry = {
         "sender": sender,
         "sender_role": sender_role,
-        "message": message.strip(),
+        "message": message,
         "is_ai": bool(is_ai),
         "created_at": _utc_now(),
     }

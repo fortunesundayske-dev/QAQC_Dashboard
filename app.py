@@ -12,7 +12,6 @@ st.set_page_config(
 
 from pathlib import Path
 import html
-from urllib.parse import quote
 
 import pandas as pd
 import plotly.express as px
@@ -711,23 +710,21 @@ quick_links = [
     ("Audit Schedule", "pages/Audit_Surveillance.py", "#22c55e", "A"),
     ("Document Library", "pages/Document_Status.py", "#2563eb", "D"),
 ]
-auth_token = st.session_state.get("auth", {}).get("auth_token") or st.session_state.get("auth_token")
-auth_suffix = f"?auth_token={quote(str(auth_token))}" if auth_token else ""
-quick_html = "".join(
-    f'<a class="quick-link" href="/{Path(path).stem}{auth_suffix}" target="_self" style="--quick-color:{color};"><span>{mark}</span>{html.escape(label)}</a>'
-    for label, path, color, mark in quick_links
-)
 st.markdown(
-    f"""
+    """
 <div class="quick-access-panel">
     <div class="quick-access-title">Quick Access</div>
-    <div class="quick-access-grid">
-        {quick_html}
-        <a class="quick-link quick-link--all" href="/{auth_suffix}" target="_self">View All Tools -&gt;</a>
-    </div>
 </div>
-<div class="dashboard-security-strip"><span>Secure</span><span>Compliant</span><span>Reliable</span></div>
 """,
+    unsafe_allow_html=True,
+)
+quick_columns = st.columns(4)
+for index, (label, path, _color, mark) in enumerate(quick_links):
+    with quick_columns[index % len(quick_columns)]:
+        st.page_link(path, label=f"{mark}  {label}", use_container_width=True)
+st.page_link("app.py", label="View all tools", use_container_width=True)
+st.markdown(
+    '<div class="dashboard-security-strip"><span>Secure</span><span>Compliant</span><span>Reliable</span></div>',
     unsafe_allow_html=True,
 )
 

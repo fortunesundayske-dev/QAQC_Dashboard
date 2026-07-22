@@ -2,6 +2,8 @@
 
 from datetime import datetime, timezone
 from functools import lru_cache
+import csv
+from io import StringIO
 import json
 from pathlib import Path
 import tempfile
@@ -26,6 +28,21 @@ MAX_DETAIL_LENGTH = 2_000
 SENSITIVE_KEYS = {"password", "salt", "secret", "token", "authorization", "cookie"}
 DEFAULT_ACTIVITY_WORKBOOK_PUBLIC_ID = "qaqc-dashboard/activity-logs/QAQC_Activity_Log.xlsx"
 _ARCHIVE_LOCK = threading.Lock()
+DEFAULT_ACTIVITY_PAGE_SIZE = 25
+MAX_ACTIVITY_PAGE_SIZE = 100
+CSV_COLUMNS = (
+    "occurred_at", "event_id", "username", "name", "email", "role", "action",
+    "category", "page", "target", "status", "details", "cloud_archive_status",
+)
+
+
+def _csv_safe(value):
+    """Prevent spreadsheet formula execution when an exported CSV is opened."""
+    if not isinstance(value, str):
+        return value
+    if value.lstrip().startswith(("=", "+", "-", "@")):
+        return "'" + value
+    return value
 
 
 def _utc_now():
@@ -185,7 +202,7 @@ def record_activity(
         return False
 
 
-def list_activities(start_at=None, end_at=None, username=None, action=None, status=None, limit=5_000):
+def _activity_query(start_at=None, end_at=None, username=None, action=None, status=None):
     query = {}
     if start_at or end_at:
         query["occurred_at"] = {}
@@ -199,12 +216,64 @@ def list_activities(start_at=None, end_at=None, username=None, action=None, stat
         query["action"] = action
     if status:
         query["status"] = status
+    return query
+
+
+def _serialise_activity(record):
+    item = dict(record)
+    item["id"] = str(item.pop("_id", ""))
+    occurred_at = item.get("occurred_at")
+    if isinstance(occurred_at, datetime):
+        item["occurred_at"] = occurred_at.astimezone(timezone.utc).isoformat()
+    return item
+
+
+def list_activities(start_at=None, end_at=None, username=None, action=None, status=None, limit=5_000):
+    query = _activity_query(start_at, end_at, username, action, status)
     cursor = ensure_activity_log().find(query).sort("occurred_at", DESCENDING).limit(int(limit))
-    records = []
-    for record in cursor:
-        record["id"] = str(record.pop("_id"))
-        records.append(record)
-    return records
+    return [_serialise_activity(record) for record in cursor]
+
+
+def paginate_activities(
+    start_at=None, end_at=None, username=None, action=None, status=None, *, page=1,
+    page_size=DEFAULT_ACTIVITY_PAGE_SIZE,
+):
+    """Return a stable server-side page and pagination metadata."""
+    page = max(1, int(page))
+    page_size = min(MAX_ACTIVITY_PAGE_SIZE, max(1, int(page_size)))
+    query = _activity_query(start_at, end_at, username, action, status)
+    collection = ensure_activity_log()
+    total = int(collection.count_documents(query))
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    cursor = (
+        collection.find(query)
+        .sort([("occurred_at", DESCENDING), ("_id", DESCENDING)])
+        .skip((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return {
+        "items": [_serialise_activity(record) for record in cursor],
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": total_pages,
+        "has_previous": page > 1,
+        "has_next": page < total_pages,
+    }
+
+
+def activity_csv(start_at=None, end_at=None, username=None, action=None, status=None):
+    """Create a UTF-8 CSV for the complete filtered result set."""
+    records = list_activities(start_at, end_at, username, action, status, limit=100_000)
+    output = StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=CSV_COLUMNS, extrasaction="ignore")
+    writer.writeheader()
+    for record in records:
+        row = dict(record)
+        row["details"] = json.dumps(row.get("details") or {}, ensure_ascii=False, default=str)
+        writer.writerow({key: _csv_safe(value) for key, value in row.items()})
+    return output.getvalue().encode("utf-8-sig")
 
 
 def activity_filter_values():

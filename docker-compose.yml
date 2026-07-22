@@ -1,14 +1,53 @@
-version: '3.8'
-
 services:
   qaqc-dashboard:
     build: .
     ports:
-      - "8501:8501"
-    volumes:
-      - .:/app
+      - "${QAQC_BIND_ADDRESS:-127.0.0.1}:8501:8501"
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,noexec,nosuid,nodev
+      - /app/tmp:size=128m,noexec,nosuid,nodev
+      - /app/outputs:size=128m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - qaqc-data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
       - MONGODB_URI=${MONGODB_URI}
       - MONGODB_DATABASE=${MONGODB_DATABASE:-qaqc_dashboard}
+      - QAQC_ENV=production
+      - QAQC_ALLOWED_HOSTS=${QAQC_ALLOWED_HOSTS:-localhost,127.0.0.1,qaqc-api}
+
+  qaqc-api:
+    build: .
+    command: uvicorn activity_api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "${QAQC_BIND_ADDRESS:-127.0.0.1}:8000:8000"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/health', headers={'X-Forwarded-Proto':'https'}); urllib.request.urlopen(r, timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-qaqc_dashboard}
+      - QAQC_ENV=production
+      - QAQC_ALLOWED_HOSTS=${QAQC_ALLOWED_HOSTS:-localhost,127.0.0.1,qaqc-api}
+      - QAQC_FORCE_HTTPS=${QAQC_FORCE_HTTPS:-true}
+
+volumes:
+  qaqc-data:

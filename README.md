@@ -50,6 +50,8 @@ docker-compose up --build
 ```
 
 Then open http://localhost:8501 in your browser to view the dashboard.
+The companion API is available at http://localhost:8000. Interactive API
+documentation is available only in development mode; it is disabled in production.
 
 Notes:
 - The Docker image runs `sample_data.py` and `database/init_db.py` at build time to create `data/QAQC_Master.xlsx` and the SQLite DB.
@@ -87,6 +89,8 @@ pip install -r requirements.txt
 ```powershell
 $env:MONGODB_URI="mongodb+srv://USERNAME:PASSWORD@HOST/?retryWrites=true&w=majority"
 $env:MONGODB_DATABASE="qaqc_dashboard"
+$env:QAQC_BOOTSTRAP_ADMIN_EMAIL="security-admin@example.com"
+$env:QAQC_BOOTSTRAP_ADMIN_PASSWORD="use-a-unique-strong-password-here"
 ```
 
 5. Migrate the existing users once, then run the app:
@@ -95,6 +99,10 @@ $env:MONGODB_DATABASE="qaqc_dashboard"
 python database/migrate_users_to_mongodb.py
 streamlit run app.py
 ```
+
+On the first successful startup, remove `QAQC_BOOTSTRAP_ADMIN_PASSWORD` from
+the environment or secrets store. The application never creates a predictable
+default account and will fail closed until a strong bootstrap credential is supplied.
 
 The migration preserves the existing password hashes. It refuses to overwrite a
 non-empty MongoDB users collection unless `--force` is explicitly supplied.
@@ -106,10 +114,15 @@ the existing `.env` values:
 python scripts/create_streamlit_secrets.py
 ```
 
-Then add the three Azure application values still marked as missing to
-`.streamlit/secrets.toml`. A sanitized reference is available at
+Then add your email delivery credentials to `.streamlit/secrets.toml`. For
+Gmail, enable 2-Step Verification on `fortunesundayske@gmail.com`, create a
+Google App Password, and save the 16-character value as
+`QAQC_GMAIL_APP_PASSWORD`. Do not use or store the normal Gmail password.
+A sanitized reference is available at
 `.streamlit/secrets.toml.example`; the populated file is never committed.
-These Exchange Online settings enable approval and customer-support email delivery.
+Gmail is used when both `QAQC_GMAIL_ADDRESS` and `QAQC_GMAIL_APP_PASSWORD` are
+configured; otherwise the existing Exchange Online configuration is used.
+These settings enable approval and customer-support email delivery.
 The Azure application needs Microsoft Graph `Mail.Send` application permission
 with administrator consent. Support tickets are saved to MongoDB even when
 Exchange is not configured.
@@ -130,6 +143,8 @@ for invalid credentials, network timeouts, and malformed URIs.
 Add `CLOUDINARY_URL`, `OPENAI_API_KEY`, and the `QAQC_EXCHANGE_*` values there
 to enable cloud uploads, AI support, and Exchange email notifications in
 production.
+AI support remains disabled unless `QAQC_ENABLE_AI_SUPPORT=true` is also set,
+so project support messages are not sent to an external model unintentionally.
 Set `QAQC_APP_URL` to the deployed dashboard URL to include a direct sign-in
 link in each requestor's approval email.
 
@@ -139,6 +154,14 @@ User activity is stored in MongoDB for the admin Activity Log and continuously
 synced to the authenticated Cloudinary workbook
 `qaqc-dashboard/activity-logs/QAQC_Activity_Log.xlsx`. The workbook contains
 one worksheet per UTC date and uses event IDs to prevent duplicate rows.
+
+The admin activity API exposes `GET /api/activity-logs` for paginated results and
+`GET /api/activity-logs/csv` for the complete filtered CSV. Both accept inclusive
+`start_date` and `end_date` values in `YYYY-MM-DD` format plus optional `username`,
+`action`, and `result` filters. The list endpoint additionally accepts `page` and
+`page_size` (maximum 100). Send the active dashboard session token as
+`Authorization: Bearer <token>`. Only approved users with the exact `admin` role
+are accepted; every other role receives HTTP 403.
 
 The six page-background assets are stored under
 `qaqc-dashboard/backgrounds/` in Cloudinary. To republish the local fallback
@@ -195,3 +218,27 @@ A SQLite schema is available at `database/schema.sql`. Use `database/init_db.py`
 - The app reads from `data/QAQC_Master.xlsx` on startup.
 - Use the sidebar filters to explore projects, disciplines, time periods, and status categories.
 - Export buttons produce management-level Excel and PDF reports.
+
+## Production security
+
+- Terminate TLS at a managed load balancer or reverse proxy; never expose ports
+  8501 or 8000 directly to the internet. The Docker Compose defaults bind them
+  to localhost for this reason.
+- Set `QAQC_ALLOWED_HOSTS` to the exact API hostname and keep
+  `QAQC_FORCE_HTTPS=true`. Production API docs are disabled and responses include
+  no-store, anti-framing, content-type, referrer, permissions, CSP, and HSTS headers.
+- Remote `mongodb://` connections must explicitly enable TLS; Atlas
+  `mongodb+srv://` connections use TLS unless explicitly disabled. Restrict Atlas
+  network access and use a least-privilege database user.
+- Authentication sessions are server-side, expire after eight hours, time out
+  after inactivity, and are never placed in URLs. Five failed attempts lock an
+  account for 15 minutes. Password hashes are upgraded to 600,000-iteration
+  PBKDF2 on successful login.
+- New support attachments and profile photos are content-validated, stored as
+  authenticated Cloudinary assets, and exposed only through short-lived signed URLs.
+- Prefer Docker/Kubernetes secret files by setting `SETTING_NAME_FILE=/run/secrets/...`;
+  the app reads these without placing secret values in source files. Encrypt backups,
+  rotate credentials, test restores, and retain audit logs according to company policy.
+- Add organization-managed SSO with phishing-resistant MFA at the identity proxy
+  for internet-facing deployments. Application controls do not replace MFA, WAF,
+  endpoint security, vulnerability scanning, or database backup controls.

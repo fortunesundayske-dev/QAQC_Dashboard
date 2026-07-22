@@ -1,5 +1,7 @@
 # Local secrets
 .env
+.env.*
+!.env.example
 
 # Python
 __pycache__/
@@ -17,8 +19,14 @@ venv/
 data/smtp_config.json
 data/teams_config.json
 data/teams_notification_log.json
+data/users.json
+data/profile_photos/
+database/*.db
 
 # Temporary files
 ~$*
 .DS_Store
 Thumbs.db
+tmp/
+outputs/
+.pytest_cache/

@@ -1,9 +1,11 @@
 from pathlib import Path
+import html
 
 import streamlit as st
 
 import auth
 from utils import inject_global_ui, render_navigation, render_top_nav, render_page_header
+from database.cloudinary_storage import private_asset_url
 
 
 st.set_page_config(page_title="User Profile", layout="wide")
@@ -20,7 +22,12 @@ user = getattr(auth, "current_user", lambda: None)()
 
 
 def render_profile_avatar(user_record):
-    photo = user_record.get("profile_photo")
+    photo = user_record.get("profile_photo_asset") or user_record.get("profile_photo")
+    if isinstance(photo, dict):
+        try:
+            photo = private_asset_url(photo, expires_in=300)
+        except Exception:
+            photo = ""
     if photo and (str(photo).startswith(("https://", "http://")) or Path(str(photo)).exists()):
         st.image(str(photo), width=180)
         return
@@ -28,7 +35,7 @@ def render_profile_avatar(user_record):
     initials = "".join(part[:1] for part in user_record.get("name", "User").split()[:2]).upper() or "U"
     st.markdown(
         '<div class="profile-avatar" style="height: 150px; width: 150px; font-size: 2rem;">'
-        + initials
+        + html.escape(initials)
         + "</div>",
         unsafe_allow_html=True,
     )

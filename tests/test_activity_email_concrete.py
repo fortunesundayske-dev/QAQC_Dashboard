@@ -6,7 +6,7 @@ import shutil
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from openpyxl import Workbook, load_workbook
 
@@ -259,7 +259,7 @@ class DashboardFeatureTests(unittest.TestCase):
             return FakeGraphResponse(status=202)
 
         with patch.object(auth, "_load_users", return_value=users), \
-             patch.object(auth, "current_user", return_value={"username": "admin", "role": "admin"}), \
+             patch.object(auth, "current_user", return_value={"username": "admin", "role": "admin", "status": "approved"}), \
              patch.object(auth, "_try_save_users", side_effect=lambda value: snapshots.append(dict(value["requestor"])) or True), \
              patch.object(auth, "get_setting", side_effect=lambda name, default="": exchange_settings.get(name, default)), \
              patch.object(auth, "urlopen", side_effect=fake_urlopen), \
@@ -282,9 +282,30 @@ class DashboardFeatureTests(unittest.TestCase):
         self.assertIn("access approved", mail_payload["message"]["subject"].lower())
         self.assertIn("Assigned role: Viewer", mail_payload["message"]["body"]["content"])
         self.assertIn("https://qaqc.example.com", mail_payload["message"]["body"]["content"])
+        self.assertIn("Evomec Global Services QA/QC Dashboard", mail_payload["message"]["body"]["content"])
+        self.assertIn("KPAKUE FORTUNE (QA)", mail_payload["message"]["body"]["content"])
         self.assertIsNotNone(snapshots[-1]["approval_email_sent_at"])
         self.assertIsNone(snapshots[-1]["approval_email_error"])
         activity.assert_called_once()
+
+    def test_send_email_prefers_configured_gmail(self):
+        settings = {
+            "QAQC_GMAIL_ADDRESS": "fortunesundayske@gmail.com",
+            "QAQC_GMAIL_APP_PASSWORD": "abcd efgh ijkl mnop",
+        }
+        smtp = MagicMock()
+        smtp.__enter__.return_value = smtp
+
+        with patch.object(auth, "get_setting", side_effect=lambda name, default="": settings.get(name, default)), \
+             patch.object(auth.smtplib, "SMTP_SSL", return_value=smtp) as smtp_ssl:
+            sent = auth.send_email("requestor@example.com", "Access approved", "You have access.")
+
+        self.assertTrue(sent)
+        smtp_ssl.assert_called_once_with("smtp.gmail.com", 465, timeout=20)
+        smtp.login.assert_called_once_with("fortunesundayske@gmail.com", "abcdefghijklmnop")
+        message = smtp.send_message.call_args.args[0]
+        self.assertEqual(message["To"], "requestor@example.com")
+        self.assertEqual(message["Subject"], "Access approved")
 
     def test_activity_is_saved_to_mongodb_and_cloudinary_without_secrets(self):
         collection = FakeAuditCollection()

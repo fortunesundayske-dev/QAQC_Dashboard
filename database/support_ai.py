@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import re
 
 from dotenv import load_dotenv
 
@@ -13,7 +14,8 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 def automatic_reply(ticket, messages):
     api_key = str(get_setting("OPENAI_API_KEY", "")).strip()
-    if not api_key:
+    enabled = str(get_setting("QAQC_ENABLE_AI_SUPPORT", "false")).strip().lower() in {"1", "true", "yes"}
+    if not api_key or not enabled:
         return (
             "Thanks for contacting QA/QC Support. Your request has been recorded. "
             "Please add any relevant steps, error messages, or screenshots here. "
@@ -26,6 +28,12 @@ def automatic_reply(ticket, messages):
         f"{item.get('sender_role', 'user')}: {item.get('message', '')}"
         for item in messages[-12:]
     )
+    # Prevent common credentials from being forwarded to the external AI service.
+    transcript = re.sub(
+        r"(?i)(password|secret|api[_ -]?key|authorization|token)\s*[:=]\s*\S+",
+        r"\1=[REDACTED]",
+        transcript,
+    )[:12_000]
     response = OpenAI(api_key=api_key).responses.create(
         model=str(get_setting("OPENAI_SUPPORT_MODEL", "gpt-5-mini")),
         instructions=(

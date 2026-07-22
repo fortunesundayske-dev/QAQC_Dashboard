@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from pymongo import ASCENDING, MongoClient, ReplaceOne
 from pymongo.errors import CollectionInvalid
@@ -33,6 +34,9 @@ USER_VALIDATOR = {
             "failed_attempts": {"bsonType": "int", "minimum": 0},
             "profile_photo": {"bsonType": ["string", "null"]},
             "locked_until": {"bsonType": ["string", "null"]},
+            "password_iterations": {"bsonType": ["int", "null"], "minimum": 260000},
+            "session_created_at": {"bsonType": ["string", "null"]},
+            "session_expires_at": {"bsonType": ["string", "null"]},
         },
         "additionalProperties": True,
     }
@@ -50,6 +54,19 @@ def normalize_mongodb_uri(uri):
         hosts = authority.rsplit("@", 1)[-1]
         if "," in hosts:
             value = "mongodb://" + value[len("mongodb+srv://"):]
+    require_tls = str(get_setting("QAQC_REQUIRE_MONGODB_TLS", "true")).strip().lower() in {"1", "true", "yes"}
+    if require_tls:
+        parsed = urlsplit(value)
+        hosts = parsed.netloc.rsplit("@", 1)[-1].lower()
+        local = all(
+            host.partition(":")[0].strip("[]") in {"localhost", "127.0.0.1", "::1"}
+            for host in hosts.split(",")
+        )
+        query = {key.lower(): [item.lower() for item in values] for key, values in parse_qs(parsed.query).items()}
+        tls_disabled = query.get("tls") == ["false"] or query.get("ssl") == ["false"]
+        tls_enabled = query.get("tls") == ["true"] or query.get("ssl") == ["true"]
+        if tls_disabled or (value.startswith("mongodb://") and not local and not tls_enabled):
+            raise ValueError("Remote MongoDB connections must explicitly enable TLS.")
     return value
 
 
@@ -67,7 +84,14 @@ def _settings():
 @lru_cache(maxsize=1)
 def get_database():
     uri, database_name = _settings()
-    client = MongoClient(uri, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000)
+    client = MongoClient(
+        uri,
+        appname="evomec-qaqc-dashboard",
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        socketTimeoutMS=15000,
+        maxPoolSize=50,
+    )
     client.admin.command("ping")
     return client[database_name]
 
