@@ -1352,26 +1352,86 @@ def render_header():
 
 def _render_account_menu(user):
     account_name = str(user.get("name", "User"))
-    account_role = str(user.get("role", "user")).title()
+    account_role = str(user.get("role", "user")).replace("_", " ").title()
+    account_discipline = str(user.get("discipline") or "QA/QC")
+    account_button_label = f"{account_name}\nEVOMEC - Nigeria LNG"
     photo_src = _profile_photo_src(user.get("profile_photo"))
     st.markdown(
         """
 <style>
+.st-key-navigation_account {
+    background: linear-gradient(135deg, #0866e8 0%, #1279ff 100%);
+    border: 1px solid rgba(147, 197, 253, 0.54);
+    border-radius: 8px;
+    box-shadow: 0 12px 28px rgba(8, 102, 232, 0.30);
+    padding: 0.36rem 0.48rem;
+}
 .header-account-avatar {
     align-items: center; background: linear-gradient(135deg, #2563eb, #22c55e);
-    border: 2px solid rgba(96,165,250,.7); border-radius: 999px; color: #fff;
-    display: flex; font-size: .72rem; font-weight: 900; height: 2.45rem;
-    justify-content: center; overflow: hidden; width: 2.45rem;
+    border: 2px solid rgba(255,255,255,.72); border-radius: 999px; color: #fff;
+    display: flex; font-size: .76rem; font-weight: 900; height: 2.72rem;
+    justify-content: center; overflow: hidden; width: 2.72rem;
 }
 .header-account-avatar img { height: 100%; object-fit: cover; width: 100%; }
-.st-key-navigation_account div[data-testid="stHorizontalBlock"] { align-items: center; }
-.st-key-navigation_account div[data-testid="stPopover"] button { min-height: 2.55rem; white-space: nowrap; }
+.st-key-navigation_account div[data-testid="stHorizontalBlock"] { align-items: center; gap: .35rem; }
+.st-key-navigation_account div[data-testid="stPopover"] { max-width: none !important; width: 100% !important; }
+.st-key-navigation_account div[data-testid="stPopover"] button {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: #ffffff !important;
+    justify-content: space-between !important;
+    max-width: none !important;
+    min-height: 2.72rem !important;
+    min-width: 0 !important;
+    padding: 0 .2rem !important;
+    width: 100% !important;
+}
+.st-key-navigation_account div[data-testid="stPopover"] button p {
+    color: #ffffff !important;
+    font-size: .72rem !important;
+    font-weight: 750 !important;
+    line-height: 1.25 !important;
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: pre-line !important;
+}
+.st-key-navigation_account div[data-testid="stPopover"] button p::first-line {
+    font-size: .96rem;
+    font-weight: 900;
+}
+.st-key-navigation_account div[data-testid="stPopover"] button svg { color: #ffffff !important; flex: 0 0 auto; }
+.st-key-account_menu_panel { min-width: 13.5rem; padding: .2rem; }
+.st-key-account_menu_panel [data-testid="stImage"] img {
+    border: 1px solid rgba(148, 163, 184, .24);
+    border-radius: 6px;
+    height: 4.5rem;
+    object-fit: cover;
+    width: 4.5rem;
+}
+.st-key-account_menu_panel hr { border-color: rgba(148, 163, 184, .18); margin: .7rem 0; }
+div[data-baseweb="popover"]:has(.st-key-account_menu_panel) > div {
+    background: #0d1118 !important;
+    border: 1px solid rgba(148, 163, 184, .26) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .42) !important;
+    min-width: 15rem !important;
+}
+div[data-baseweb="popover"]:has(.st-key-account_menu_panel) p,
+div[data-baseweb="popover"]:has(.st-key-account_menu_panel) a,
+div[data-baseweb="popover"]:has(.st-key-account_menu_panel) span {
+    color: #f8fafc !important;
+}
+div[data-baseweb="popover"]:has(.st-key-account_menu_panel) [data-testid="stCaptionContainer"] p {
+    color: #aab2bf !important;
+}
 </style>
 """,
         unsafe_allow_html=True,
     )
     with st.container(key="navigation_account"):
-        avatar_col, menu_col = st.columns([0.42, 2.58], gap="small")
+        avatar_col, menu_col = st.columns([0.52, 2.48], gap="small")
         with avatar_col:
             if photo_src:
                 avatar_content = f'<img src="{photo_src}" alt="Profile photo">'
@@ -1379,17 +1439,21 @@ def _render_account_menu(user):
                 avatar_content = html.escape("".join(part[:1] for part in account_name.split()[:2]).upper() or "U")
             st.markdown(f'<div class="header-account-avatar">{avatar_content}</div>', unsafe_allow_html=True)
         with menu_col:
-            with st.popover(f"{account_name} · {account_role}", use_container_width=True):
-                if photo_src:
-                    st.image(photo_src, width=72)
-                st.markdown(f"**{account_name}**")
-                st.caption(f"{account_role} · {user.get('discipline', 'QA/QC')}")
-                st.page_link("pages/User_Profile.py", label="User Profile", use_container_width=True)
-                if st.button("Sign out", key="header_account_sign_out", use_container_width=True, type="primary"):
-                    import auth
+            with st.popover(account_button_label, use_container_width=True):
+                with st.container(key="account_menu_panel"):
+                    if photo_src:
+                        st.image(photo_src, width=72)
+                    else:
+                        st.markdown(f'<div class="header-account-avatar">{avatar_content}</div>', unsafe_allow_html=True)
+                    st.markdown(f"**{html.escape(account_name)}**")
+                    st.caption(f"{account_role} · {account_discipline}")
+                    st.divider()
+                    st.page_link("pages/User_Profile.py", label="User Profile", use_container_width=True)
+                    if st.button("Sign out", key="header_account_sign_out", use_container_width=True, type="primary"):
+                        import auth
 
-                    auth.sign_out()
-                    st.rerun()
+                        auth.sign_out()
+                        st.rerun()
 
             
 # =========================
@@ -1794,17 +1858,56 @@ def render_navigation():
 
     with st.container(key="primary_navigation_row"):
         user = st.session_state.get("auth") or {}
-        nav_col, tool_col, account_col = st.columns([0.2, 0.5, 0.3], gap="small")
+        nav_col, tool_col, account_col = st.columns([0.24, 0.46, 0.30], gap="small")
         with nav_col:
-            with st.popover("›  Page Navigation", use_container_width=False):
+            with st.popover("›  Page Navigation", use_container_width=True):
+                query = (
+                    st.text_input(
+                        "Search pages",
+                        placeholder="Search",
+                        label_visibility="collapsed",
+                        icon=":material/search:",
+                        key=f"page_navigation_search_{_current_page_name()}",
+                    )
+                    or ""
+                ).strip().casefold()
                 suffix = _auth_query_suffix()
-                links = []
+                sections = []
+                current_page = _current_page_name()
                 for group, items in grouped_pages:
-                    links.append(f'<div class="nav-popover-group">{html.escape(group)}</div>')
-                    for label, page in items:
+                    visible_items = [
+                        (label, page)
+                        for label, page in items
+                        if not query or query in label.casefold() or query in group.casefold()
+                    ]
+                    if not visible_items:
+                        continue
+                    link_markup = []
+                    section_is_current = False
+                    for label, page in visible_items:
                         href = "/" + suffix if page == "app.py" else "/" + quote(Path(page).stem) + suffix
-                        links.append(f'<a class="nav-popover-link" href="{href}" target="_self">{html.escape(label)}</a>')
-                st.markdown('<div class="nav-popover-menu">' + "".join(links) + "</div>", unsafe_allow_html=True)
+                        page_name = "app" if page == "app.py" else Path(page).stem
+                        is_current = page_name == current_page
+                        section_is_current = section_is_current or is_current
+                        current_attr = ' aria-current="page"' if is_current else ""
+                        link_markup.append(
+                            f'<a class="nav-popover-link" href="{href}" target="_self"{current_attr}>'
+                            f'{html.escape(label)}</a>'
+                        )
+                    open_attr = " open" if query or section_is_current else ""
+                    sections.append(
+                        f'<details class="nav-popover-section"{open_attr}>'
+                        f'<summary>{html.escape(group)}</summary>'
+                        f'<div class="nav-popover-section__links">{"".join(link_markup)}</div>'
+                        f'</details>'
+                    )
+                if sections:
+                    st.markdown(
+                        '<div class="nav-popover-menu">' + "".join(sections) + "</div>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.caption("No pages match your search.")
         with tool_col:
             st.markdown(
                 '<div class="command-tools command-tools--compact"><span>⌕</span><span>•</span><span>● Online</span></div>',
@@ -5299,20 +5402,95 @@ def inject_global_ui():
         text-transform: uppercase !important;
     }}
 
-    .nav-popover-group {{
-        color: var(--qaqc-muted) !important;
-        margin-top: 0.7rem !important;
+    .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"]
+    > div[data-testid="column"]:first-child div[data-testid="stPopover"] {{
+        max-width: 15rem !important;
+        width: 100% !important;
     }}
+
+    .st-key-primary_navigation_row > div > div[data-testid="stHorizontalBlock"]
+    > div[data-testid="column"]:first-child div[data-testid="stPopover"] button {{
+        background: #60a5fa !important;
+        border: 1px solid rgba(147, 197, 253, 0.68) !important;
+        box-shadow: 0 10px 24px rgba(30, 64, 175, 0.25) !important;
+        color: #ffffff !important;
+        font-size: 0.84rem !important;
+        font-weight: 800 !important;
+        justify-content: space-between !important;
+        max-width: 15rem !important;
+        min-height: 2.8rem !important;
+        width: 100% !important;
+    }}
+
+    div[data-baseweb="popover"]:has(.nav-popover-menu) > div {{
+        background: #031326 !important;
+        border: 1px solid rgba(96, 165, 250, 0.30) !important;
+        border-radius: 9px !important;
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.42) !important;
+        min-width: 17rem !important;
+    }}
+
+    div[data-baseweb="popover"]:has(.nav-popover-menu) [data-testid="stTextInput"] input {{
+        background: #020c19 !important;
+        border-color: rgba(148, 163, 184, 0.24) !important;
+        color: #ffffff !important;
+    }}
+
+    div[data-baseweb="popover"]:has(.nav-popover-menu) [data-testid="stTextInput"] input::placeholder {{
+        color: #cbd5e1 !important;
+    }}
+
+    .nav-popover-menu {{
+        display: grid;
+        gap: 0.38rem;
+        max-height: 24rem;
+        max-width: 16rem;
+        min-width: 15rem;
+        overflow-y: auto;
+        padding: 0.12rem;
+        width: 16rem;
+    }}
+
+    .nav-popover-section {{
+        background: #06182e;
+        border: 1px solid rgba(96, 165, 250, 0.18);
+        border-radius: 7px;
+        overflow: hidden;
+    }}
+
+    .nav-popover-section summary {{
+        align-items: center;
+        background: #07284c;
+        color: #ffffff !important;
+        cursor: pointer;
+        display: flex;
+        font-size: 0.8rem;
+        font-weight: 850;
+        justify-content: space-between;
+        list-style: none;
+        min-height: 2.55rem;
+        padding: 0.5rem 0.65rem;
+    }}
+
+    .nav-popover-section summary::-webkit-details-marker {{ display: none; }}
+    .nav-popover-section summary::after {{
+        color: #bfdbfe;
+        content: "⌄";
+        font-size: 0.95rem;
+        transition: transform 0.18s ease;
+    }}
+    .nav-popover-section[open] summary::after {{ transform: rotate(180deg); }}
+    .nav-popover-section__links {{ display: grid; gap: 0.22rem; padding: 0.34rem; }}
 
     .nav-popover-link {{
         align-items: center;
-        border: 1px solid var(--qaqc-line);
-        border-radius: 7px;
-        color: var(--qaqc-text) !important;
+        background: rgba(2, 12, 25, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        border-radius: 6px;
+        color: #dbeafe !important;
         display: flex;
         font-size: 0.84rem;
         font-weight: 700;
-        margin: 0.18rem 0;
         min-height: 2.35rem;
         padding: 0.45rem 0.65rem;
         text-decoration: none !important;
@@ -5320,8 +5498,15 @@ def inject_global_ui():
 
     .nav-popover-link:hover,
     .nav-popover-link:focus-visible {{
-        background: color-mix(in srgb, var(--qaqc-blue) 12%, var(--qaqc-surface));
-        border-color: color-mix(in srgb, var(--qaqc-blue) 36%, var(--qaqc-line));
+        background: #155eef;
+        border-color: #60a5fa;
+        color: #ffffff !important;
+    }}
+
+    .nav-popover-link[aria-current="page"] {{
+        background: rgba(37, 99, 235, 0.36);
+        border-color: rgba(96, 165, 250, 0.62);
+        color: #ffffff !important;
     }}
 
     section[data-testid="stSidebar"] div[data-testid="stSelectbox"] {{
