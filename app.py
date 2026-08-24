@@ -535,18 +535,18 @@ def search_dashboard_records(data, query, max_results=25):
         return pd.DataFrame(columns=["Module", "Record", "Match", "_Page"])
 
     module_pages = {
-        "NCR Log": ("NCR Register", "pages/NCR_Tracker.py"),
-        "OBS Log": ("OBS Register", "pages/OBS_Tracker.py"),
+        "NCR Log": ("Quality Operations", "pages/Quality_Operations.py"),
+        "OBS Log": ("Quality Operations", "pages/Quality_Operations.py"),
         "Daily Reports": ("Daily Reports", "pages/Daily_Reports.py"),
-        "Concrete Tracker": ("Concrete Tracker", "pages/Concrete_Tracker.py"),
-        "Calibration Log": ("Calibration Log", "pages/Calibration_Log.py"),
+        "Concrete Tracker": ("Quality Operations", "pages/Quality_Operations.py"),
+        "Calibration Log": ("Quality Operations", "pages/Quality_Operations.py"),
         "Audit Register": ("Audit Schedule", "pages/Audit_Surveillance.py"),
         "Surveillance Register": ("Audit Schedule", "pages/Audit_Surveillance.py"),
-        "Document Register": ("Document Library", "pages/Document_Status.py"),
-        "ITR Log": ("ITR Tracker", "pages/ITR_Tracker.py"),
-        "CTQ Log": ("CTQ Dashboard", "pages/CTQ_Dashboard.py"),
+        "Document Register": ("Quality Operations", "pages/Quality_Operations.py"),
+        "ITR Log": ("Quality Operations", "pages/Quality_Operations.py"),
+        "CTQ Log": ("Quality Operations", "pages/Quality_Operations.py"),
         "KPI KRA Register": ("KPI KRA Register", "pages/KPI_KRA_Register.py"),
-        "Defect-Rework Log": ("Defect & Rework", "pages/Defect_Rework_Tracker.py"),
+        "Defect-Rework Log": ("Quality Operations", "pages/Quality_Operations.py"),
         "Lessons Learned": ("Lessons Learned", "pages/Lessons_Learned.py"),
     }
     rows = []
@@ -726,14 +726,11 @@ module_cards = [
 st.markdown('<div class="module-grid module-grid--compact">' + "".join(module_cards) + "</div>", unsafe_allow_html=True)
 
 quick_links = [
-    ("NCR Register", "pages/NCR_Tracker.py", "#ef4444", "!"),
-    ("OBS Register", "pages/OBS_Tracker.py", "#f97316", "O"),
+    ("Quality Operations", "pages/Quality_Operations.py", "#14b8a6", "Q"),
     ("Daily Reports", "pages/Daily_Reports.py", "#7c3aed", "R"),
-    ("Concrete Tracker", "pages/Concrete_Tracker.py", "#0ea5e9", "C"),
     ("KPI KRA Register", "pages/KPI_KRA_Register.py", "#14b8a6", "K"),
-    ("Calibration Log", "pages/Calibration_Log.py", "#dc2626", "!"),
     ("Audit Schedule", "pages/Audit_Surveillance.py", "#22c55e", "A"),
-    ("Document Library", "pages/Document_Status.py", "#2563eb", "D"),
+    ("Customer Support", "pages/Customer_Support.py", "#2563eb", "S"),
 ]
 st.markdown(
     """

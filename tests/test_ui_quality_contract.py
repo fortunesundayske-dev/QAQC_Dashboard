@@ -37,7 +37,8 @@ def test_streamlit_surfaces_use_current_responsive_width_api() -> None:
 def test_every_dashboard_page_uses_the_shared_page_header() -> None:
     page_sources = list((ROOT / "pages").glob("*.py"))
 
-    assert len(page_sources) == 21
+    assert len(page_sources) == 22
+    assert ROOT / "pages" / "Quality_Operations.py" in page_sources
     for source in page_sources:
         page = source.read_text(encoding="utf-8")
         assert "render_page_header(" in page, f"{source.name} bypasses the shared page header"

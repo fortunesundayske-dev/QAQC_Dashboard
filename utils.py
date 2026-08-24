@@ -1518,6 +1518,7 @@ def get_navigation_pages():
         "Management_Executive_Summary": "Management Summary",
         "NCR_Tracker": "NCR Tracker",
         "OBS_Tracker": "OBS Tracker",
+        "Quality_Operations": "Quality Operations",
         "Quality_Tools": "Quality Tools",
         "Standards_Library": "Standards Library",
         "User_Profile": "User Profile",
@@ -1528,17 +1529,10 @@ def get_navigation_pages():
         "Quality Tools",
         "Standards Library",
         "Learning Academy",
-        "Calibration Log",
-        "Concrete Tracker",
-        "NCR Tracker",
-        "OBS Tracker",
+        "Quality Operations",
         "Audit & Surveillance",
         "KPI KRA Register",
-        "CTQ Dashboard",
         "Daily Reports",
-        "ITR Tracker",
-        "Document Status",
-        "Defect & Rework",
         "Lessons Learned",
         "Management Summary",
         "User Profile",
@@ -1563,6 +1557,20 @@ def get_navigation_pages():
     if role != "admin":
         pages.pop("Access Admin", None)
         pages.pop("Activity Log", None)
+
+    # These modules are now presented in the combined Quality Operations
+    # workspace. Their direct routes remain available for advanced workflows.
+    for label in {
+        "Calibration Log",
+        "Concrete Tracker",
+        "CTQ Dashboard",
+        "Defect & Rework",
+        "Document Status",
+        "ITR Tracker",
+        "NCR Tracker",
+        "OBS Tracker",
+    }:
+        pages.pop(label, None)
 
     ordered = {
         label: pages[label]
@@ -1589,9 +1597,7 @@ def _auth_query_suffix():
 
 NAVIGATION_GROUPS = {
     "Overview": ["Executive Home", "Executive Analytics", "Management Summary", "KPI KRA Register"],
-    "Quality Records": ["NCR Tracker", "OBS Tracker", "ITR Tracker", "Defect & Rework"],
-    "Engineering": ["CTQ Dashboard", "Document Status"],
-    "Materials and Equipment": ["Concrete Tracker", "Calibration Log"],
+    "Quality Operations": ["Quality Operations"],
     "Audits and Reports": ["Audit & Surveillance", "Daily Reports", "Lessons Learned"],
     "Knowledge and Tools": ["Standards Library", "Learning Academy", "Quality Tools"],
     "Account and Administration": ["User Profile", "Customer Support", "Access Admin", "Activity Log"],
