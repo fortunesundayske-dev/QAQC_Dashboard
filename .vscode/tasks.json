@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Verify QAQC UI contract",
+			"type": "shell",
+			"command": "python -m pytest tests/test_ui_quality_contract.py -q",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		}
+	]
+}

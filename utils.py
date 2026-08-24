@@ -5753,14 +5753,33 @@ def inject_global_ui():
     }}
 
     div[data-testid="stTabs"] div[role="tablist"] {{
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 0.35rem !important;
         overflow-x: auto !important;
+        overflow-y: hidden !important;
         overscroll-behavior-inline: contain;
         scrollbar-width: thin;
+        scroll-snap-type: x proximity;
     }}
 
     div[data-testid="stTabs"] button[role="tab"] {{
         flex: 0 0 auto !important;
+        max-width: 100% !important;
+        scroll-snap-align: start;
         white-space: nowrap !important;
+    }}
+
+    @media (max-width: 768px) {{
+        div[data-testid="stTabs"] div[role="tablist"] {{
+            padding-bottom: 0.18rem !important;
+        }}
+
+        div[data-testid="stTabs"] button[role="tab"] {{
+            min-width: max-content !important;
+            padding-left: 0.8rem !important;
+            padding-right: 0.8rem !important;
+        }}
     }}
 
     /* Plotly tools stay available without competing with the chart itself. */

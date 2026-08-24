@@ -1,754 +1,799 @@
+"""Evomec QA/QC Command Centre — single-page application.
+
+All operational modules live in ``sections/`` and are rendered on one
+Streamlit route.
+
+This entry point owns:
+- authentication
+- enterprise theme
+- global sidebar
+- global project filter
+- enterprise top navigation
+- section navigation
+- section execution
+
+Individual sections retain their business logic but do not render duplicate
+application-level chrome.
+"""
+
+from __future__ import annotations
+
+import html
+import runpy
+from pathlib import Path
+
+import pandas as pd
 import streamlit as st
 
-# =========================
-# CONFIG (MUST BE FIRST)
-# =========================
+import auth
+import utils
+
+
+# ---------------------------------------------------------------------------
+# STREAMLIT PAGE CONFIG
+# ---------------------------------------------------------------------------
+
 st.set_page_config(
-    page_title="Evomec QA/QC Executive Dashboard",
+    page_title="Evomec QA/QC Command Centre",
     page_icon="✅",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-from pathlib import Path
-import html
 
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-
-import auth
-from utils import (
-    extract_projects,
-    global_filter_sidebar,
-    inject_enterprise_theme,
-    load_master_data,
-    render_page_header,
-    render_table,
-    render_top_nav,
-    get_navigation_pages,
-    render_navigation,
-    get_calibration_summary,
-)
-
+# ---------------------------------------------------------------------------
+# PATHS
+# ---------------------------------------------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
-EXCEL_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
-get_navigation_pages()
-
-def status_count(df, status):
-    if not isinstance(df, pd.DataFrame) or df.empty or "Status" not in df.columns:
-        return 0
-    return int(df["Status"].astype(str).str.lower().eq(status.lower()).sum())
+SECTIONS_DIR = BASE_DIR / "sections"
+DATA_FILE = BASE_DIR / "data" / "QAQC_Master.xlsx"
 
 
-def status_count_any(df, statuses):
-    if not isinstance(df, pd.DataFrame) or df.empty or "Status" not in df.columns:
-        return 0
-    wanted = {status.lower() for status in statuses}
-    return int(df["Status"].astype(str).str.strip().str.lower().isin(wanted).sum())
+# ---------------------------------------------------------------------------
+# SECTION REGISTER
+# ---------------------------------------------------------------------------
+
+SECTIONS = [
+    {
+        "id": "executive-dashboard",
+        "label": "Executive Dashboard",
+        "icon": "🏠",
+        "group": "Overview",
+        "file": "Executive_Dashboard.py",
+    },
+    {
+        "id": "management-summary",
+        "label": "Management Summary",
+        "icon": "📋",
+        "group": "Overview",
+        "file": "Management_Executive_Summary.py",
+    },
+    {
+        "id": "kpi-kra",
+        "label": "KPI / KRA Register",
+        "icon": "🎯",
+        "group": "Overview",
+        "file": "KPI_KRA_Register.py",
+    },
+    {
+        "id": "daily-reports",
+        "label": "Daily Reports",
+        "icon": "📅",
+        "group": "Reports",
+        "file": "Daily_Reports.py",
+    },
+    {
+        "id": "lessons-learned",
+        "label": "Lessons Learned",
+        "icon": "📘",
+        "group": "Reports",
+        "file": "Lessons_Learned.py",
+    },
+    {
+        "id": "itr-tracker",
+        "label": "ITR Tracker",
+        "icon": "📦",
+        "group": "Quality Records",
+        "file": "ITR_Tracker.py",
+    },
+    {
+        "id": "ncr-tracker",
+        "label": "NCR Tracker",
+        "icon": "🚫",
+        "group": "Quality Records",
+        "file": "NCR_Tracker.py",
+    },
+    {
+        "id": "obs-tracker",
+        "label": "OBS Tracker",
+        "icon": "👁",
+        "group": "Quality Records",
+        "file": "OBS_Tracker.py",
+    },
+    {
+        "id": "defect-rework",
+        "label": "Defect & Rework",
+        "icon": "🔧",
+        "group": "Quality Records",
+        "file": "Defect_Rework_Tracker.py",
+    },
+    {
+        "id": "ctq-dashboard",
+        "label": "CTQ Dashboard",
+        "icon": "📊",
+        "group": "Engineering",
+        "file": "CTQ_Dashboard.py",
+    },
+    {
+        "id": "document-status",
+        "label": "Document Status",
+        "icon": "📄",
+        "group": "Engineering",
+        "file": "Document_Status.py",
+    },
+    {
+        "id": "standards-library",
+        "label": "Standards Library",
+        "icon": "📚",
+        "group": "Engineering",
+        "file": "Standards_Library.py",
+    },
+    {
+        "id": "concrete-tracker",
+        "label": "Concrete Tracker",
+        "icon": "🏗",
+        "group": "Materials",
+        "file": "Concrete_Tracker.py",
+    },
+    {
+        "id": "audit-surveillance",
+        "label": "Audit & Surveillance",
+        "icon": "🔍",
+        "group": "Audits",
+        "file": "Audit_Surveillance.py",
+    },
+    {
+        "id": "calibration-log",
+        "label": "Calibration Log",
+        "icon": "⚙",
+        "group": "Audits",
+        "file": "Calibration_Log.py",
+    },
+    {
+        "id": "quality-tools",
+        "label": "Quality Tools",
+        "icon": "🧰",
+        "group": "Toolkit",
+        "file": "Quality_Tools.py",
+    },
+    {
+        "id": "learning-academy",
+        "label": "Learning Academy",
+        "icon": "🎓",
+        "group": "Toolkit",
+        "file": "Learning_Academy.py",
+    },
+    {
+        "id": "customer-support",
+        "label": "Customer Support",
+        "icon": "💬",
+        "group": "Workspace",
+        "file": "Customer_Support.py",
+    },
+    {
+        "id": "user-profile",
+        "label": "My Profile",
+        "icon": "👤",
+        "group": "Workspace",
+        "file": "User_Profile.py",
+    },
+    {
+        "id": "activity-log",
+        "label": "Activity Log",
+        "icon": "🛡",
+        "group": "Administration",
+        "file": "Activity_Log.py",
+        "admin_only": True,
+    },
+    {
+        "id": "access-admin",
+        "label": "Access Admin",
+        "icon": "🔐",
+        "group": "Administration",
+        "file": "Access_Admin.py",
+        "admin_only": True,
+    },
+]
 
 
-def open_count(df):
-    return status_count(df, "Open")
+# ---------------------------------------------------------------------------
+# SINGLE-PAGE SCROLL STYLING
+#
+# This styling is deliberately lightweight.
+# The main enterprise visual system remains controlled by utils.py.
+# ---------------------------------------------------------------------------
 
+def inject_scroll_css() -> None:
+    st.markdown(
+        """
+        <style>
 
-def closed_count(df):
-    return status_count(df, "Closed") + status_count(df, "Completed")
+        html,
+        body,
+        [data-testid="stAppViewContainer"],
+        [data-testid="stMain"],
+        section.main {
+            scroll-behavior: smooth !important;
+        }
 
+        .section-anchor {
+            display: block;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            scroll-margin-top: 105px;
+        }
 
-def pct(numerator, denominator):
-    return int((numerator / denominator) * 100) if denominator else 0
+        /*
+        Do NOT replace the enterprise dashboard cards/panels.
+        This wrapper only provides section-level spacing and animation.
+        */
+        .qaqc-section-wrap {
+            animation: qaqc-fade-slide-up .45s ease both;
+        }
 
+        @keyframes qaqc-fade-slide-up {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
 
-def compact_number(value):
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return str(value)
-    if abs(number) >= 1_000_000:
-        return f"{number / 1_000_000:.1f}M"
-    if abs(number) >= 1_000:
-        return f"{number / 1_000:.2f}K".rstrip("0").rstrip(".")
-    return f"{int(number):,}" if number == int(number) else f"{number:,.1f}"
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
+        .qaqc-section-divider {
+            margin: 2.5rem 0 2rem;
+            border: 0;
+            border-top: 1px solid rgba(148, 163, 184, .18);
+        }
 
-def metric_delta(current, total):
-    if not total:
-        return "No records"
-    return f"{pct(current, total)}% of records"
+        /*
+        Secondary single-page jump navigation.
+        The main enterprise navigation from utils.py remains active.
+        */
+        .evomec-scrollnav {
+            position: sticky;
+            top: 0;
+            z-index: 998;
 
+            display: flex;
+            gap: 6px;
 
-def metric_card(label, value, subtitle, accent, mark, delta=None):
-    delta_html = f'<div class="exec-metric__delta">{html.escape(str(delta))}</div>' if delta else ""
-    accessible_label = html.escape(f"{label}: {value}", quote=True)
-    return f"""
-<div class="exec-metric" role="group" aria-label="{accessible_label}" style="--metric-color: {html.escape(str(accent), quote=True)};">
-    <div class="exec-metric__icon" aria-hidden="true">{html.escape(str(mark))}</div>
-    <div>
-        <div class="exec-metric__label">{html.escape(str(label))}</div>
-        <div class="exec-metric__value">{html.escape(str(value))}</div>
-        <div class="exec-metric__sub">{html.escape(str(subtitle))}</div>
-        {delta_html}
-    </div>
-</div>
-"""
+            overflow-x: auto;
+            white-space: nowrap;
 
+            padding: 8px 10px;
+            margin: 0 0 1rem;
 
-def find_date_column(df, candidates):
-    return next((col for col in candidates if isinstance(df, pd.DataFrame) and col in df.columns), None)
+            background: rgba(11, 31, 54, .88);
+            backdrop-filter: blur(12px);
 
+            border: 1px solid rgba(148, 163, 184, .14);
+            border-radius: 12px;
 
-def clean_numeric_series(series):
-    return (
-        series.astype(str)
-        .str.replace("m3", "", regex=False)
-        .str.replace("mÃ‚Â³", "", regex=False)
-        .str.replace("mÃƒâ€šÃ‚Â³", "", regex=False)
-        .str.replace("mÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³", "", regex=False)
-        .str.replace(",", "", regex=False)
-        .str.strip()
-        .replace({"nan": None, "None": None, "": None})
-        .pipe(pd.to_numeric, errors="coerce")
-        .fillna(0)
+            scrollbar-width: thin;
+        }
+
+        .evomec-scrollnav::-webkit-scrollbar {
+            height: 5px;
+        }
+
+        .evomec-scrollnav::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, .32);
+            border-radius: 999px;
+        }
+
+        .evomec-scrollnav a {
+            flex: 0 0 auto;
+
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+
+            padding: 7px 13px;
+
+            border: 1px solid transparent;
+            border-radius: 999px;
+
+            background: rgba(255, 255, 255, .055);
+            color: #e5edf8;
+
+            font-size: .78rem;
+            font-weight: 600;
+
+            text-decoration: none;
+
+            transition:
+                transform .18s ease,
+                background .18s ease,
+                border-color .18s ease;
+        }
+
+        .evomec-scrollnav a:hover {
+            transform: translateY(-1px);
+            background: #2970ff;
+            border-color: #2970ff;
+            color: #fff;
+        }
+
+        .evomec-scrollnav .nav-group-label {
+            flex: 0 0 auto;
+
+            display: inline-flex;
+            align-items: center;
+
+            padding: 7px 4px 7px 10px;
+
+            color: #7a8a9e;
+
+            font-size: .68rem;
+            font-weight: 700;
+
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+
+        @media (max-width: 900px) {
+            .evomec-scrollnav {
+                border-radius: 10px;
+            }
+
+            .evomec-scrollnav a {
+                font-size: .74rem;
+                padding: 6px 10px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .qaqc-section-wrap {
+                animation: none !important;
+            }
+
+            html,
+            body,
+            [data-testid="stAppViewContainer"],
+            [data-testid="stMain"],
+            section.main {
+                scroll-behavior: auto !important;
+            }
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
 
-def monthly_sum(df, date_candidates, value_col, months=6):
-    if not isinstance(df, pd.DataFrame) or df.empty or value_col not in df.columns:
-        return pd.DataFrame(columns=["Month", "Value"])
-    date_col = find_date_column(df, date_candidates)
-    if not date_col:
-        return pd.DataFrame(columns=["Month", "Value"])
-    frame = df.copy()
-    frame[date_col] = pd.to_datetime(frame[date_col], errors="coerce")
-    frame[value_col] = clean_numeric_series(frame[value_col])
-    frame = frame.dropna(subset=[date_col])
-    if frame.empty:
-        return pd.DataFrame(columns=["Month", "Value"])
-    frame["Month"] = frame[date_col].dt.to_period("M").dt.to_timestamp()
-    grouped = frame.groupby("Month", as_index=False)[value_col].sum().rename(columns={value_col: "Value"})
-    return grouped.sort_values("Month").tail(months)
+# ---------------------------------------------------------------------------
+# SINGLE-PAGE SECTION NAVIGATION
+# ---------------------------------------------------------------------------
 
+def render_scroll_nav(
+    sections: list[dict],
+    is_admin: bool,
+) -> None:
+    grouped: dict[str, list[dict]] = {}
 
-def monthly_count(df, date_candidates, months=6):
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        return pd.DataFrame(columns=["Month", "Count"])
-    date_col = find_date_column(df, date_candidates)
-    if not date_col:
-        return pd.DataFrame(columns=["Month", "Count"])
-    frame = df.copy()
-    frame[date_col] = pd.to_datetime(frame[date_col], errors="coerce")
-    frame = frame.dropna(subset=[date_col])
-    if frame.empty:
-        return pd.DataFrame(columns=["Month", "Count"])
-    frame["Month"] = frame[date_col].dt.to_period("M").dt.to_timestamp()
-    return frame.groupby("Month", as_index=False).size().rename(columns={"size": "Count"}).sort_values("Month").tail(months)
-
-
-def ncr_month_status(df, months=6):
-    if not isinstance(df, pd.DataFrame) or df.empty or "Status" not in df.columns:
-        return pd.DataFrame(columns=["Month", "Open", "Closed"])
-    date_col = find_date_column(df, ["Date Raised", "Date_Raised", "Date"])
-    if not date_col:
-        return pd.DataFrame(columns=["Month", "Open", "Closed"])
-    frame = df.copy()
-    frame[date_col] = pd.to_datetime(frame[date_col], errors="coerce")
-    frame = frame.dropna(subset=[date_col])
-    if frame.empty:
-        return pd.DataFrame(columns=["Month", "Open", "Closed"])
-    frame["Month"] = frame[date_col].dt.to_period("M").dt.to_timestamp()
-    frame["StatusBand"] = frame["Status"].astype(str).str.lower().map(lambda value: "Closed" if value in {"closed", "completed"} else "Open")
-    pivot = frame.pivot_table(index="Month", columns="StatusBand", values="Status", aggfunc="count", fill_value=0).reset_index()
-    for col in ["Open", "Closed"]:
-        if col not in pivot.columns:
-            pivot[col] = 0
-    return pivot[["Month", "Open", "Closed"]].sort_values("Month").tail(months)
-
-
-def material_month_trend(df, months=6):
-    if not isinstance(df, pd.DataFrame) or df.empty or "Date" not in df.columns or "Quantity (t)" not in df.columns:
-        return pd.DataFrame(columns=["Month", "Material", "Quantity"])
-    frame = df.copy()
-    frame["Date"] = pd.to_datetime(frame["Date"], errors="coerce")
-    frame["Quantity"] = clean_numeric_series(frame["Quantity (t)"])
-    frame["Material"] = frame.get("Material", "Material").fillna("Material").astype(str)
-    frame = frame.dropna(subset=["Date"])
-    if frame.empty:
-        return pd.DataFrame(columns=["Month", "Material", "Quantity"])
-    frame["Month"] = frame["Date"].dt.to_period("M").dt.to_timestamp()
-    grouped = frame.groupby(["Month", "Material"], as_index=False)["Quantity"].sum().sort_values("Month")
-    latest_months = grouped["Month"].drop_duplicates().tail(months)
-    return grouped[grouped["Month"].isin(latest_months)]
-
-
-def obs_category_summary(df):
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        return pd.DataFrame(columns=["Category", "Count"])
-    category_col = next((col for col in ["Discipline", "Category", "Project", "Responsible_Person"] if col in df.columns), None)
-    if not category_col:
-        return pd.DataFrame(columns=["Category", "Count"])
-    return df[category_col].fillna("Unassigned").astype(str).value_counts().head(5).rename_axis("Category").reset_index(name="Count")
-
-
-def concrete_total_volume(df):
-    if not isinstance(df, pd.DataFrame) or df.empty or "Volume" not in df.columns:
-        return 0
-    return float(clean_numeric_series(df["Volume"]).sum())
-
-
-def style_dark_chart(fig, height=300):
-    fig.update_layout(
-        template="plotly_dark",
-        height=height,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#dbeafe", family="Inter, Segoe UI, sans-serif", size=11),
-        margin=dict(l=20, r=16, t=18, b=28),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(gridcolor="rgba(148, 163, 184, 0.12)", zeroline=False),
-        yaxis=dict(gridcolor="rgba(148, 163, 184, 0.12)", zeroline=False),
-    )
-    return fig
-
-
-def recent_ncr_html(df):
-    columns = ["NCR_ID", "Project", "Discipline", "Description", "Date Raised", "Status"]
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        return '<div class="exec-empty">No NCR records available.</div>'
-    rows = df.copy()
-    if "Date Raised" in rows.columns:
-        rows["Date Raised"] = pd.to_datetime(rows["Date Raised"], errors="coerce")
-        rows = rows.sort_values("Date Raised", ascending=False)
-    available = [col for col in columns if col in rows.columns]
-    rows = rows.head(5)
-    header = "".join(f"<th>{html.escape(col.replace('_', ' '))}</th>" for col in available)
-    body = []
-    for _, row in rows.iterrows():
-        cells = []
-        for col in available:
-            value = row[col]
-            if col == "Date Raised" and pd.notna(value):
-                value = pd.to_datetime(value).strftime("%d %b %Y")
-            if col == "Status":
-                status = str(value)
-                badge = "closed" if status.lower() in {"closed", "completed"} else "open"
-                cells.append(f'<td><span class="status-badge status-badge--{badge}">{html.escape(status)}</span></td>')
-            else:
-                cells.append(f"<td>{html.escape('' if pd.isna(value) else str(value))}</td>")
-        body.append("<tr>" + "".join(cells) + "</tr>")
-    return '<table class="exec-table"><thead><tr>' + header + '</tr></thead><tbody>' + "".join(body) + "</tbody></table>"
-
-
-def panel_html(title, body):
-    return f"""
-<div class="exec-panel exec-panel--html">
-    <div class="panel-title">{html.escape(title)}<span>...</span></div>
-    {body}
-</div>
-"""
-
-
-def month_label(value):
-    if pd.isna(value):
-        return ""
-    return pd.to_datetime(value).strftime("%b")
-
-
-def line_chart_html(df, value_col="Value", empty_label="No data available."):
-    if not isinstance(df, pd.DataFrame) or df.empty or value_col not in df.columns:
-        return f'<div class="exec-empty">{html.escape(empty_label)}</div>'
-    rows = df.copy()
-    rows[value_col] = pd.to_numeric(rows[value_col], errors="coerce").fillna(0)
-    rows = rows.tail(6).reset_index(drop=True)
-    values = rows[value_col].tolist()
-    labels = [month_label(value) for value in rows["Month"]]
-    max_value = max(values) if values else 0
-    max_value = max_value if max_value > 0 else 1
-    width, height = 640, 250
-    left, right, top, bottom = 42, 18, 18, 38
-    plot_w = width - left - right
-    plot_h = height - top - bottom
-    denom = max(len(values) - 1, 1)
-    points = []
-    for index, value in enumerate(values):
-        x = left + (plot_w * index / denom)
-        y = top + plot_h - (plot_h * value / max_value)
-        points.append((x, y, value))
-    point_string = " ".join(f"{x:.1f},{y:.1f}" for x, y, _ in points)
-    circles = "".join(
-        f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" fill="#38bdf8"/><text x="{x:.1f}" y="{max(y - 12, 12):.1f}" text-anchor="middle">{html.escape(compact_number(value))}</text>'
-        for x, y, value in points
-    )
-    x_labels = "".join(
-        f'<text class="axis-label" x="{points[index][0]:.1f}" y="{height - 12}" text-anchor="middle">{html.escape(label)}</text>'
-        for index, label in enumerate(labels)
-    )
-    return f"""
-<svg class="inline-chart" viewBox="0 0 {width} {height}" role="img">
-    <defs>
-        <linearGradient id="lineFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#2563eb" stop-opacity="0.38"/>
-            <stop offset="100%" stop-color="#2563eb" stop-opacity="0.02"/>
-        </linearGradient>
-    </defs>
-    <line x1="{left}" y1="{top + plot_h}" x2="{width - right}" y2="{top + plot_h}" stroke="rgba(148,163,184,.24)"/>
-    <polyline points="{left},{top + plot_h} {point_string} {width - right},{top + plot_h}" fill="url(#lineFill)" stroke="none"/>
-    <polyline points="{point_string}" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-    {circles}
-    {x_labels}
-</svg>
-"""
-
-
-def ncr_trend_html(df):
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        return '<div class="exec-empty">No NCR trend data available.</div>'
-    rows = df.tail(6).reset_index(drop=True)
-    width, height = 640, 250
-    left, top, bottom = 42, 18, 38
-    plot_w, plot_h = width - 64, height - top - bottom
-    max_value = max(float(rows[["Open", "Closed"]].max().max()), 1)
-    slot = plot_w / max(len(rows), 1)
-    bars = []
-    labels = []
-    for index, row in rows.iterrows():
-        x0 = left + index * slot + slot * 0.22
-        month = month_label(row["Month"])
-        labels.append(f'<text class="axis-label" x="{left + index * slot + slot / 2:.1f}" y="{height - 12}" text-anchor="middle">{html.escape(month)}</text>')
-        for offset, col, color in [(0, "Open", "#ef4444"), (slot * 0.18, "Closed", "#22c55e")]:
-            value = float(row[col])
-            bar_h = plot_h * value / max_value
-            y = top + plot_h - bar_h
-            bars.append(f'<rect x="{x0 + offset:.1f}" y="{y:.1f}" width="{slot * 0.15:.1f}" height="{bar_h:.1f}" rx="4" fill="{color}"/><text x="{x0 + offset + slot * 0.075:.1f}" y="{max(y - 7, 12):.1f}" text-anchor="middle">{int(value)}</text>')
-    return f"""
-<svg class="inline-chart" viewBox="0 0 {width} {height}" role="img">
-    <line x1="{left}" y1="{top + plot_h}" x2="{width - 18}" y2="{top + plot_h}" stroke="rgba(148,163,184,.24)"/>
-    <g class="legend"><circle cx="500" cy="18" r="5" fill="#ef4444"/><text x="512" y="22">Open</text><circle cx="558" cy="18" r="5" fill="#22c55e"/><text x="570" y="22">Closed</text></g>
-    {''.join(bars)}
-    {''.join(labels)}
-</svg>
-"""
-
-
-def material_trend_html(df):
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        return '<div class="exec-empty">No material receipt data available.</div>'
-    rows = df.copy()
-    month_totals = rows.groupby("Month", as_index=False)["Quantity"].sum().tail(6)
-    return line_chart_html(month_totals.rename(columns={"Quantity": "Value"}), "Value", "No material receipt data available.")
-
-
-def category_bars_html(df, label="No category data available."):
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        return f'<div class="exec-empty">{html.escape(label)}</div>'
-    rows = df.copy().head(6)
-    max_value = max(float(rows["Count"].max()), 1)
-    items = []
-    colors = ["#2563eb", "#22c55e", "#f97316", "#7c3aed", "#ef4444", "#38bdf8"]
-    for index, row in rows.iterrows():
-        pct_width = max(8, float(row["Count"]) / max_value * 100)
-        items.append(
-            f"""
-<div class="category-row">
-    <div class="category-label"><span style="background:{colors[index % len(colors)]};"></span>{html.escape(str(row["Category"]))}</div>
-    <div class="category-track"><i style="width:{pct_width:.1f}%; background:{colors[index % len(colors)]};"></i></div>
-    <strong>{int(row["Count"])}</strong>
-</div>
-"""
-        )
-    return '<div class="category-bars">' + "".join(items) + "</div>"
-
-
-def empty_chart(title, message):
-    fig = go.Figure()
-    fig.add_annotation(
-        text=message,
-        x=0.5,
-        y=0.5,
-        xref="paper",
-        yref="paper",
-        showarrow=False,
-        font=dict(size=14, color="#94a3b8"),
-    )
-    fig.update_xaxes(visible=False)
-    fig.update_yaxes(visible=False)
-    return style_dark_chart(fig, height=286).update_layout(title=dict(text=title, font=dict(size=1)))
-
-
-def concrete_volume_fig(monthly_volume, monthly_count_data):
-    rows = monthly_volume.copy()
-    y_col = "Value"
-    title = "Monthly Concrete Volume (m3)"
-    if rows.empty and not monthly_count_data.empty:
-        rows = monthly_count_data.rename(columns={"Count": "Value"}).copy()
-        title = "Monthly Concrete Activity"
-    if rows.empty:
-        return empty_chart(title, "No concrete tracker values found.")
-    rows["Month Label"] = pd.to_datetime(rows["Month"], errors="coerce").dt.strftime("%b %Y")
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=rows["Month Label"],
-            y=pd.to_numeric(rows[y_col], errors="coerce").fillna(0),
-            mode="lines+markers+text",
-            text=[compact_number(value) for value in rows[y_col]],
-            textposition="top center",
-            line=dict(color="#38bdf8", width=4),
-            marker=dict(size=9, color="#60a5fa"),
-            fill="tozeroy",
-            fillcolor="rgba(37, 99, 235, 0.22)",
-            hovertemplate="%{x}<br>%{y:,.2f}<extra></extra>",
-        )
-    )
-    fig.update_yaxes(title_text="m3" if title.endswith("(m3)") else "Records")
-    return style_dark_chart(fig, height=286)
-
-
-def ncr_trend_fig(rows):
-    if not isinstance(rows, pd.DataFrame) or rows.empty:
-        return empty_chart("NCR Trend", "No NCR dates found.")
-    frame = rows.copy()
-    frame["Month Label"] = pd.to_datetime(frame["Month"], errors="coerce").dt.strftime("%b %Y")
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=frame["Month Label"], y=frame["Open"], name="Open", marker_color="#ef4444"))
-    fig.add_trace(go.Bar(x=frame["Month Label"], y=frame["Closed"], name="Closed", marker_color="#22c55e"))
-    fig.update_layout(barmode="group")
-    fig.update_yaxes(title_text="Records")
-    return style_dark_chart(fig, height=286)
-
-
-def material_receipt_fig(rows):
-    if not isinstance(rows, pd.DataFrame) or rows.empty:
-        return empty_chart("Material Receipt Trend", "No material receipt dates found.")
-    frame = rows.groupby("Month", as_index=False)["Quantity"].sum().tail(6)
-    frame["Month Label"] = pd.to_datetime(frame["Month"], errors="coerce").dt.strftime("%b %Y")
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=frame["Month Label"],
-            y=frame["Quantity"],
-            mode="lines+markers+text",
-            text=[compact_number(value) for value in frame["Quantity"]],
-            textposition="top center",
-            line=dict(color="#a855f7", width=4),
-            marker=dict(size=9, color="#c084fc"),
-            fill="tozeroy",
-            fillcolor="rgba(124, 58, 237, 0.22)",
-            hovertemplate="%{x}<br>%{y:,.2f} t<extra></extra>",
-        )
-    )
-    fig.update_yaxes(title_text="Quantity (t)")
-    return style_dark_chart(fig, height=286)
-
-
-def obs_category_fig(rows):
-    if not isinstance(rows, pd.DataFrame) or rows.empty:
-        return empty_chart("OBS by Category", "No OBS categories found.")
-    frame = rows.copy().sort_values("Count", ascending=True)
-    fig = go.Figure(
-        go.Bar(
-            x=frame["Count"],
-            y=frame["Category"],
-            orientation="h",
-            marker_color=["#2563eb", "#22c55e", "#f97316", "#7c3aed", "#ef4444", "#38bdf8"][: len(frame)],
-            text=frame["Count"],
-            textposition="outside",
-            hovertemplate="%{y}<br>%{x} records<extra></extra>",
-        )
-    )
-    fig.update_xaxes(title_text="Records")
-    return style_dark_chart(fig, height=314)
-
-
-def recent_ncr_frame(df):
-    columns = ["NCR_ID", "Project", "Discipline", "Description", "Date Raised", "Status"]
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        return pd.DataFrame(columns=["NCR ID", "Project", "Discipline", "Description", "Date Raised", "Status"])
-    rows = df.copy()
-    if "Date Raised" in rows.columns:
-        rows["Date Raised"] = pd.to_datetime(rows["Date Raised"], errors="coerce")
-        rows = rows.sort_values("Date Raised", ascending=False)
-    available = [col for col in columns if col in rows.columns]
-    rows = rows[available].head(6)
-    if "Date Raised" in rows.columns:
-        rows["Date Raised"] = rows["Date Raised"].dt.strftime("%d %b %Y").fillna("")
-    return rows.rename(columns={"NCR_ID": "NCR ID"})
-
-
-def panel_title(title):
-    st.markdown(f'<div class="native-panel-title">{html.escape(title)}<span>...</span></div>', unsafe_allow_html=True)
-
-
-def module_card(title, stats, color="#2563eb", progress=70):
-    stat_html = "".join(
-        f'<div class="module-card__stat"><span>{html.escape(str(label))}</span><strong>{html.escape(str(value))}</strong></div>'
-        for label, value in stats
-    )
-    safe_progress = max(0, min(int(progress), 100))
-    return (
-        f'<div class="module-card" style="--module-color: {color};">'
-        f'<h3>{html.escape(str(title))}</h3>'
-        f'{stat_html}'
-        f'<div class="module-card__bar"><div style="width:{safe_progress}%;"></div></div>'
-        f'</div>'
-    )
-
-
-def trend_frame(df, label, date_candidates):
-    if not isinstance(df, pd.DataFrame) or df.empty:
-        return pd.DataFrame(columns=["Month", "Count", "Type"])
-    date_col = next((col for col in date_candidates if col in df.columns), None)
-    if not date_col:
-        return pd.DataFrame(columns=["Month", "Count", "Type"])
-    frame = df.copy()
-    frame[date_col] = pd.to_datetime(frame[date_col], errors="coerce")
-    frame = frame.dropna(subset=[date_col])
-    if frame.empty:
-        return pd.DataFrame(columns=["Month", "Count", "Type"])
-    frame["Month"] = frame[date_col].dt.to_period("M").dt.to_timestamp()
-    return frame.groupby("Month").size().reset_index(name="Count").assign(Type=label)
-
-
-def project_performance(data):
-    rows = []
-    for name in ["ITR Log", "NCR Log", "OBS Log", "CTQ Log"]:
-        df = data.get(name, pd.DataFrame())
-        if not isinstance(df, pd.DataFrame) or df.empty or "Project" not in df.columns or "Status" not in df.columns:
+    for section in sections:
+        if section.get("admin_only") and not is_admin:
             continue
-        temp = df.copy()
-        temp["ClosedFlag"] = temp["Status"].astype(str).str.strip().str.lower().isin(
-            ["closed", "completed", "accepted", "approved", "passed", "pass", "compliant"]
+
+        grouped.setdefault(section["group"], []).append(section)
+
+    parts = [
+        '<nav class="evomec-scrollnav" '
+        'aria-label="QA/QC section navigation">'
+    ]
+
+    for group, items in grouped.items():
+        parts.append(
+            f'<span class="nav-group-label">'
+            f'{html.escape(group)}'
+            f'</span>'
         )
-        grouped = temp.groupby("Project").agg(Total=("Status", "size"), Closed=("ClosedFlag", "sum")).reset_index()
-        grouped["Compliance %"] = grouped.apply(lambda row: pct(row["Closed"], row["Total"]), axis=1)
-        rows.append(grouped[["Project", "Compliance %"]])
-    if not rows:
-        return pd.DataFrame(columns=["Project", "Compliance %"])
-    merged = pd.concat(rows, ignore_index=True)
-    return merged.groupby("Project", as_index=False)["Compliance %"].mean().sort_values("Compliance %", ascending=False)
 
-
-def search_dashboard_records(data, query, max_results=25):
-    query = str(query or "").strip().lower()
-    if not query:
-        return pd.DataFrame(columns=["Module", "Record", "Match", "_Page"])
-
-    module_pages = {
-        "NCR Log": ("Quality Operations", "pages/Quality_Operations.py"),
-        "OBS Log": ("Quality Operations", "pages/Quality_Operations.py"),
-        "Daily Reports": ("Daily Reports", "pages/Daily_Reports.py"),
-        "Concrete Tracker": ("Quality Operations", "pages/Quality_Operations.py"),
-        "Calibration Log": ("Quality Operations", "pages/Quality_Operations.py"),
-        "Audit Register": ("Audit Schedule", "pages/Audit_Surveillance.py"),
-        "Surveillance Register": ("Audit Schedule", "pages/Audit_Surveillance.py"),
-        "Document Register": ("Quality Operations", "pages/Quality_Operations.py"),
-        "ITR Log": ("Quality Operations", "pages/Quality_Operations.py"),
-        "CTQ Log": ("Quality Operations", "pages/Quality_Operations.py"),
-        "KPI KRA Register": ("KPI KRA Register", "pages/KPI_KRA_Register.py"),
-        "Defect-Rework Log": ("Quality Operations", "pages/Quality_Operations.py"),
-        "Lessons Learned": ("Lessons Learned", "pages/Lessons_Learned.py"),
-    }
-    rows = []
-    for sheet, frame in data.items():
-        if not isinstance(frame, pd.DataFrame) or frame.empty:
-            continue
-        module_label, page_path = module_pages.get(sheet, (sheet, "app.py"))
-        text_columns = [col for col in frame.columns if frame[col].dtype == "object" or str(frame[col].dtype).startswith("datetime")]
-        if not text_columns:
-            text_columns = list(frame.columns)
-        search_frame = frame[text_columns].fillna("").astype(str)
-        mask = search_frame.apply(lambda col: col.str.lower().str.contains(query, na=False, regex=False)).any(axis=1)
-        matches = frame[mask].head(max_results)
-        for _, row in matches.iterrows():
-            record = next(
-                (
-                    str(row.get(col, "")).strip()
-                    for col in ["NCR_ID", "OBS_ID", "ITR_ID", "CTQ_ID", "Calibration_ID", "Audit_ID", "Surveillance_ID", "Document_ID", "KPI"]
-                    if str(row.get(col, "")).strip()
-                ),
-                sheet,
+        for section in items:
+            parts.append(
+                f'<a href="#{html.escape(section["id"])}">'
+                f'{html.escape(section["icon"])}&nbsp;'
+                f'{html.escape(section["label"])}'
+                f'</a>'
             )
-            matched_values = [
-                str(row.get(col, "")).strip()
-                for col in text_columns
-                if query in str(row.get(col, "")).lower()
-            ]
-            rows.append(
-                {
-                    "Module": module_label,
-                    "Record": record,
-                    "Match": " | ".join(matched_values[:2])[:180],
-                    "_Page": page_path,
-                }
-            )
-            if len(rows) >= max_results:
-                return pd.DataFrame(rows)
-    return pd.DataFrame(rows)
 
+    parts.append("</nav>")
 
-inject_enterprise_theme()
-if not auth.login():
-    st.stop()
-
-render_navigation()
-render_top_nav()
-getattr(auth, "render_user_sidebar", lambda: None)()
-
-render_page_header(
-    "Executive command centre",
-    "Monitor portfolio quality, closeout performance, field activity, and calibration readiness from one view.",
-    "Portfolio overview",
-)
-
-try:
-    data = load_master_data(EXCEL_FILE)
-except FileNotFoundError as err:
-    st.error(err)
-    st.stop()
-
-filtered_data = global_filter_sidebar(data)
-projects = extract_projects(filtered_data)
-calibration_summary = get_calibration_summary(data)
-
-if calibration_summary.get("reminders", 0):
-    st.warning(
-        f"Calibration reminder: {calibration_summary['reminders']} equipment item(s) need attention. "
-        f"{calibration_summary['overdue']} overdue, {calibration_summary['due_in_21_days']} due exactly 21 days from today."
+    st.markdown(
+        "".join(parts),
+        unsafe_allow_html=True,
     )
 
-home_search = st.text_input("Search dashboard", placeholder="Search KPI, KRA, NCR, OBS, ITR, calibration, document, project...")
-if home_search:
-    search_results = search_dashboard_records(filtered_data, home_search)
-    if search_results.empty:
-        st.info("No dashboard records match your search.")
-    else:
-        st.caption(f"{len(search_results)} result(s) found")
-        render_table(
-            search_results,
-            height=260,
-            columns=["Module", "Record", "Match"],
-            empty_message="No matching records were found.",
+
+# ---------------------------------------------------------------------------
+# SIDEBAR
+# ---------------------------------------------------------------------------
+
+def render_shared_sidebar(is_admin: bool) -> None:
+    user = st.session_state.get("auth") or {}
+
+    st.sidebar.markdown(
+        """
+        <div class="side-brand">
+            <div>
+                <div class="side-brand__name">NLNG</div>
+                <div class="side-brand__sub">
+                    QA/QC Command Centre
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if user.get("logged_in"):
+        account = getattr(
+            auth,
+            "current_user",
+            lambda: None,
+        )() or {}
+
+        name = account.get(
+            "name",
+            user.get("username", "User"),
         )
-        result_index = st.selectbox(
-            "Open a matching module",
-            list(search_results.index),
-            format_func=lambda index: (
-                f"{search_results.loc[index, 'Module']} — {search_results.loc[index, 'Record']}"
-            ),
+
+        role = str(
+            account.get(
+                "role",
+                user.get("role", "user"),
+            )
+        ).title()
+
+        st.sidebar.caption(
+            f"{name} · {role}"
         )
-        st.page_link(
-            str(search_results.loc[result_index, "_Page"]),
-            label="Open selected module",
+
+        if st.sidebar.button(
+            "Sign out",
+            key="single_page_sign_out",
             width="stretch",
+        ):
+            auth.sign_out()
+            st.rerun()
+
+    st.sidebar.markdown(
+        '<div class="side-menu-title">Appearance</div>',
+        unsafe_allow_html=True,
+    )
+
+    if hasattr(utils, "render_theme_selector"):
+        utils.render_theme_selector()
+
+    st.sidebar.markdown(
+        '<div class="side-menu-title">Jump to section</div>',
+        unsafe_allow_html=True,
+    )
+
+    for section in SECTIONS:
+        if section.get("admin_only") and not is_admin:
+            continue
+
+        st.sidebar.markdown(
+            f'<a class="side-nav-group" '
+            f'style="display:block;text-decoration:none;" '
+            f'href="#{html.escape(section["id"])}">'
+            f'{html.escape(section["icon"])} '
+            f'{html.escape(section["label"])}'
+            f'</a>',
+            unsafe_allow_html=True,
         )
 
-ncr = filtered_data.get("NCR Log", pd.DataFrame())
-obs = filtered_data.get("OBS Log", pd.DataFrame())
-itr = filtered_data.get("ITR Log", pd.DataFrame())
-ctq = filtered_data.get("CTQ Log", pd.DataFrame())
-concrete = filtered_data.get("Concrete Tracker", pd.DataFrame())
-daily = filtered_data.get("Daily Reports", pd.DataFrame())
-docs = filtered_data.get("Document Register", pd.DataFrame())
-lessons = filtered_data.get("Lessons Learned", pd.DataFrame())
-materials = filtered_data.get("Material_Receipts", pd.DataFrame())
-concrete_volume_total = concrete_total_volume(concrete)
 
-open_ncr = open_count(ncr)
-closed_ncr = closed_count(ncr)
-open_obs = open_count(obs)
-closed_obs = closed_count(obs)
-open_itr = open_count(itr)
-closed_itr = closed_count(itr)
-ctq_total = len(ctq) if isinstance(ctq, pd.DataFrame) else 0
-ctq_passed = status_count_any(ctq, ["Passed", "Pass", "Compliant", "Approved", "Accepted"])
-ctq_failed = status_count_any(ctq, ["Failed", "Fail", "Non-Compliant", "Nonconforming", "Rejected"])
-ctq_pending = max(ctq_total - ctq_passed - ctq_failed, 0)
-ctq_compliance = pct(ctq_passed, ctq_total)
-quality_score = pct(
-    closed_ncr + closed_obs + closed_itr + ctq_passed,
-    open_ncr + closed_ncr + open_obs + closed_obs + open_itr + closed_itr + ctq_total,
-)
+# ---------------------------------------------------------------------------
+# GLOBAL PROJECT FILTER
+# ---------------------------------------------------------------------------
 
-metric_html = [
-    metric_card("Total Projects", len(projects), "Active work fronts", "#2563eb", "P", "Current portfolio"),
-    metric_card("Open NCRs", open_ncr, "Requires action", "#ef4444", "!", metric_delta(open_ncr, open_ncr + closed_ncr)),
-    metric_card("Closed NCRs", closed_ncr, "Closed records", "#22c55e", "C", metric_delta(closed_ncr, open_ncr + closed_ncr)),
-    metric_card("Open OBS", open_obs, "Field observations", "#f97316", "O", metric_delta(open_obs, open_obs + closed_obs)),
-    metric_card("Daily Reports", len(daily), "Records loaded", "#7c3aed", "R", "Current selection"),
-    metric_card("Concrete Volume (m3)", compact_number(concrete_volume_total), "Actual tracker total", "#0ea5e9", "C", "Concrete tracker"),
-    metric_card("Calibration Alerts", calibration_summary.get("reminders", 0), "Due within 21 days", "#dc2626", "!", f"{calibration_summary.get('overdue', 0)} overdue"),
-]
+def _silent_global_filter(data):
+    """Apply the application-level project selection to section data."""
 
-concrete_monthly = monthly_sum(concrete, ["Date", "Pour_Date", "Report_Date"], "Volume")
-concrete_counts = monthly_count(concrete, ["Date", "Pour_Date", "Report_Date"])
-ncr_status_monthly = ncr_month_status(ncr)
-material_trend = material_month_trend(materials)
-obs_categories = obs_category_summary(obs)
-performance = project_performance(filtered_data)
+    if not isinstance(data, dict):
+        return data
 
-st.markdown(f'<div class="metric-grid metric-grid--six">{"".join(metric_html)}</div>', unsafe_allow_html=True)
+    project = st.session_state.get(
+        "global_project",
+        "All",
+    )
 
-chart_col1, chart_col2, chart_col3 = st.columns(3)
-with chart_col1:
-    with st.container(border=True):
-        panel_title("Monthly Concrete Volume (m3)")
-        st.plotly_chart(concrete_volume_fig(concrete_monthly, concrete_counts), width="stretch", key="home_concrete_volume_trend")
-with chart_col2:
-    with st.container(border=True):
-        panel_title("NCR Trend")
-        st.plotly_chart(ncr_trend_fig(ncr_status_monthly), width="stretch", key="home_ncr_trend")
-with chart_col3:
-    with st.container(border=True):
-        panel_title("Material Receipt Trend")
-        st.plotly_chart(material_receipt_fig(material_trend), width="stretch", key="home_material_receipt_trend")
+    if project == "All":
+        return data
 
-bottom_col1, bottom_col2 = st.columns([1, 2])
-with bottom_col1:
-    with st.container(border=True):
-        panel_title("OBS by Category")
-        st.plotly_chart(obs_category_fig(obs_categories), width="stretch", key="home_obs_category")
-with bottom_col2:
-    with st.container(border=True):
-        panel_title("Recent NCRs")
-        recent_ncr = recent_ncr_frame(ncr)
-        if recent_ncr.empty:
-            st.info("No recent NCR records available.")
+    filtered = {}
+
+    for key, frame in data.items():
+        if (
+            isinstance(frame, pd.DataFrame)
+            and "Project" in frame.columns
+        ):
+            filtered[key] = frame[
+                frame["Project"] == project
+            ].copy()
         else:
-            render_table(recent_ncr, height=314, empty_message="No recent NCR records are available.")
+            filtered[key] = frame
 
-module_cards = [
-    module_card("Audit", [("Planned", len(filtered_data.get("Audit Register", pd.DataFrame()))), ("Documents", len(docs))], "#2563eb", 83),
-    module_card("ITR", [("Open", open_itr), ("Closed", closed_itr)], "#14b8a6", pct(closed_itr, open_itr + closed_itr)),
-    module_card("CTQ", [("Total", ctq_total), ("Compliance", f"{ctq_compliance}%")], "#7c3aed", ctq_compliance),
-    module_card("Rework", [("Records", len(filtered_data.get("Defect-Rework Log", pd.DataFrame()))), ("Lessons", len(lessons))], "#f97316", 72),
-]
-st.markdown('<div class="module-grid module-grid--compact">' + "".join(module_cards) + "</div>", unsafe_allow_html=True)
+    return filtered
 
-quick_links = [
-    ("Quality Operations", "pages/Quality_Operations.py", "#14b8a6", "Q"),
-    ("Daily Reports", "pages/Daily_Reports.py", "#7c3aed", "R"),
-    ("KPI KRA Register", "pages/KPI_KRA_Register.py", "#14b8a6", "K"),
-    ("Audit Schedule", "pages/Audit_Surveillance.py", "#22c55e", "A"),
-    ("Customer Support", "pages/Customer_Support.py", "#2563eb", "S"),
-]
-st.markdown(
+
+# ---------------------------------------------------------------------------
+# SECTION CHROME PATCHING
+#
+# IMPORTANT:
+# We only suppress duplicate chrome.
+#
+# We DO NOT suppress the enterprise theme.
+# The enterprise theme is what gives the application the polished
+# appearance shown in the preferred screenshot.
+# ---------------------------------------------------------------------------
+
+def patch_section_chrome() -> None:
+    """Prevent legacy sections from creating duplicate app-level chrome."""
+
+    # Individual sections must not attempt to reset Streamlit page config.
+    st.set_page_config = lambda *args, **kwargs: None
+
+    # The application owns the top-level navigation.
+    if hasattr(utils, "render_navigation"):
+        utils.render_navigation = lambda: None
+
+    if hasattr(utils, "render_top_nav"):
+        utils.render_top_nav = lambda: None
+
+    # IMPORTANT:
+    # Do NOT disable inject_enterprise_theme().
+    #
+    # The enterprise theme is intentionally preserved because it provides
+    # the visual system used by the preferred dashboard design.
+
+    # Prevent each section from creating another global filter.
+    utils.global_filter_sidebar = _silent_global_filter
+
+    # Authentication is handled once by app.py.
+    auth.login = lambda: True
+    auth.render_user_sidebar = lambda: None
+
+
+# ---------------------------------------------------------------------------
+# SECTION EXECUTION
+# ---------------------------------------------------------------------------
+
+def run_section(section: dict) -> None:
+    path = SECTIONS_DIR / section["file"]
+
+    # Anchor used by the single-page navigation.
+    st.markdown(
+        f'<div id="{html.escape(section["id"])}" '
+        f'class="section-anchor"></div>',
+        unsafe_allow_html=True,
+    )
+
+    if not path.exists():
+        st.warning(
+            f"{section['label']} is not available yet."
+        )
+        return
+
+    with st.container():
+        st.markdown(
+            '<div class="qaqc-section-wrap">',
+            unsafe_allow_html=True,
+        )
+
+        try:
+            runpy.run_path(
+                str(path),
+                run_name="__section__",
+            )
+
+        except BaseException as exc:
+            # Streamlit's StopException is expected when a section calls
+            # st.stop().
+            if type(exc).__name__ == "StopException":
+                pass
+
+            elif isinstance(
+                exc,
+                (KeyboardInterrupt, SystemExit),
+            ):
+                raise
+
+            else:
+                st.error(
+                    f"The {section['label']} module "
+                    f"was skipped: {exc}"
+                )
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        '<hr class="qaqc-section-divider">',
+        unsafe_allow_html=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ENTERPRISE APPLICATION SHELL
+# ---------------------------------------------------------------------------
+
+def render_enterprise_shell() -> None:
     """
-<div class="quick-access-panel">
-    <div class="quick-access-title">Quick Access</div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-quick_columns = st.columns(4)
-for index, (label, path, _color, mark) in enumerate(quick_links):
-    with quick_columns[index % len(quick_columns)]:
-        st.page_link(path, label=f"{mark}  {label}", width="stretch")
-st.page_link("app.py", label="View all tools", width="stretch")
-st.markdown(
-    '<div class="dashboard-security-strip"><span>Secure</span><span>Compliant</span><span>Reliable</span></div>',
-    unsafe_allow_html=True,
-)
+    Load the existing enterprise UI system from utils.py.
 
-st.sidebar.caption(f"Total Projects: {len(projects)}")
+    This is intentionally executed ONCE before sections are loaded.
+    """
 
+    if hasattr(
+        utils,
+        "inject_enterprise_theme",
+    ):
+        utils.inject_enterprise_theme()
+
+    elif hasattr(
+        utils,
+        "inject_global_ui",
+    ):
+        utils.inject_global_ui()
+
+
+# ---------------------------------------------------------------------------
+# TOP NAVIGATION
+# ---------------------------------------------------------------------------
+
+def render_enterprise_top_navigation() -> None:
+    """
+    Render the existing polished top navigation supplied by utils.py.
+
+    The preferred screenshot uses this navigation style, so we preserve it
+    rather than replacing it with the simplified section-only navigation.
+    """
+
+    if hasattr(
+        utils,
+        "render_top_nav",
+    ):
+        try:
+            utils.render_top_nav()
+            return
+        except TypeError:
+            # Some versions may expect no arguments while others may not
+            # expose a compatible implementation.
+            pass
+        except Exception:
+            # Fall back silently to the single-page navigation below.
+            pass
+
+
+# ---------------------------------------------------------------------------
+# MAIN
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    # ---------------------------------------------------------------
+    # 1. Load the enterprise visual system FIRST.
+    # ---------------------------------------------------------------
+
+    render_enterprise_shell()
+
+    # ---------------------------------------------------------------
+    # 2. Authenticate once.
+    # ---------------------------------------------------------------
+
+    if not auth.login():
+        st.stop()
+
+    is_admin = (
+        str(auth.get_role() or "").lower()
+        == "admin"
+    )
+
+    # ---------------------------------------------------------------
+    # 3. Inject single-page enhancements.
+    # ---------------------------------------------------------------
+
+    inject_scroll_css()
+
+    # ---------------------------------------------------------------
+    # 4. Render shared sidebar.
+    # ---------------------------------------------------------------
+
+    render_shared_sidebar(is_admin)
+
+    # ---------------------------------------------------------------
+    # 5. Load master data.
+    # ---------------------------------------------------------------
+
+    source_data = utils.load_master_data(
+        DATA_FILE
+    )
+
+    # ---------------------------------------------------------------
+    # 6. Apply global project filter.
+    # ---------------------------------------------------------------
+
+    if hasattr(
+        utils,
+        "global_filter_sidebar",
+    ):
+        utils.global_filter_sidebar(
+            source_data
+        )
+
+    # ---------------------------------------------------------------
+    # 7. Render the enterprise top navigation.
+    #
+    # This is deliberately NOT disabled here.
+    # ---------------------------------------------------------------
+
+    render_enterprise_top_navigation()
+
+    # ---------------------------------------------------------------
+    # 8. Render single-page section navigation.
+    #
+    # This is an additional jump navigation and does not replace the
+    # enterprise navigation.
+    # ---------------------------------------------------------------
+
+    render_scroll_nav(
+        SECTIONS,
+        is_admin,
+    )
+
+    # ---------------------------------------------------------------
+    # 9. Prevent individual sections from duplicating global chrome.
+    # ---------------------------------------------------------------
+
+    patch_section_chrome()
+
+    # ---------------------------------------------------------------
+    # 10. Render every section.
+    # ---------------------------------------------------------------
+
+    for section in SECTIONS:
+        if (
+            section.get("admin_only")
+            and not is_admin
+        ):
+            continue
+
+        run_section(section)
+
+    # ---------------------------------------------------------------
+    # 11. Application footer.
+    # ---------------------------------------------------------------
+
+    st.sidebar.caption(
+        "Evomec QA/QC Command Centre · "
+        "single-page build"
+    )
+
+
+# ---------------------------------------------------------------------------
+# APPLICATION ENTRY POINT
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    main()
