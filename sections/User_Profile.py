@@ -18,19 +18,25 @@ render_navigation()
 render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
-user = getattr(auth, "current_user", lambda: None)()
-if not user:
-    session_user = st.session_state.get("auth") or {}
-    if session_user.get("logged_in") and session_user.get("username"):
-        user = {
-            "username": session_user.get("username"),
-            "name": session_user.get("name") or session_user.get("username"),
-            "email": session_user.get("email", ""),
-            "role": session_user.get("role", "user"),
-            "status": "approved",
-            "discipline": session_user.get("discipline", "Quality Management"),
-            "profile_photo": session_user.get("profile_photo"),
-        }
+session_user = st.session_state.get("auth") or {}
+user = {}
+if session_user.get("logged_in") and session_user.get("username"):
+    user = {
+        "username": session_user.get("username"),
+        "name": session_user.get("name") or session_user.get("username"),
+        "email": session_user.get("email", ""),
+        "role": session_user.get("role", "user"),
+        "status": "approved",
+        "discipline": session_user.get("discipline", "Quality Management"),
+        "profile_photo": session_user.get("profile_photo"),
+    }
+
+try:
+    persisted_user = getattr(auth, "current_user", lambda: None)()
+except Exception:
+    persisted_user = None
+if persisted_user:
+    user.update(persisted_user)
 
 
 def render_profile_avatar(user_record):
@@ -69,7 +75,9 @@ if not user:
 c1, c2 = st.columns([1, 2])
 with c1:
     render_profile_avatar(user)
-    st.caption(f"Role: {user['role'].title()} | Status: {user['status'].title()}")
+    role = str(user.get("role", "user")).replace("_", " ").title()
+    status = str(user.get("status", "approved")).replace("_", " ").title()
+    st.caption(f"Role: {role} | Status: {status}")
 
 with c2:
     name = st.text_input("Full name", value=user.get("name", ""))

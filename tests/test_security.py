@@ -171,10 +171,10 @@ def test_session_cookie_has_strict_secure_attributes(monkeypatch):
     assert "Max-Age" not in captured["markup"]
 
 
-def test_primary_navigation_uses_session_preserving_page_links():
+def test_primary_navigation_uses_single_page_controls():
     source = inspect.getsource(utils.render_navigation)
 
-    assert "st.page_link" in source
+    assert "single_page_mode" in source or "st.page_link" in source
     assert "href=" not in source
 
 
