@@ -9,6 +9,7 @@ import secrets
 import time
 import zipfile
 import warnings
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -36,6 +37,23 @@ MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
 MAX_OFFICE_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
 MAX_OFFICE_PARTS = 1_000
+
+
+def cloudinary_storage_status():
+    """Return safe configuration status without exposing Cloudinary credentials."""
+    configured = bool(cloudinary_url)
+    parsed = urlparse(cloudinary_url) if cloudinary_url else None
+    return {
+        "configured": configured,
+        "valid_format": bool(
+            parsed
+            and parsed.scheme == "cloudinary"
+            and parsed.username
+            and parsed.password
+            and parsed.hostname
+        ),
+        "cloud_name": parsed.hostname if parsed and parsed.scheme == "cloudinary" else None,
+    }
 
 
 def _safe_filename(filename):
