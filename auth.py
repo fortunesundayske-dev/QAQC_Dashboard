@@ -825,6 +825,16 @@ def _send_approval_email(user):
 # ============================================================================
 
 def init_auth():
+    """
+    Initialize and synchronize authentication state.
+
+    The application historically used individual Streamlit session keys
+    such as st.session_state.username while the newer implementation uses
+    st.session_state.auth.
+
+    This function keeps both structures synchronized.
+    """
+
     if "auth" not in st.session_state:
         st.session_state.auth = {
             "logged_in": False,
@@ -834,14 +844,83 @@ def init_auth():
             "email": None,
             "discipline": "QA/QC",
             "profile_photo": None,
+            "profile_photo_asset": None,
             "auth_token": None,
         }
 
-    elif not isinstance(
-        st.session_state.auth,
-        dict,
-    ):
-        st.session_state.auth = {
+    auth_state = st.session_state.auth
+
+    # Ensure required keys always exist.
+    defaults = {
+        "logged_in": False,
+        "username": None,
+        "name": None,
+        "role": None,
+        "email": None,
+        "discipline": "QA/QC",
+        "profile_photo": None,
+        "profile_photo_asset": None,
+        "auth_token": None,
+    }
+
+    for key, default in defaults.items():
+        if key not in auth_state:
+            auth_state[key] = default
+
+    # Recover from legacy session state if necessary.
+    legacy_map = {
+        "username": st.session_state.get("username"),
+        "name": st.session_state.get("name"),
+        "role": st.session_state.get("role"),
+        "email": st.session_state.get("email"),
+        "discipline": st.session_state.get("discipline"),
+        "profile_photo": (
+            st.session_state.get("profile_photo_asset")
+            or st.session_state.get("profile_photo")
+        ),
+        "profile_photo_asset": (
+            st.session_state.get("profile_photo_asset")
+            or st.session_state.get("profile_photo")
+        ),
+        "auth_token": st.session_state.get("auth_token"),
+    }
+
+    for key, value in legacy_map.items():
+        if value is not None and value != "":
+            auth_state[key] = value
+
+    # Keep photo fields synchronized.
+    photo = (
+        auth_state.get("profile_photo_asset")
+        or auth_state.get("profile_photo")
+        or None
+    )
+
+    auth_state["profile_photo"] = photo
+    auth_state["profile_photo_asset"] = photo
+
+    # Keep legacy state synchronized.
+    st.session_state.username = auth_state.get("username")
+    st.session_state.name = auth_state.get("name")
+    st.session_state.role = auth_state.get("role")
+    st.session_state.email = auth_state.get("email")
+    st.session_state.discipline = auth_state.get("discipline", "QA/QC")
+    st.session_state.profile_photo = photo
+    st.session_state.profile_photo_asset = photo
+    st.session_state.auth_token = auth_state.get("auth_token")
+
+    st.session_state.logged_in = bool(auth_state.get("logged_in"))
+
+def sync_auth_state():
+    """
+    Synchronize the canonical auth state with the legacy session-state
+    fields used by older sections of the application.
+    """
+    init_auth()
+
+    auth_state = st.session_state.setdefault(
+        "auth",
+        {
             "logged_in": False,
             "username": None,
             "name": None,
@@ -850,120 +929,73 @@ def init_auth():
             "discipline": "QA/QC",
             "profile_photo": None,
             "auth_token": None,
-        }
-
-    auth_state = st.session_state.auth
-
-    if (
-        st.session_state.get("logged_in")
-        and not auth_state.get("logged_in")
-    ):
-        auth_state["logged_in"] = True
-
-    legacy_fields = {
-        "username": st.session_state.get(
-            "username"
-        ),
-        "name": st.session_state.get(
-            "name"
-        ),
-        "role": st.session_state.get(
-            "role"
-        ),
-        "email": st.session_state.get(
-            "email"
-        ),
-        "discipline": st.session_state.get(
-            "discipline"
-        ),
-        "profile_photo": st.session_state.get(
-            "profile_photo"
-        ),
-    }
-
-    for key, value in legacy_fields.items():
-
-        if (
-            value is not None
-            and not auth_state.get(key)
-        ):
-            auth_state[key] = value
-
-
-def _set_logged_in(
-    username,
-    user,
-    session_token=None,
-):
-    existing_auth = st.session_state.get(
-        "auth"
+        },
     )
 
-    if not isinstance(
-        existing_auth,
-        dict,
-    ):
-        existing_auth = {}
+    # If there is no authenticated session, do not manufacture one.
+    if not auth_state.get("logged_in"):
+        return auth_state
 
-    existing_token = existing_auth.get(
-        "auth_token"
+    # Synchronize legacy fields FROM the canonical auth object.
+    st.session_state.logged_in = True
+    st.session_state.username = auth_state.get("username")
+    st.session_state.name = auth_state.get("name")
+    st.session_state.role = auth_state.get("role")
+    st.session_state.email = auth_state.get("email")
+    st.session_state.discipline = auth_state.get("discipline", "QA/QC")
+    st.session_state.profile_photo = (
+        auth_state.get("profile_photo_asset")
+        or auth_state.get("profile_photo")
     )
+    st.session_state.auth_token = auth_state.get("auth_token")
 
-    safe_name = _normalise_name(
-        user.get("name")
-        or user.get("username")
-        or username
-    )
+    return auth_state
 
-    safe_email = _normalise_email(
-        user.get("email")
-    )
+def _set_logged_in(username, user, session_token=None):
+    """
+    Synchronize the authenticated user into both the modern auth state
+    and legacy Streamlit session-state fields.
 
-    safe_role = str(
-        user.get(
-            "role",
-            "user",
-        )
-        or "user"
-    ).lower()
-
-    safe_discipline = str(
-        user.get(
-            "discipline",
-            "QA/QC",
-        )
-        or "QA/QC"
-    )
-
-    safe_photo = (
+    This deliberately keeps both profile_photo and profile_photo_asset
+    available because different dashboard modules may consume either field.
+    """
+    profile_photo_asset = (
         user.get("profile_photo_asset")
         or user.get("profile_photo")
-    )
-
-    active_token = (
-        session_token
-        or existing_token
+        or None
     )
 
     st.session_state.auth = {
         "logged_in": True,
         "username": username,
-        "name": safe_name,
-        "role": safe_role,
-        "email": safe_email,
-        "discipline": safe_discipline,
-        "profile_photo": safe_photo,
-        "auth_token": active_token,
+        "name": user.get("name", ""),
+        "role": user.get("role", "user"),
+        "email": user.get("email", ""),
+        "discipline": user.get("discipline", "QA/QC"),
+        "profile_photo": profile_photo_asset,
+        "profile_photo_asset": profile_photo_asset,
+        "auth_token": (
+            session_token
+            or st.session_state.get("auth", {}).get("auth_token")
+        ),
     }
 
+    # Legacy/session compatibility
     st.session_state.logged_in = True
     st.session_state.username = username
-    st.session_state.name = safe_name
-    st.session_state.role = safe_role
-    st.session_state.email = safe_email
-    st.session_state.discipline = safe_discipline
-    st.session_state.profile_photo = safe_photo
-    st.session_state.auth_token = active_token
+    st.session_state.name = user.get("name", "")
+    st.session_state.role = user.get("role", "user")
+    st.session_state.email = user.get("email", "")
+    st.session_state.discipline = user.get("discipline", "QA/QC")
+
+    st.session_state.profile_photo = profile_photo_asset
+    st.session_state.profile_photo_asset = profile_photo_asset
+
+    st.session_state.auth_token = (
+        session_token
+        or st.session_state.auth.get("auth_token")
+    )
+
     st.session_state.auth_last_activity = time.time()
 
 
@@ -2117,60 +2149,881 @@ def login():
 # ============================================================================
 
 def get_role():
+    """
+    Return the role of the currently authenticated user.
+
+    Prefer the live MongoDB account record. Fall back to session state
+    only when the account cannot be loaded.
+    """
     init_auth()
 
+    username = (
+        st.session_state.auth.get("username")
+        or st.session_state.get("username")
+    )
+
+    if username:
+        try:
+            users = _load_users()
+            user = users.get(str(username).strip().lower())
+
+            if user:
+                role = str(user.get("role", "")).strip().lower()
+
+                # Keep session state synchronized.
+                st.session_state.auth["role"] = role
+                st.session_state.role = role
+
+                return role
+        except Exception:
+            pass
+
     return str(
-        st.session_state.auth.get(
-            "role"
-        )
+        st.session_state.auth.get("role")
+        or st.session_state.get("role")
         or ""
-    ).lower()
+    ).strip().lower()
 
 
 def current_user():
+    """
+    Return the current authenticated user's live MongoDB record.
+
+    MongoDB is the source of truth for:
+    - name
+    - email
+    - discipline
+    - role
+    - status
+    - profile photo
+    """
+
     init_auth()
 
-    users = _load_users()
+    auth_state = _safe_dict(
+        st.session_state.get("auth")
+    )
 
-    username = _normalise_username(
-        st.session_state.auth.get(
-            "username"
-        )
-        or st.session_state.get(
-            "username"
-        )
+    username = (
+        auth_state.get("username")
+        or st.session_state.get("username")
     )
 
     if not username:
         return None
 
-    user = users.get(
-        username
+    username = _normalise_username(username)
+
+    try:
+        users = _load_users()
+    except Exception:
+        return None
+
+    user = users.get(username)
+
+    if not isinstance(user, dict):
+        # Fallback if MongoDB key and embedded username differ.
+        for record in users.values():
+            if not isinstance(record, dict):
+                continue
+
+            record_username = _normalise_username(
+                record.get("username")
+            )
+
+            if record_username == username:
+                user = record
+                break
+
+    if not isinstance(user, dict):
+        return None
+
+    # ------------------------------------------------------------
+    # Synchronize profile data into session state
+    # ------------------------------------------------------------
+
+    photo = (
+        user.get("profile_photo_asset")
+        or user.get("profile_photo")
+        or None
     )
 
-    if user is not None:
-        return user
+    role = str(
+        user.get("role", "user")
+    ).strip().lower()
 
-    for record in users.values():
+    name = str(
+        user.get("name", "")
+    ).strip()
 
-        if not isinstance(
-            record,
-            dict,
-        ):
-            continue
+    email = str(
+        user.get("email", "")
+    ).strip()
 
-        if (
-            _normalise_username(
-                record.get(
-                    "username"
-                )
+    discipline = str(
+        user.get(
+            "discipline",
+            "QA/QC",
+        )
+    ).strip()
+
+    auth_state["logged_in"] = True
+    auth_state["username"] = user.get(
+        "username",
+        username,
+    )
+    auth_state["name"] = name
+    auth_state["email"] = email
+    auth_state["role"] = role
+    auth_state["discipline"] = discipline
+    auth_state["profile_photo"] = photo
+    auth_state["profile_photo_asset"] = photo
+
+    st.session_state.auth = auth_state
+
+    st.session_state.username = auth_state["username"]
+    st.session_state.name = name
+    st.session_state.email = email
+    st.session_state.role = role
+    st.session_state.discipline = discipline
+    st.session_state.profile_photo = photo
+    st.session_state.profile_photo_asset = photo
+    st.session_state.logged_in = True
+
+    return user
+
+def get_profile_photo():
+    """
+    Return the best available profile-photo reference.
+
+    Supports both the current Cloudinary field and the legacy
+    profile_photo field.
+    """
+    user = current_user()
+
+    if user:
+        return (
+            user.get("profile_photo_asset")
+            or user.get("profile_photo")
+        )
+
+    auth_state = st.session_state.get("auth") or {}
+
+    return (
+        auth_state.get("profile_photo_asset")
+        or auth_state.get("profile_photo")
+        or st.session_state.get("profile_photo")
+    )
+
+import pandas as pd
+import streamlit as st
+
+import auth
+
+from utils import (
+    inject_global_ui,
+    render_navigation,
+    render_page_header,
+    render_top_nav,
+    render_table,
+)
+
+
+st.set_page_config(
+    page_title="Access Admin",
+    layout="wide",
+)
+
+
+# ---------------------------------------------------------
+# GLOBAL UI
+# ---------------------------------------------------------
+
+inject_global_ui()
+
+
+# ---------------------------------------------------------
+# AUTHENTICATION
+# ---------------------------------------------------------
+
+if not auth.login():
+    st.stop()
+
+
+# ---------------------------------------------------------
+# ADMIN SECURITY GATE
+# ---------------------------------------------------------
+
+auth.require_role(["admin"])
+
+
+# ---------------------------------------------------------
+# NAVIGATION
+# ---------------------------------------------------------
+
+
+
+
+# ---------------------------------------------------------
+# PAGE HEADER
+# ---------------------------------------------------------
+
+render_page_header(
+    "User Approval Centre",
+    (
+        "Review registration requests, approve access, assign roles, "
+        "restrict accounts, and maintain controlled access to the "
+        "QA/QC Command Centre."
+    ),
+    "Security Administration",
+)
+
+
+# ---------------------------------------------------------
+# LOAD USER DATA
+# ---------------------------------------------------------
+
+pending = auth.pending_users()
+all_accounts = auth.all_users()
+approved = auth.approved_users()
+restricted = auth.restricted_users()
+rejected = auth.rejected_users()
+
+
+# ---------------------------------------------------------
+# ADMIN IDENTITY
+# ---------------------------------------------------------
+
+current_admin = auth.current_user()
+
+admin_username = (
+    current_admin.get("username")
+    if current_admin
+    else None
+)
+
+
+# ---------------------------------------------------------
+# KPI CARDS
+# ---------------------------------------------------------
+
+c1, c2, c3, c4, c5 = st.columns(5)
+
+c1.metric(
+    "Pending approvals",
+    len(pending),
+)
+
+c2.metric(
+    "Approved users",
+    len(approved),
+)
+
+c3.metric(
+    "Restricted users",
+    len(restricted),
+)
+
+c4.metric(
+    "Rejected requests",
+    len(rejected),
+)
+
+c5.metric(
+    "Admin users",
+    sum(
+        1
+        for user in approved.values()
+        if str(user.get("role", "")).lower() == "admin"
+    ),
+)
+
+
+# ---------------------------------------------------------
+# REFRESH
+# ---------------------------------------------------------
+
+st.markdown("")
+
+refresh_col = st.columns([5, 1])[1]
+
+with refresh_col:
+    if st.button(
+        "Refresh",
+        width="stretch",
+        key="access_admin_refresh",
+    ):
+        st.rerun()
+
+
+# =========================================================
+# PENDING REGISTRATION REQUESTS
+# =========================================================
+
+st.markdown(
+    '<div class="section-heading">Pending Registration Requests</div>',
+    unsafe_allow_html=True,
+)
+
+
+if not pending:
+
+    st.info(
+        "There are currently no pending registration requests."
+    )
+
+else:
+
+    st.success(
+        f"{len(pending)} registration request(s) require approval."
+    )
+
+    for username, user in pending.items():
+
+        with st.container(border=True):
+
+            st.subheader(
+                user.get("name") or username
             )
-            == username
-        ):
-            return record
 
-    return None
+            st.caption(
+                f"Username: {username}  |  "
+                f"Email: {user.get('email', '')}  |  "
+                f"Discipline: {user.get('discipline', 'Not set')}  |  "
+                f"Requested: {user.get('created_at', '')}"
+            )
 
+            role = st.selectbox(
+                "Role on approval",
+                ["user", "viewer", "admin"],
+                key=f"pending_role_{username}",
+            )
+
+            approve_col, reject_col, delete_col = st.columns(3)
+
+            with approve_col:
+
+                if st.button(
+                    "Approve access",
+                    type="primary",
+                    width="stretch",
+                    key=f"pending_approve_{username}",
+                ):
+
+                    ok, message = auth.approve_user(
+                        username,
+                        role,
+                    )
+
+                    if ok:
+                        st.success(message)
+                        st.rerun()
+
+                    st.error(message)
+
+            with reject_col:
+
+                if st.button(
+                    "Reject",
+                    width="stretch",
+                    key=f"pending_reject_{username}",
+                ):
+
+                    ok = auth.reject_user(
+                        username
+                    )
+
+                    if ok:
+                        st.warning(
+                            "Registration request rejected."
+                        )
+                        st.rerun()
+
+                    st.error(
+                        "The registration request could not be rejected."
+                    )
+
+            with delete_col:
+
+                confirm = st.checkbox(
+                    "Confirm delete",
+                    key=f"pending_delete_confirm_{username}",
+                )
+
+                if st.button(
+                    "Delete",
+                    width="stretch",
+                    disabled=not confirm,
+                    key=f"pending_delete_{username}",
+                ):
+
+                    ok, message = auth.delete_user(
+                        username
+                    )
+
+                    if ok:
+                        st.warning(message)
+                        st.rerun()
+
+                    st.error(message)
+
+
+# =========================================================
+# ALL ACCOUNTS
+# =========================================================
+
+st.markdown(
+    '<div class="section-heading">All User Account Status</div>',
+    unsafe_allow_html=True,
+)
+
+
+if all_accounts:
+
+    account_rows = []
+
+    for username, user in all_accounts.items():
+
+        account_rows.append(
+            {
+                "Username": username,
+                "Name": user.get("name", ""),
+                "Email": user.get("email", ""),
+                "Role": user.get("role", ""),
+                "Status": user.get("status", ""),
+                "Discipline": user.get("discipline", ""),
+                "Created": user.get("created_at", ""),
+                "Approved by": user.get("approved_by", ""),
+                "Approved at": user.get("approved_at", ""),
+                "Restricted at": user.get("restricted_at", ""),
+                "Rejected at": user.get("rejected_at", ""),
+            }
+        )
+
+    accounts_df = pd.DataFrame(
+        account_rows
+    )
+
+    render_table(
+        accounts_df,
+        include_internal=True,
+    )
+
+else:
+
+    st.warning(
+        "No user accounts were found."
+    )
+
+
+# =========================================================
+# ACCOUNT MANAGEMENT
+# =========================================================
+
+st.markdown(
+    '<div class="section-heading">Account Management</div>',
+    unsafe_allow_html=True,
+)
+
+
+account_options = []
+
+for username, user in all_accounts.items():
+
+    account_options.append(
+        {
+            "username": username,
+            "name": user.get("name") or username,
+            "status": user.get("status") or "unknown",
+            "role": user.get("role") or "user",
+            "email": user.get("email") or "",
+            "discipline": user.get("discipline") or "",
+        }
+    )
+
+
+if not account_options:
+
+    st.info(
+        "No user accounts are available."
+    )
+
+else:
+
+    with st.container(border=True):
+
+        selected_username = st.selectbox(
+            "Select user account",
+            [
+                item["username"]
+                for item in account_options
+            ],
+            key="admin_selected_username",
+        )
+
+        selected = next(
+            item
+            for item in account_options
+            if item["username"] == selected_username
+        )
+
+        username = selected["username"]
+        status = str(
+            selected["status"]
+        ).lower()
+
+        role = selected["role"]
+
+        st.markdown(
+            f"""
+**{selected['name']}**
+
+- Username: `{username}`
+- Email: `{selected['email']}`
+- Discipline: `{selected['discipline']}`
+- Role: `{role}`
+- Status: `{status}`
+"""
+        )
+
+        is_self = (
+            username == admin_username
+        )
+
+
+        # -------------------------------------------------
+        # APPROVED ACCOUNT
+        # -------------------------------------------------
+
+        if status == "approved":
+
+            role_options = [
+                "user",
+                "viewer",
+                "admin",
+            ]
+
+            current_role = (
+                role
+                if role in role_options
+                else "user"
+            )
+
+            new_role = st.selectbox(
+                "Account role",
+                role_options,
+                index=role_options.index(
+                    current_role
+                ),
+                disabled=is_self,
+                key=f"role_{username}",
+            )
+
+            if st.button(
+                "Save role",
+                type="primary",
+                width="stretch",
+                disabled=(
+                    is_self
+                    or new_role == current_role
+                ),
+                key=f"save_role_{username}",
+            ):
+
+                ok, message = auth.change_user_role(
+                    username,
+                    new_role,
+                )
+
+                if ok:
+                    st.success(message)
+                    st.rerun()
+
+                st.error(message)
+
+
+            restrict_col, delete_col = st.columns(2)
+
+            with restrict_col:
+
+                if st.button(
+                    "Restrict account",
+                    width="stretch",
+                    disabled=is_self,
+                    key=f"restrict_{username}",
+                ):
+
+                    ok, message = auth.restrict_user(
+                        username
+                    )
+
+                    if ok:
+                        st.warning(message)
+                        st.rerun()
+
+                    st.error(message)
+
+
+            with delete_col:
+
+                confirm = st.checkbox(
+                    "Confirm delete",
+                    disabled=is_self,
+                    key=f"delete_confirm_{username}",
+                )
+
+                if st.button(
+                    "Delete account",
+                    width="stretch",
+                    disabled=(
+                        is_self
+                        or not confirm
+                    ),
+                    key=f"delete_{username}",
+                ):
+
+                    ok, message = auth.delete_user(
+                        username
+                    )
+
+                    if ok:
+                        st.warning(message)
+                        st.rerun()
+
+                    st.error(message)
+
+
+            if is_self:
+
+                st.info(
+                    "You cannot restrict, demote, or delete "
+                    "your own active administrator account."
+                )
+
+
+        # -------------------------------------------------
+        # RESTRICTED ACCOUNT
+        # -------------------------------------------------
+
+        elif status == "restricted":
+
+            role_options = [
+                "user",
+                "viewer",
+                "admin",
+            ]
+
+            current_role = (
+                role
+                if role in role_options
+                else "user"
+            )
+
+            new_role = st.selectbox(
+                "Account role",
+                role_options,
+                index=role_options.index(
+                    current_role
+                ),
+                key=f"restricted_role_{username}",
+            )
+
+            if st.button(
+                "Save role",
+                type="primary",
+                width="stretch",
+                disabled=(
+                    new_role == current_role
+                ),
+                key=f"restricted_save_role_{username}",
+            ):
+
+                ok, message = auth.change_user_role(
+                    username,
+                    new_role,
+                )
+
+                if ok:
+                    st.success(message)
+                    st.rerun()
+
+                st.error(message)
+
+
+            unrestrict_col, delete_col = st.columns(2)
+
+            with unrestrict_col:
+
+                if st.button(
+                    "Unrestrict",
+                    type="primary",
+                    width="stretch",
+                    key=f"unrestrict_{username}",
+                ):
+
+                    ok, message = auth.unrestrict_user(
+                        username
+                    )
+
+                    if ok:
+                        st.success(message)
+                        st.rerun()
+
+                    st.error(message)
+
+
+            with delete_col:
+
+                confirm = st.checkbox(
+                    "Confirm delete",
+                    key=f"restricted_delete_confirm_{username}",
+                )
+
+                if st.button(
+                    "Delete",
+                    width="stretch",
+                    disabled=not confirm,
+                    key=f"restricted_delete_{username}",
+                ):
+
+                    ok, message = auth.delete_user(
+                        username
+                    )
+
+                    if ok:
+                        st.warning(message)
+                        st.rerun()
+
+                    st.error(message)
+
+
+        # -------------------------------------------------
+        # REJECTED ACCOUNT
+        # -------------------------------------------------
+
+        elif status == "rejected":
+
+            role = st.selectbox(
+                "Role on approval",
+                [
+                    "user",
+                    "viewer",
+                    "admin",
+                ],
+                key=f"rejected_role_{username}",
+            )
+
+            approve_col, delete_col = st.columns(2)
+
+            with approve_col:
+
+                if st.button(
+                    "Approve request",
+                    type="primary",
+                    width="stretch",
+                    key=f"approve_rejected_{username}",
+                ):
+
+                    ok, message = auth.approve_user(
+                        username,
+                        role,
+                    )
+
+                    if ok:
+                        st.success(message)
+                        st.rerun()
+
+                    st.error(message)
+
+
+            with delete_col:
+
+                confirm = st.checkbox(
+                    "Confirm delete",
+                    key=f"rejected_delete_confirm_{username}",
+                )
+
+                if st.button(
+                    "Delete",
+                    width="stretch",
+                    disabled=not confirm,
+                    key=f"rejected_delete_{username}",
+                ):
+
+                    ok, message = auth.delete_user(
+                        username
+                    )
+
+                    if ok:
+                        st.warning(message)
+                        st.rerun()
+
+                    st.error(message)
+
+
+        # -------------------------------------------------
+        # PENDING ACCOUNT
+        # -------------------------------------------------
+
+        elif status == "pending":
+
+            st.info(
+                "This account is waiting for administrator approval. "
+                "Use the Pending Registration Requests section above "
+                "to approve or reject it."
+            )
+
+
+# =========================================================
+# SECURITY CHECKLIST
+# =========================================================
+
+st.markdown(
+    '<div class="section-heading">Production Security Checklist</div>',
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
+<div class="tool-grid">
+
+<div class="security-card">
+<h3>Identity</h3>
+<p>
+Use SSO/MFA where possible and keep administrator
+accounts separate from normal user accounts.
+</p>
+</div>
+
+<div class="security-card">
+<h3>Transport</h3>
+<p>
+Run the application behind HTTPS with secure cookies
+and a trusted reverse proxy.
+</p>
+</div>
+
+<div class="security-card">
+<h3>Secrets</h3>
+<p>
+Keep MongoDB, Cloudinary, Exchange Online, Gmail,
+and signing credentials in Streamlit Secrets or
+environment variables.
+</p>
+</div>
+
+<div class="security-card">
+<h3>Audit</h3>
+<p>
+Retain login, approval, role-change, restriction,
+deletion, export, and critical data-change events.
+</p>
+</div>
+
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
 def require_role(roles):
     role = get_role()
@@ -2220,13 +3073,7 @@ def require_role(roles):
         st.stop()
 
 
-def render_user_sidebar():
-    # Intentionally empty.
-    #
-    # The global application shell owns the sidebar.
-    # Keeping this function allows existing pages to call it
-    # without breaking compatibility.
-    return None
+
 
 
 # ============================================================================
@@ -2999,177 +3846,274 @@ def update_profile(
     discipline,
     uploaded_photo=None,
 ):
+    """
+    Update the authenticated user's profile.
+
+    MongoDB stores the profile metadata.
+    Cloudinary stores the profile image.
+    Both profile_photo and profile_photo_asset are maintained
+    for backwards compatibility.
+    """
+
     user = current_user()
 
     if not user:
+        st.error(
+            "Your account could not be located."
+        )
+        return False
+
+    username = _normalise_username(
+        user.get("username")
+    )
+
+    if not username:
+        st.error(
+            "The authenticated account has no username."
+        )
         return False
 
     users = _load_users()
 
-    username = user.get(
-        "username"
+    if username not in users:
+        # Try to locate by embedded username.
+        matching_key = None
+
+        for key, record in users.items():
+            if not isinstance(record, dict):
+                continue
+
+            if (
+                _normalise_username(
+                    record.get("username")
+                )
+                == username
+            ):
+                matching_key = key
+                break
+
+        if matching_key is None:
+            st.error(
+                "Your account could not be located in the user store."
+            )
+            return False
+
+        username = matching_key
+
+    record = users[username]
+
+    # ------------------------------------------------------------
+    # Normalize input
+    # ------------------------------------------------------------
+
+    clean_name = _normalise_name(name)
+    clean_email = _normalise_email(email)
+    clean_discipline = " ".join(
+        str(discipline or "").strip().split()
     )
 
-    if not username or username not in users:
+    if not clean_name:
+        st.error("Full name is required.")
         return False
 
-    record = users[
-        username
-    ]
+    if len(clean_name) > 100:
+        st.error("Full name is too long.")
+        return False
 
-    name = _normalise_name(
-        name
-    )
-
-    email = _normalise_email(
-        email
-    )
-
-    discipline = _normalise_name(
-        discipline
-    )
-
-    if (
-        not name
-        or len(name) > 100
-        or not valid_email(email)
-        or not discipline
-        or len(discipline) > 80
-    ):
-
+    if not valid_email(clean_email):
         st.error(
-            "Enter a valid name, work email, and discipline."
+            "Enter a valid work email address."
         )
-
         return False
 
-    duplicate_email = any(
-        username_key != username
-        and _normalise_email(
-            item.get("email")
-        ) == email
-        for username_key, item
-        in users.items()
-        if isinstance(
-            item,
-            dict,
-        )
-    )
-
-    if duplicate_email:
-
+    if not clean_discipline:
         st.error(
-            "That email address is already assigned to another account."
+            "Primary discipline is required."
         )
-
         return False
 
-    previous_asset = record.get(
-        "profile_photo_asset"
+    if len(clean_discipline) > 80:
+        st.error(
+            "Discipline is too long."
+        )
+        return False
+
+    # ------------------------------------------------------------
+    # Prevent duplicate email
+    # ------------------------------------------------------------
+
+    for other_username, other_user in users.items():
+
+        if (
+            _normalise_username(other_username)
+            == _normalise_username(username)
+        ):
+            continue
+
+        if not isinstance(other_user, dict):
+            continue
+
+        other_email = _normalise_email(
+            other_user.get("email")
+        )
+
+        if (
+            other_email
+            and other_email == clean_email
+        ):
+            st.error(
+                "That email address is already assigned "
+                "to another account."
+            )
+            return False
+
+    # ------------------------------------------------------------
+    # Existing profile photo
+    # ------------------------------------------------------------
+
+    old_photo = (
+        record.get("profile_photo_asset")
+        or record.get("profile_photo")
+        or None
     )
 
-    record["name"] = name
-    record["email"] = email
-    record["discipline"] = discipline
+    new_photo = old_photo
+
+    # ------------------------------------------------------------
+    # Upload new photo
+    # ------------------------------------------------------------
 
     if uploaded_photo is not None:
 
         try:
-            asset = upload_profile_photo(
+            new_photo = upload_profile_photo(
                 uploaded_photo,
                 username,
             )
 
         except Exception as exc:
-
             st.error(
-                f"Profile photo could not be uploaded: {exc}"
+                "Profile photo could not be uploaded."
             )
-
+            st.caption(
+                f"{type(exc).__name__}: {exc}"
+            )
             return False
 
-        record["profile_photo"] = None
-        record[
-            "profile_photo_asset"
-        ] = asset
+        if not new_photo:
+            st.error(
+                "The profile photo upload did not "
+                "return a valid asset."
+            )
+            return False
 
-    if not _try_save_users(
-        users
-    ):
+    # ------------------------------------------------------------
+    # Update MongoDB record
+    # ------------------------------------------------------------
 
-        if uploaded_photo is not None:
+    record["username"] = (
+        record.get("username")
+        or username
+    )
 
+    record["name"] = clean_name
+    record["email"] = clean_email
+    record["discipline"] = clean_discipline
+
+    # Keep BOTH fields synchronized.
+    record["profile_photo"] = new_photo
+    record["profile_photo_asset"] = new_photo
+
+    if not _try_save_users(users):
+
+        # Roll back newly uploaded Cloudinary asset.
+        if (
+            uploaded_photo is not None
+            and new_photo
+            and new_photo != old_photo
+        ):
             try:
                 delete_attachment(
-                    record.get(
-                        "profile_photo_asset"
-                    )
+                    new_photo
                 )
             except Exception:
                 pass
 
         st.error(
-            "Profile changes could not be saved on this deployment."
+            "Profile changes could not be saved."
         )
-
         return False
 
-    st.session_state.auth[
-        "name"
-    ] = name
-
-    st.session_state.auth[
-        "email"
-    ] = email
-
-    st.session_state.auth[
-        "discipline"
-    ] = discipline
-
-    st.session_state.auth[
-        "profile_photo"
-    ] = (
-        record.get(
-            "profile_photo_asset"
-        )
-        or record.get(
-            "profile_photo"
-        )
-    )
-
-    st.session_state.name = name
-    st.session_state.email = email
-    st.session_state.discipline = discipline
-    st.session_state.profile_photo = (
-        st.session_state.auth[
-            "profile_photo"
-        ]
-    )
+    # ------------------------------------------------------------
+    # Delete old photo only AFTER successful DB save
+    # ------------------------------------------------------------
 
     if (
         uploaded_photo is not None
-        and previous_asset
+        and old_photo
+        and old_photo != new_photo
     ):
-
         try:
             delete_attachment(
-                previous_asset
+                old_photo
             )
         except Exception:
+            # Do not fail the profile update because
+            # cleanup of an old asset failed.
             pass
 
-    record_activity(
-        "update_profile",
-        category="account",
-        page="User Profile",
-        target=username,
-        details={
-            "profile_photo_updated":
-                uploaded_photo is not None,
-            "discipline":
-                discipline,
-        },
-        actor=record,
+    # ------------------------------------------------------------
+    # Synchronize session
+    # ------------------------------------------------------------
+
+    auth_state = st.session_state.setdefault(
+        "auth",
+        {},
     )
+
+    auth_state["logged_in"] = True
+    auth_state["username"] = username
+    auth_state["name"] = clean_name
+    auth_state["email"] = clean_email
+    auth_state["discipline"] = clean_discipline
+    auth_state["role"] = record.get(
+        "role",
+        "user",
+    )
+    auth_state["profile_photo"] = new_photo
+    auth_state["profile_photo_asset"] = new_photo
+
+    st.session_state.username = username
+    st.session_state.name = clean_name
+    st.session_state.email = clean_email
+    st.session_state.discipline = clean_discipline
+    st.session_state.role = record.get(
+        "role",
+        "user",
+    )
+    st.session_state.profile_photo = new_photo
+    st.session_state.profile_photo_asset = new_photo
+    st.session_state.logged_in = True
+
+    # ------------------------------------------------------------
+    # Audit
+    # ------------------------------------------------------------
+
+    try:
+        record_activity(
+            "update_profile",
+            category="account",
+            page="User Profile",
+            target=username,
+            details={
+                "profile_photo_updated": (
+                    uploaded_photo is not None
+                ),
+                "discipline": clean_discipline,
+            },
+            actor=record,
+        )
+    except Exception:
+        pass
 
     return True

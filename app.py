@@ -537,30 +537,29 @@ def _silent_global_filter(data):
 # ---------------------------------------------------------------------------
 
 def patch_section_chrome() -> None:
-    """Prevent legacy sections from creating duplicate app-level chrome."""
+    """
+    Prevent legacy sections from rendering duplicate application chrome.
 
-    # Individual sections must not attempt to reset Streamlit page config.
+    Authentication remains owned by app.py.
+    """
+
+    # Prevent sections from resetting Streamlit configuration.
     st.set_page_config = lambda *args, **kwargs: None
 
-    # The application owns the top-level navigation.
+    # Prevent duplicate top-level navigation.
     if hasattr(utils, "render_navigation"):
         utils.render_navigation = lambda: None
 
     if hasattr(utils, "render_top_nav"):
         utils.render_top_nav = lambda: None
 
-    # IMPORTANT:
-    # Do NOT disable inject_enterprise_theme().
-    #
-    # The enterprise theme is intentionally preserved because it provides
-    # the visual system used by the preferred dashboard design.
-
-    # Prevent each section from creating another global filter.
+    # Prevent duplicate global project filters.
     utils.global_filter_sidebar = _silent_global_filter
 
-    # Authentication is handled once by app.py.
-    auth.login = lambda: True
-    auth.render_user_sidebar = lambda: None
+    # IMPORTANT:
+    # Do NOT modify auth.login().
+    # Do NOT modify auth.render_user_sidebar().
+    # Do NOT replace authentication functions with lambdas.
 
 
 # ---------------------------------------------------------------------------
@@ -689,94 +688,151 @@ def main() -> None:
     render_enterprise_shell()
 
     # ---------------------------------------------------------------
-    # 2. Authenticate once.
+    # 2. Authenticate ONCE.
     # ---------------------------------------------------------------
 
     if not auth.login():
         st.stop()
 
-    is_admin = str(auth.get_role() or "").strip().lower() in {
+    # ---------------------------------------------------------------
+    # 3. Determine current user's role.
+    # ---------------------------------------------------------------
+
+    try:
+        current_role = auth.get_role()
+    except Exception:
+        current_role = (
+            st.session_state.get("auth", {}).get("role", "user")
+        )
+
+    is_admin = str(current_role or "").strip().lower() in {
         "admin",
         "super_admin",
     }
 
     # ---------------------------------------------------------------
-    # 3. Inject single-page enhancements.
+    # 4. Establish single-page mode BEFORE rendering any UI.
     # ---------------------------------------------------------------
-
-    inject_scroll_css()
-
-    # ---------------------------------------------------------------
-    # 4. Render shared sidebar.
-    # ---------------------------------------------------------------
-
-    if "active_section" not in st.session_state:
-        st.session_state["active_section"] = "executive-dashboard"
-    section_by_id = {section["id"]: section for section in SECTIONS}
-    active_section = st.session_state.get("active_section", "executive-dashboard")
-    if active_section not in section_by_id or (
-        section_by_id[active_section].get("admin_only") and not is_admin
-    ):
-        active_section = "executive-dashboard"
-        st.session_state["active_section"] = active_section
 
     st.session_state["single_page_mode"] = True
     st.session_state["single_page_navigation"] = _section_target_map()
     st.session_state["single_page_navigate"] = _set_active_section
 
-    render_shared_sidebar(is_admin)
-
     # ---------------------------------------------------------------
-    # 5. Load master data.
+    # 5. Initialize active section.
     # ---------------------------------------------------------------
 
-    source_data = utils.load_master_data(
-        DATA_FILE
+    if "active_section" not in st.session_state:
+        st.session_state["active_section"] = "executive-dashboard"
+
+    section_by_id = {
+        section["id"]: section
+        for section in SECTIONS
+    }
+
+    active_section = st.session_state.get(
+        "active_section",
+        "executive-dashboard",
     )
 
-    # ---------------------------------------------------------------
-    # 6. Apply global project filter.
-    # ---------------------------------------------------------------
-
-    if hasattr(
-        utils,
-        "global_filter_sidebar",
-    ):
-        utils.global_filter_sidebar(
-            source_data
+    if (
+        active_section not in section_by_id
+        or (
+            section_by_id[active_section].get("admin_only")
+            and not is_admin
         )
+    ):
+        active_section = "executive-dashboard"
+        st.session_state["active_section"] = active_section
 
     # ---------------------------------------------------------------
-    # 7. Render the enterprise top navigation.
+    # 6. Inject single-page styling.
+    # ---------------------------------------------------------------
+
+    inject_scroll_css()
+
+    # ---------------------------------------------------------------
+    # 7. PATCH LEGACY SECTION CHROME BEFORE ANY SECTION/TOP NAV
+    #    CAN CALL IT.
     #
-    # This is deliberately NOT disabled here.
-    # ---------------------------------------------------------------
-
-    render_enterprise_top_navigation()
-
-    # ---------------------------------------------------------------
-    # 8. Prevent individual sections from duplicating global chrome.
+    #    app.py is now the single owner of:
+    #      - authentication
+    #      - sidebar
+    #      - navigation
+    #      - project filter
     # ---------------------------------------------------------------
 
     patch_section_chrome()
 
     # ---------------------------------------------------------------
-    # 9. Render the selected section on this single application route.
+    # 8. Render the shared user sidebar.
+    #
+    #    IMPORTANT:
+    #    Do NOT call auth.render_user_sidebar().
+    # ---------------------------------------------------------------
+
+    render_shared_sidebar(is_admin)
+
+    # ---------------------------------------------------------------
+    # 9. Load master data.
+    # ---------------------------------------------------------------
+
+    source_data = utils.load_master_data(DATA_FILE)
+
+    # ---------------------------------------------------------------
+    # 10. Apply global project filter.
+    # ---------------------------------------------------------------
+
+    if hasattr(utils, "global_filter_sidebar"):
+        utils.global_filter_sidebar(source_data)
+
+    # ---------------------------------------------------------------
+    # 11. Render enterprise top navigation.
+    # ---------------------------------------------------------------
+
+    render_enterprise_top_navigation()
+
+    # ---------------------------------------------------------------
+    # 12. Build visible section list.
     # ---------------------------------------------------------------
 
     visible_sections = [
-        section for section in SECTIONS
+        section
+        for section in SECTIONS
         if not section.get("admin_only") or is_admin
     ]
-    visible_ids = [section["id"] for section in visible_sections]
-    visible_labels = [section["label"] for section in visible_sections]
+
+    visible_ids = [
+        section["id"]
+        for section in visible_sections
+    ]
+
+    visible_labels = [
+        section["label"]
+        for section in visible_sections
+    ]
+
+    # ---------------------------------------------------------------
+    # 13. Guarantee active section is visible.
+    # ---------------------------------------------------------------
+
+    if active_section not in visible_ids:
+        active_section = visible_ids[0]
+        st.session_state["active_section"] = active_section
+
     active_index = visible_ids.index(active_section)
+
+    # ---------------------------------------------------------------
+    # 14. PAGE NAVIGATION.
+    # ---------------------------------------------------------------
+
     with st.popover(
         "Page navigation",
         icon=":material/menu:",
         key="main_page_navigation_popover",
     ):
         st.caption("Jump to section")
+
         st.select_slider(
             "Page navigation slider",
             options=range(len(visible_sections)),
@@ -787,20 +843,31 @@ def main() -> None:
             args=(visible_ids,),
             label_visibility="collapsed",
         )
+
         for section in visible_sections:
             st.button(
                 f'{section["icon"]}  {section["label"]}',
                 key=f'main_page_navigation_{section["id"]}',
                 on_click=_set_active_section,
                 args=(section["id"],),
-                type="primary" if active_section == section["id"] else "secondary",
+                type=(
+                    "primary"
+                    if active_section == section["id"]
+                    else "secondary"
+                ),
                 width="stretch",
             )
 
-    run_section(section_by_id[active_section])
+    # ---------------------------------------------------------------
+    # 15. RENDER ACTIVE SECTION.
+    # ---------------------------------------------------------------
+
+    run_section(
+        section_by_id[active_section]
+    )
 
     # ---------------------------------------------------------------
-    # 10. Application footer.
+    # 16. FOOTER.
     # ---------------------------------------------------------------
 
     st.sidebar.caption(
