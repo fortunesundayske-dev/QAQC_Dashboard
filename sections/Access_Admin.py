@@ -1,954 +1,293 @@
-"""
-Evomec QA/QC Command Centre
-Access Administration
-
-Admin-only user approval and account management module.
-
-This module is designed for the single-page sections architecture.
-Authentication and user persistence remain owned by auth.py.
-Shared visual/navigation components remain owned by utils.py.
-"""
-
-from __future__ import annotations
-
 import pandas as pd
 import streamlit as st
 
 import auth
-from utils import (
-    inject_global_ui,
-    render_navigation,
-    render_page_header,
-    render_top_nav,
-    render_table,
-)
+from utils import inject_global_ui, render_navigation, render_page_header, render_top_nav, render_table
 
 
-# ---------------------------------------------------------------------------
-# PAGE CONFIGURATION
-# ---------------------------------------------------------------------------
-
-st.set_page_config(
-    page_title="Access Admin",
-    page_icon="🔐",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-
-# ---------------------------------------------------------------------------
-# GLOBAL UI
-# ---------------------------------------------------------------------------
-
+st.set_page_config(page_title="Access Admin", layout="wide")
 inject_global_ui()
-
-
-# ---------------------------------------------------------------------------
-# AUTHENTICATION
-# ---------------------------------------------------------------------------
 
 if not auth.login():
     st.stop()
 
-
-# Admin-only access
-if hasattr(auth, "require_role"):
-    auth.require_role(["admin"])
-
-
-# ---------------------------------------------------------------------------
-# SHARED NAVIGATION
-# ---------------------------------------------------------------------------
-
+getattr(auth, "require_role", lambda roles: None)(["admin", "super_admin"])
 render_navigation()
 render_top_nav()
-
-if hasattr(auth, "render_user_sidebar"):
-    auth.render_user_sidebar()
-
-
-# ---------------------------------------------------------------------------
-# PAGE HEADER
-# ---------------------------------------------------------------------------
+getattr(auth, "render_user_sidebar", lambda: None)()
 
 render_page_header(
     "User Approval Centre",
-    (
-        "Review registration requests, approve access, assign roles, "
-        "and maintain controlled entry to the QA/QC dashboard."
-    ),
+    "Review registration requests, approve access, assign roles, and maintain controlled entry to the QA/QC dashboard.",
     "Security Administration",
 )
 
+pending_users = getattr(auth, "pending_users", lambda: {})
+all_users = getattr(auth, "all_users", lambda: {})
+approved_users = getattr(auth, "approved_users", lambda: {})
+restricted_users = getattr(auth, "restricted_users", lambda: {})
+rejected_users = getattr(auth, "rejected_users", lambda: {})
+approve_user = getattr(auth, "approve_user", None)
+reject_user = getattr(auth, "reject_user", None)
+restrict_user = getattr(auth, "restrict_user", None)
+unrestrict_user = getattr(auth, "unrestrict_user", None)
+delete_user = getattr(auth, "delete_user", None)
+change_user_role = getattr(auth, "change_user_role", None)
 
-# ---------------------------------------------------------------------------
-# AUTH FUNCTION VALIDATION
-# ---------------------------------------------------------------------------
-
-REQUIRED_AUTH_FUNCTIONS = [
-    "pending_users",
-    "all_users",
-    "approved_users",
-    "restricted_users",
-    "rejected_users",
-    "approve_user",
-    "reject_user",
-    "restrict_user",
-    "unrestrict_user",
-    "delete_user",
-    "change_user_role",
-]
-
-missing_functions = [
-    name
-    for name in REQUIRED_AUTH_FUNCTIONS
-    if not hasattr(auth, name)
-]
-
-if missing_functions:
-    st.error(
-        "Access administration cannot start because the current auth.py "
-        "does not contain the required account-management functions."
-    )
-
-    st.code(
-        "\n".join(missing_functions),
-        language="text",
-    )
-
-    st.info(
-        "Replace auth.py with the current version used by the migrated "
-        "single-page sections architecture."
-    )
-
+if any(action is None for action in [approve_user, reject_user, restrict_user, unrestrict_user, delete_user, change_user_role]):
+    st.error("Access administration needs the latest auth.py file. Please redeploy the latest repository version.")
     st.stop()
 
-
-# ---------------------------------------------------------------------------
-# LOAD USER DATA
-# ---------------------------------------------------------------------------
-
-pending = auth.pending_users() or {}
-all_accounts = auth.all_users() or {}
-approved = auth.approved_users() or {}
-restricted = auth.restricted_users() or {}
-rejected = auth.rejected_users() or {}
-
-
-# ---------------------------------------------------------------------------
-# CURRENT ADMIN
-# ---------------------------------------------------------------------------
-
-auth_state = st.session_state.get("auth", {})
-
-if isinstance(auth_state, dict):
-    admin_username = (
-        auth_state.get("username")
-        or st.session_state.get("username")
-        or ""
-    )
-else:
-    admin_username = st.session_state.get("username") or ""
-
-
-# ---------------------------------------------------------------------------
-# KPI SUMMARY
-# ---------------------------------------------------------------------------
-
-st.markdown(
-    '<div class="section-heading">Access Overview</div>',
-    unsafe_allow_html=True,
-)
-
-k1, k2, k3, k4, k5 = st.columns(5)
-
-k1.metric(
-    "Pending approvals",
-    len(pending),
-)
-
-k2.metric(
-    "Approved users",
-    len(approved),
-)
-
-k3.metric(
-    "Restricted users",
-    len(restricted),
-)
-
-k4.metric(
-    "Rejected requests",
-    len(rejected),
-)
-
-admin_count = sum(
-    1
-    for user in approved.values()
-    if isinstance(user, dict)
-    and user.get("role") == "admin"
-)
-
-k5.metric(
-    "Admin users",
-    admin_count,
-)
-
-
-# ---------------------------------------------------------------------------
-# USER STORE / REFRESH
-# ---------------------------------------------------------------------------
-
-store_col, refresh_col = st.columns([4, 1])
-
-with store_col:
-    st.caption(
-        "User store: secured application data store"
-    )
-
-with refresh_col:
-    if st.button(
-        "Refresh",
-        key="access_admin_refresh",
-        use_container_width=True,
-    ):
-        st.rerun()
-
-
-# ===========================================================================
-# PENDING REGISTRATION REQUESTS
-# ===========================================================================
-
-st.markdown(
-    '<div class="section-heading">Pending Registration Requests</div>',
-    unsafe_allow_html=True,
-)
-
-if not pending:
-
-    st.info(
-        "No pending registration requests are currently saved in the "
-        "user store."
-    )
-
-else:
-
-    st.success(
-        f"{len(pending)} pending registration request(s) require approval."
-    )
-
-    for username, user in pending.items():
-
-        if not isinstance(user, dict):
-            user = {}
-
-        with st.container(border=True):
-
-            name = user.get("name") or username
-            email = user.get("email") or "Not provided"
-            discipline = user.get("discipline") or "Not set"
-            created_at = user.get("created_at") or "Not available"
-
-            st.subheader(name)
-
-            st.caption(
-                f"Username: {username}  |  "
-                f"Email: {email}  |  "
-                f"Discipline: {discipline}  |  "
-                f"Requested: {created_at}"
-            )
-
-            role_key = f"pending_role_{username}"
-
-            selected_role = st.selectbox(
-                "Role on approval",
-                ["user", "viewer", "admin"],
-                index=0,
-                key=role_key,
-            )
-
-            approve_col, reject_col, delete_col = st.columns(3)
-
-            # ---------------------------------------------------------------
-            # APPROVE
-            # ---------------------------------------------------------------
-
-            with approve_col:
-
-                if st.button(
-                    "Approve Access",
-                    key=f"pending_approve_{username}",
-                    type="primary",
-                    use_container_width=True,
-                ):
-
-                    success, message = auth.approve_user(
-                        username,
-                        selected_role,
-                    )
-
-                    if success:
-                        st.success(message)
-                        st.rerun()
-
-                    st.error(message)
-
-            # ---------------------------------------------------------------
-            # REJECT
-            # ---------------------------------------------------------------
-
-            with reject_col:
-
-                if st.button(
-                    "Reject",
-                    key=f"pending_reject_{username}",
-                    use_container_width=True,
-                ):
-
-                    success = auth.reject_user(username)
-
-                    if success:
-                        st.warning(
-                            f"Registration request for {username} rejected."
-                        )
-                        st.rerun()
-
-                    st.error(
-                        "The registration request could not be rejected."
-                    )
-
-            # ---------------------------------------------------------------
-            # DELETE
-            # ---------------------------------------------------------------
-
-            with delete_col:
-
-                confirm_key = (
-                    f"pending_delete_confirm_{username}"
-                )
-
-                delete_confirmed = st.checkbox(
-                    "Confirm delete",
-                    key=confirm_key,
-                )
-
-                if st.button(
-                    "Delete Request",
-                    key=f"pending_delete_{username}",
-                    use_container_width=True,
-                    disabled=not delete_confirmed,
-                ):
-
-                    success, message = auth.delete_user(username)
-
-                    if success:
-                        st.warning(message)
-                        st.rerun()
-
-                    st.error(message)
-
-
-# ===========================================================================
-# ALL USER ACCOUNTS
-# ===========================================================================
-
-st.markdown(
-    '<div class="section-heading">All User Account Status</div>',
-    unsafe_allow_html=True,
-)
-
-if all_accounts:
-
-    account_rows = []
-
-    for username, user in all_accounts.items():
-
-        if not isinstance(user, dict):
-            user = {}
-
-        account_rows.append(
-            {
-                "Username": username,
-                "Name": user.get("name", ""),
-                "Email": user.get("email", ""),
-                "Role": user.get("role", ""),
-                "Status": user.get("status", ""),
-                "Discipline": user.get("discipline", ""),
-                "Created": user.get("created_at", ""),
-                "Approved by": user.get("approved_by", ""),
-                "Rejected at": user.get("rejected_at", ""),
-            }
-        )
-
-    accounts_df = pd.DataFrame(account_rows)
-
-    render_table(
-        accounts_df,
-        include_internal=True,
-    )
-
-else:
-
-    st.warning(
-        "No user accounts were found in the current user store."
-    )
-
-
-# ===========================================================================
-# BUILD ACCOUNT CONTROL LIST
-# ===========================================================================
-
-user_groups = {
+pending = pending_users()
+all_accounts = all_users()
+approved = approved_users()
+restricted = restricted_users()
+rejected = rejected_users()
+all_user_groups = {
     "pending": pending,
     "approved": approved,
     "restricted": restricted,
     "rejected": rejected,
 }
+admin_username = st.session_state.get("auth", {}).get("username") or st.session_state.get("username")
+
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.metric("Pending approvals", len(pending))
+c2.metric("Approved users", len(approved))
+c3.metric("Restricted users", len(restricted))
+c4.metric("Rejected requests", len(rejected))
+c5.metric("Admin users", sum(1 for user in approved.values() if user.get("role") == "admin"))
+
+store_col, refresh_col = st.columns([3, 1])
+with store_col:
+    st.caption("User store: secured application data store")
+with refresh_col:
+    if st.button("Refresh access requests", width="stretch"):
+        st.rerun()
+
+st.markdown('<div class="section-heading">Pending Registration Requests</div>', unsafe_allow_html=True)
+if not pending:
+    st.info("No pending registration requests are saved in the current user store. Ask the user to confirm they saw the 'Registration submitted' success message.")
+else:
+    st.success(f"{len(pending)} pending request(s) need approval.")
+    for username, user in pending.items():
+        with st.container(border=True):
+            st.subheader(user.get("name", username))
+            st.caption(
+                f"Username: {username} | Email: {user.get('email', '')} | "
+                f"Discipline: {user.get('discipline', 'Not set')} | Requested: {user.get('created_at', '')}"
+            )
+            role = st.selectbox(
+                "Role on approval",
+                ["user", "viewer", "admin"],
+                key=f"top_role_{username}",
+            )
+            c_approve, c_reject, c_delete = st.columns(3)
+            if c_approve.button("Approve access", key=f"top_approve_{username}", type="primary", width="stretch"):
+                ok, message = approve_user(username, role)
+                if ok:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+            if c_reject.button("Reject", key=f"top_reject_{username}", width="stretch"):
+                if reject_user(username):
+                    st.warning("Registration rejected.")
+                    st.rerun()
+            confirm_delete = c_delete.checkbox("Confirm delete", key=f"top_confirm_delete_pending_{username}")
+            if c_delete.button("Delete request", key=f"top_delete_pending_{username}", width="stretch", disabled=not confirm_delete):
+                ok, message = delete_user(username)
+                if ok:
+                    st.warning(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+
+st.markdown('<div class="section-heading">All User Account Status</div>', unsafe_allow_html=True)
+if all_accounts:
+    accounts_df = pd.DataFrame(
+        [
+            {
+                "Username": username,
+                "Name": user.get("name"),
+                "Email": user.get("email"),
+                "Role": user.get("role"),
+                "Status": user.get("status"),
+                "Discipline": user.get("discipline"),
+                "Created": user.get("created_at"),
+                "Approved by": user.get("approved_by"),
+                "Rejected at": user.get("rejected_at"),
+            }
+            for username, user in all_accounts.items()
+        ]
+    )
+    render_table(accounts_df, include_internal=True)
+else:
+    st.warning("No users were found in the current user store.")
 
 control_options = []
-
-for status, group in user_groups.items():
-
+for status, group in all_user_groups.items():
     for username, user in group.items():
-
-        if not isinstance(user, dict):
-            user = {}
-
-        display_name = user.get("name") or username
-
         control_options.append(
             {
-                "label": (
-                    f"{display_name} "
-                    f"({username}) - "
-                    f"{status.title()}"
-                ),
+                "label": f"{user.get('name', username)} ({username}) - {status.title()}",
                 "username": username,
                 "status": status,
                 "user": user,
             }
         )
 
-
-# ===========================================================================
-# ACCOUNT MANAGEMENT
-# ===========================================================================
-
-st.markdown(
-    '<div class="section-heading">Account Management</div>',
-    unsafe_allow_html=True,
-)
-
+st.markdown('<div class="section-heading">Account Management</div>', unsafe_allow_html=True)
 with st.container(border=True):
-
-    st.markdown("### Admin Control Panel")
-
-    st.caption(
-        "Manage approval, roles, restrictions, and account deletion "
-        "from one controlled administration panel."
-    )
-
+    st.markdown("### Admin control panel")
+    st.caption("Restrict, unrestrict, approve, reject, or delete users from one visible control panel.")
     if not control_options:
-
-        st.info(
-            "No user accounts are currently available for administration."
-        )
-
+        st.info("No user accounts are available for administration.")
     else:
-
-        labels = [
-            item["label"]
-            for item in control_options
-        ]
-
         selected_label = st.selectbox(
             "Select user account",
-            labels,
-            key="access_admin_selected_account",
+            [item["label"] for item in control_options],
+            key="admin_control_selected_user",
+        )
+        selected = next(item for item in control_options if item["label"] == selected_label)
+        username = selected["username"]
+        user = selected["user"]
+        status = selected["status"]
+        st.write(
+            f"**{user.get('name', username)}** | Username: `{username}` | "
+            f"Email: `{user.get('email', '')}` | Role: `{user.get('role', '')}` | Status: `{status}`"
         )
 
-        selected_account = next(
-            item
-            for item in control_options
-            if item["label"] == selected_label
-        )
-
-        username = selected_account["username"]
-        status = selected_account["status"]
-        user = selected_account["user"]
-
-        display_name = user.get("name") or username
-        email = user.get("email") or "Not provided"
-        current_role = user.get("role") or "user"
-
-        st.markdown(
-            f"""
-            <div class="security-card">
-                <h3>{display_name}</h3>
-                <p>
-                    <strong>Username:</strong> {username}<br>
-                    <strong>Email:</strong> {email}<br>
-                    <strong>Role:</strong> {current_role}<br>
-                    <strong>Status:</strong> {status.title()}
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        st.write("")
-
-
-        # ===================================================================
-        # PENDING
-        # ===================================================================
-
+        is_self = username == admin_username
         if status == "pending":
-
-            st.markdown("#### Registration Request")
-
-            role_key = (
-                f"management_pending_role_{username}"
-            )
-
-            role = st.selectbox(
-                "Role on approval",
-                ["user", "viewer", "admin"],
-                key=role_key,
-            )
-
+            role = st.selectbox("Role on approval", ["user", "viewer", "admin"], key=f"control_role_{username}")
             approve_col, reject_col, delete_col = st.columns(3)
-
-            with approve_col:
-
-                if st.button(
-                    "Approve",
-                    key=f"management_approve_{username}",
-                    type="primary",
-                    use_container_width=True,
-                ):
-
-                    success, message = auth.approve_user(
-                        username,
-                        role,
-                    )
-
-                    if success:
-                        st.success(message)
-                        st.rerun()
-
+            if approve_col.button("Approve", key=f"control_approve_{username}", type="primary", width="stretch"):
+                ok, message = approve_user(username, role)
+                if ok:
+                    st.success(message)
+                    st.rerun()
+                else:
                     st.error(message)
-
-            with reject_col:
-
-                if st.button(
-                    "Reject",
-                    key=f"management_reject_{username}",
-                    use_container_width=True,
-                ):
-
-                    success = auth.reject_user(username)
-
-                    if success:
-                        st.warning(
-                            "Registration request rejected."
-                        )
-                        st.rerun()
-
-                    st.error(
-                        "The registration request could not be rejected."
-                    )
-
-            with delete_col:
-
-                confirmed = st.checkbox(
-                    "Confirm delete",
-                    key=(
-                        f"management_pending_delete_confirm_"
-                        f"{username}"
-                    ),
-                )
-
-                if st.button(
-                    "Delete",
-                    key=f"management_delete_pending_{username}",
-                    use_container_width=True,
-                    disabled=not confirmed,
-                ):
-
-                    success, message = auth.delete_user(
-                        username
-                    )
-
-                    if success:
-                        st.warning(message)
-                        st.rerun()
-
+            if reject_col.button("Reject", key=f"control_reject_{username}", width="stretch"):
+                if reject_user(username):
+                    st.warning("Registration rejected.")
+                    st.rerun()
+            confirm_delete = delete_col.checkbox("Confirm delete", key=f"control_confirm_delete_pending_{username}")
+            if delete_col.button("Delete", key=f"control_delete_pending_{username}", width="stretch", disabled=not confirm_delete):
+                ok, message = delete_user(username)
+                if ok:
+                    st.warning(message)
+                    st.rerun()
+                else:
                     st.error(message)
-
-
-        # ===================================================================
-        # APPROVED
-        # ===================================================================
-
         elif status == "approved":
-
-            st.markdown("#### Active Account")
-
-            role_options = [
-                "user",
-                "viewer",
-                "admin",
-            ]
-
-            current_role_index = (
-                role_options.index(current_role)
-                if current_role in role_options
-                else 0
-            )
-
-            is_self = (
-                username == admin_username
-            )
-
+            current_role = user.get("role", "user")
+            role_options = ["user", "viewer", "admin"]
             new_role = st.selectbox(
                 "Account role",
                 role_options,
-                index=current_role_index,
-                key=f"management_approved_role_{username}",
+                index=role_options.index(current_role) if current_role in role_options else 0,
+                key=f"control_change_role_{username}",
                 disabled=is_self,
             )
-
-            save_col, restrict_col, delete_col = st.columns(3)
-
-            # ---------------------------------------------------------------
-            # SAVE ROLE
-            # ---------------------------------------------------------------
-
-            with save_col:
-
-                if st.button(
-                    "Save Role",
-                    key=f"management_save_role_{username}",
-                    type="primary",
-                    use_container_width=True,
-                    disabled=(
-                        is_self
-                        or new_role == current_role
-                    ),
-                ):
-
-                    success, message = auth.change_user_role(
-                        username,
-                        new_role,
-                    )
-
-                    if success:
-                        st.success(message)
-                        st.rerun()
-
+            if st.button(
+                "Save role",
+                key=f"control_save_role_{username}",
+                type="primary",
+                width="stretch",
+                disabled=is_self or new_role == current_role,
+            ):
+                ok, message = change_user_role(username, new_role)
+                if ok:
+                    st.success(message)
+                    st.rerun()
+                else:
                     st.error(message)
-
-            # ---------------------------------------------------------------
-            # RESTRICT
-            # ---------------------------------------------------------------
-
-            with restrict_col:
-
-                if st.button(
-                    "Restrict User",
-                    key=f"management_restrict_{username}",
-                    use_container_width=True,
-                    disabled=is_self,
-                ):
-
-                    success, message = auth.restrict_user(
-                        username
-                    )
-
-                    if success:
-                        st.warning(message)
-                        st.rerun()
-
+            restrict_col, delete_col = st.columns(2)
+            if restrict_col.button("Restrict", key=f"control_restrict_{username}", width="stretch", disabled=is_self):
+                ok, message = restrict_user(username)
+                if ok:
+                    st.warning(message)
+                    st.rerun()
+                else:
                     st.error(message)
-
-            # ---------------------------------------------------------------
-            # DELETE
-            # ---------------------------------------------------------------
-
-            with delete_col:
-
-                delete_confirmed = st.checkbox(
-                    "Confirm delete",
-                    key=(
-                        f"management_approved_delete_confirm_"
-                        f"{username}"
-                    ),
-                    disabled=is_self,
-                )
-
-                if st.button(
-                    "Delete",
-                    key=f"management_delete_approved_{username}",
-                    use_container_width=True,
-                    disabled=(
-                        is_self
-                        or not delete_confirmed
-                    ),
-                ):
-
-                    success, message = auth.delete_user(
-                        username
-                    )
-
-                    if success:
-                        st.warning(message)
-                        st.rerun()
-
+            confirm_delete = delete_col.checkbox("Confirm delete", key=f"control_confirm_delete_approved_{username}", disabled=is_self)
+            if delete_col.button("Delete", key=f"control_delete_approved_{username}", width="stretch", disabled=is_self or not confirm_delete):
+                ok, message = delete_user(username)
+                if ok:
+                    st.warning(message)
+                    st.rerun()
+                else:
                     st.error(message)
-
             if is_self:
-
-                st.info(
-                    "You cannot change the role, restrict, or delete "
-                    "your own active administrator account."
-                )
-
-
-        # ===================================================================
-        # RESTRICTED
-        # ===================================================================
-
+                st.info("You cannot restrict or delete your own active admin account.")
         elif status == "restricted":
-
-            st.markdown("#### Restricted Account")
-
-            role_options = [
-                "user",
-                "viewer",
-                "admin",
-            ]
-
-            current_role_index = (
-                role_options.index(current_role)
-                if current_role in role_options
-                else 0
-            )
-
+            current_role = user.get("role", "user")
+            role_options = ["user", "viewer", "admin"]
             new_role = st.selectbox(
                 "Account role",
                 role_options,
-                index=current_role_index,
-                key=f"management_restricted_role_{username}",
+                index=role_options.index(current_role) if current_role in role_options else 0,
+                key=f"control_change_role_restricted_{username}",
             )
-
-            save_col, unrestrict_col, delete_col = st.columns(3)
-
-            # ---------------------------------------------------------------
-            # SAVE ROLE
-            # ---------------------------------------------------------------
-
-            with save_col:
-
-                if st.button(
-                    "Save Role",
-                    key=f"management_save_restricted_role_{username}",
-                    type="primary",
-                    use_container_width=True,
-                    disabled=(
-                        new_role == current_role
-                    ),
-                ):
-
-                    success, message = auth.change_user_role(
-                        username,
-                        new_role,
-                    )
-
-                    if success:
-                        st.success(message)
-                        st.rerun()
-
+            if st.button(
+                "Save role",
+                key=f"control_save_role_restricted_{username}",
+                type="primary",
+                width="stretch",
+                disabled=new_role == current_role,
+            ):
+                ok, message = change_user_role(username, new_role)
+                if ok:
+                    st.success(message)
+                    st.rerun()
+                else:
                     st.error(message)
-
-            # ---------------------------------------------------------------
-            # UNRESTRICT
-            # ---------------------------------------------------------------
-
-            with unrestrict_col:
-
-                if st.button(
-                    "Unrestrict User",
-                    key=f"management_unrestrict_{username}",
-                    type="primary",
-                    use_container_width=True,
-                ):
-
-                    success, message = auth.unrestrict_user(
-                        username
-                    )
-
-                    if success:
-                        st.success(message)
-                        st.rerun()
-
+            unrestrict_col, delete_col = st.columns(2)
+            if unrestrict_col.button("Unrestrict", key=f"control_unrestrict_{username}", type="primary", width="stretch"):
+                ok, message = unrestrict_user(username)
+                if ok:
+                    st.success(message)
+                    st.rerun()
+                else:
                     st.error(message)
-
-            # ---------------------------------------------------------------
-            # DELETE
-            # ---------------------------------------------------------------
-
-            with delete_col:
-
-                delete_confirmed = st.checkbox(
-                    "Confirm delete",
-                    key=(
-                        f"management_restricted_delete_confirm_"
-                        f"{username}"
-                    ),
-                )
-
-                if st.button(
-                    "Delete",
-                    key=f"management_delete_restricted_{username}",
-                    use_container_width=True,
-                    disabled=not delete_confirmed,
-                ):
-
-                    success, message = auth.delete_user(
-                        username
-                    )
-
-                    if success:
-                        st.warning(message)
-                        st.rerun()
-
+            confirm_delete = delete_col.checkbox("Confirm delete", key=f"control_confirm_delete_restricted_{username}")
+            if delete_col.button("Delete", key=f"control_delete_restricted_{username}", width="stretch", disabled=not confirm_delete):
+                ok, message = delete_user(username)
+                if ok:
+                    st.warning(message)
+                    st.rerun()
+                else:
                     st.error(message)
-
-
-        # ===================================================================
-        # REJECTED
-        # ===================================================================
-
         elif status == "rejected":
-
-            st.markdown("#### Rejected Registration")
-
-            role_key = (
-                f"management_rejected_role_{username}"
-            )
-
-            role = st.selectbox(
-                "Role if approved",
-                ["user", "viewer", "admin"],
-                key=role_key,
-            )
-
+            role = st.selectbox("Role on approval", ["user", "viewer", "admin"], key=f"control_role_rejected_{username}")
             approve_col, delete_col = st.columns(2)
-
-            # ---------------------------------------------------------------
-            # APPROVE AGAIN
-            # ---------------------------------------------------------------
-
-            with approve_col:
-
-                if st.button(
-                    "Approve Request",
-                    key=f"management_approve_rejected_{username}",
-                    type="primary",
-                    use_container_width=True,
-                ):
-
-                    success, message = auth.approve_user(
-                        username,
-                        role,
-                    )
-
-                    if success:
-                        st.success(message)
-                        st.rerun()
-
+            if approve_col.button("Approve rejected request", key=f"control_approve_rejected_{username}", type="primary", width="stretch"):
+                ok, message = approve_user(username, role)
+                if ok:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
+            confirm_delete = delete_col.checkbox("Confirm delete", key=f"control_confirm_delete_rejected_{username}")
+            if delete_col.button("Delete rejected request", key=f"control_delete_rejected_{username}", width="stretch", disabled=not confirm_delete):
+                ok, message = delete_user(username)
+                if ok:
+                    st.warning(message)
+                    st.rerun()
+                else:
                     st.error(message)
 
-            # ---------------------------------------------------------------
-            # DELETE
-            # ---------------------------------------------------------------
-
-            with delete_col:
-
-                delete_confirmed = st.checkbox(
-                    "Confirm delete",
-                    key=(
-                        f"management_rejected_delete_confirm_"
-                        f"{username}"
-                    ),
-                )
-
-                if st.button(
-                    "Delete Request",
-                    key=f"management_delete_rejected_{username}",
-                    use_container_width=True,
-                    disabled=not delete_confirmed,
-                ):
-
-                    success, message = auth.delete_user(
-                        username
-                    )
-
-                    if success:
-                        st.warning(message)
-                        st.rerun()
-
-                    st.error(message)
-
-
-# ===========================================================================
-# SECURITY CHECKLIST
-# ===========================================================================
-
-st.markdown(
-    '<div class="section-heading">Production Security Checklist</div>',
-    unsafe_allow_html=True,
-)
-
+st.markdown('<div class="section-heading">Production Security Checklist</div>', unsafe_allow_html=True)
 st.markdown(
     """
-    <div class="tool-grid">
-
-        <div class="security-card">
-            <h3>Identity</h3>
-            <p>
-                Use SSO/MFA where possible. Keep administrator accounts
-                separate from normal user accounts.
-            </p>
-        </div>
-
-        <div class="security-card">
-            <h3>Transport</h3>
-            <p>
-                Run the dashboard behind HTTPS with secure cookies and
-                a trusted reverse-proxy configuration.
-            </p>
-        </div>
-
-        <div class="security-card">
-            <h3>Secrets</h3>
-            <p>
-                Store database credentials, Exchange Online credentials,
-                signing secrets, and API keys in environment variables
-                or a secrets vault.
-            </p>
-        </div>
-
-        <div class="security-card">
-            <h3>Audit</h3>
-            <p>
-                Retain login, approval, export, and critical data-change
-                logs for project and client audit review.
-            </p>
-        </div>
-
-    </div>
-    """,
+<div class="tool-grid">
+    <div class="security-card"><h3>Identity</h3><p>Use SSO/MFA where possible. Keep admin accounts separate from normal user accounts.</p></div>
+    <div class="security-card"><h3>Transport</h3><p>Run only behind HTTPS with secure cookies and trusted reverse proxy configuration.</p></div>
+    <div class="security-card"><h3>Secrets</h3><p>Store Exchange Online, database, and signing secrets in environment variables or a secrets vault, never in source code.</p></div>
+    <div class="security-card"><h3>Audit</h3><p>Retain login, approval, export, and critical data-change logs for project and client audit review.</p></div>
+</div>
+""",
     unsafe_allow_html=True,
 )

@@ -15,7 +15,7 @@ inject_global_ui()
 if not auth.login():
     st.stop()
 
-auth.require_role(["admin"])
+auth.require_role(["admin", "super_admin"])
 render_navigation()
 render_top_nav()
 
@@ -23,30 +23,6 @@ render_page_header(
     "Activity Log",
     "Investigate account and system activity, narrow the timeline, and export exactly what you need.",
     "Security · Administration · Traceability",
-)
-
-st.markdown(
-    """
-    <style>
-    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(5)) {
-        flex-wrap: wrap !important;
-        gap: 0.75rem !important;
-    }
-
-    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(5)) > div[data-testid="column"] {
-        min-width: min(100%, 12rem) !important;
-    }
-
-    @media (max-width: 768px) {
-        div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(5)) > div[data-testid="column"] {
-            flex: 1 1 100% !important;
-            min-width: 100% !important;
-            width: 100% !important;
-        }
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
 )
 
 today = datetime.now(timezone.utc).date()

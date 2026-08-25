@@ -19,6 +19,18 @@ render_top_nav()
 getattr(auth, "render_user_sidebar", lambda: None)()
 
 user = getattr(auth, "current_user", lambda: None)()
+if not user:
+    session_user = st.session_state.get("auth") or {}
+    if session_user.get("logged_in") and session_user.get("username"):
+        user = {
+            "username": session_user.get("username"),
+            "name": session_user.get("name") or session_user.get("username"),
+            "email": session_user.get("email", ""),
+            "role": session_user.get("role", "user"),
+            "status": "approved",
+            "discipline": session_user.get("discipline", "Quality Management"),
+            "profile_photo": session_user.get("profile_photo"),
+        }
 
 
 def render_profile_avatar(user_record):

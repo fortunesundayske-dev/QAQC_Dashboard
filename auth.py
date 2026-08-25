@@ -363,6 +363,19 @@ def init_auth():
     elif "logged_in" not in st.session_state:
         st.session_state.logged_in = st.session_state.auth.get("logged_in", False)
 
+    auth_state = st.session_state.auth
+    legacy_fields = {
+        "username": st.session_state.get("username"),
+        "name": st.session_state.get("name"),
+        "role": st.session_state.get("role"),
+        "email": st.session_state.get("email"),
+        "discipline": st.session_state.get("discipline"),
+        "profile_photo": st.session_state.get("profile_photo"),
+    }
+    for key, value in legacy_fields.items():
+        if not auth_state.get(key) and value:
+            auth_state[key] = value
+
     if st.session_state.get("logged_in") and not st.session_state.auth.get("logged_in"):
         st.session_state.auth.update(
             {
@@ -793,13 +806,22 @@ def get_role():
 def current_user():
     init_auth()
     users = _load_users()
-    username = st.session_state.auth.get("username")
-    return users.get(username) if username else None
+    username = st.session_state.auth.get("username") or st.session_state.get("username")
+    if not username:
+        return None
+    user = users.get(str(username).strip().lower())
+    if user is not None:
+        return user
+    return next(
+        (record for record in users.values() if str(record.get("username", "")).strip().lower() == str(username).strip().lower()),
+        None,
+    )
 
 
 def require_role(roles):
-    role = get_role()
-    if role not in roles:
+    role = str(get_role() or "").strip().lower()
+    allowed_roles = {str(item).strip().lower() for item in roles}
+    if role not in allowed_roles:
         allowed = ", ".join(str(item).title() for item in roles)
         current = str(role or "not signed in").title()
         st.error(f"This module is restricted to: {allowed}. Your current role is: {current}.")

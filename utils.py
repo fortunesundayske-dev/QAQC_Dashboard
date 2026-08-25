@@ -1482,7 +1482,13 @@ div[data-baseweb="popover"]:has(.st-key-account_menu_panel) [data-testid="stCapt
                     st.markdown(f"**{html.escape(account_name)}**")
                     st.caption(f"{account_role} · {account_discipline}")
                     st.divider()
-                    st.page_link("pages/User_Profile.py", label="User Profile", width="stretch")
+                    st.markdown('<a class="nav-popover-link" href="#executive-dashboard" target="_self">Executive Home</a>', unsafe_allow_html=True)
+                    st.markdown('<a class="nav-popover-link" href="#user-profile" target="_self">My Profile</a>', unsafe_allow_html=True)
+                    st.markdown('<a class="nav-popover-link" href="#customer-support" target="_self">Customer Support</a>', unsafe_allow_html=True)
+                    role = (user.get("role") or st.session_state.get("role") or "").strip().lower()
+                    if role in {"admin", "super_admin"}:
+                        st.markdown('<a class="nav-popover-link" href="#activity-log" target="_self">Activity Log</a>', unsafe_allow_html=True)
+                        st.markdown('<a class="nav-popover-link" href="#access-admin" target="_self">Access Admin</a>', unsafe_allow_html=True)
                     if st.button("Sign out", key="header_account_sign_out", width="stretch", type="primary"):
                         import auth
 
@@ -1526,24 +1532,25 @@ def get_navigation_pages():
     preferred_order = [
         "Executive Home",
         "Executive Analytics",
-        "Quality Tools",
+        "Quality Operations",
+        "CTQ Dashboard",
+        "Document Status",
         "Standards Library",
         "Learning Academy",
-        "Quality Operations",
+        "Quality Tools",
         "Audit & Surveillance",
-        "KPI KRA Register",
+        "Calibration Log",
         "Daily Reports",
         "Lessons Learned",
         "Management Summary",
+        "KPI KRA Register",
         "User Profile",
         "Customer Support",
         "Access Admin",
         "Activity Log",
     ]
 
-    pages = {
-        "Executive Home": "app.py",
-    }
+    pages = {"Executive Home": "app.py"}
 
     if pages_dir.exists():
         for page_file in sorted(pages_dir.glob("*.py")):
@@ -1553,30 +1560,12 @@ def get_navigation_pages():
             label = label_overrides.get(page_key, page_key.replace("_", " ").title())
             pages[label] = f"pages/{page_file.name}"
 
-    role = st.session_state.get("auth", {}).get("role") or st.session_state.get("role")
-    if role != "admin":
+    role = (st.session_state.get("auth", {}).get("role") or st.session_state.get("role") or "").strip().lower()
+    if role not in {"admin", "super_admin"}:
         pages.pop("Access Admin", None)
         pages.pop("Activity Log", None)
 
-    # These modules are now presented in the combined Quality Operations
-    # workspace. Their direct routes remain available for advanced workflows.
-    for label in {
-        "Calibration Log",
-        "Concrete Tracker",
-        "CTQ Dashboard",
-        "Defect & Rework",
-        "Document Status",
-        "ITR Tracker",
-        "NCR Tracker",
-        "OBS Tracker",
-    }:
-        pages.pop(label, None)
-
-    ordered = {
-        label: pages[label]
-        for label in preferred_order
-        if label in pages
-    }
+    ordered = {label: pages[label] for label in preferred_order if label in pages}
     for label in sorted(pages):
         if label not in ordered:
             ordered[label] = pages[label]
@@ -1597,8 +1586,8 @@ def _auth_query_suffix():
 
 NAVIGATION_GROUPS = {
     "Overview": ["Executive Home", "Executive Analytics", "Management Summary", "KPI KRA Register"],
-    "Quality Operations": ["Quality Operations"],
-    "Audits and Reports": ["Audit & Surveillance", "Daily Reports", "Lessons Learned"],
+    "Quality Operations": ["Quality Operations", "CTQ Dashboard", "Document Status"],
+    "Audits and Reports": ["Audit & Surveillance", "Calibration Log", "Daily Reports", "Lessons Learned"],
     "Knowledge and Tools": ["Standards Library", "Learning Academy", "Quality Tools"],
     "Account and Administration": ["User Profile", "Customer Support", "Access Admin", "Activity Log"],
 }
@@ -1973,19 +1962,25 @@ def _render_navigation_legacy():
     st.markdown("### 🧭 Page Navigation", unsafe_allow_html=True)
 
     pages = {
+        "� Executive Dashboard": "app.py",
+        "📊 Executive Summary": "pages/Executive_Dashboard.py",
         "🏗 Concrete": "pages/Concrete_Tracker.py",
         "📛 NCR": "pages/NCR_Tracker.py",
         "👁 OBS": "pages/OBS_Tracker.py",
         "📋 Audit": "pages/Audit_Surveillance.py",
-        "🏠 Executive Dashboard": "app.py",
-        "📊 CTQ Dashboard": "pages/CTR_Dashboard.py",
+        "📈 Calibration Log": "pages/Calibration_Log.py",
+        "📊 CTQ Dashboard": "pages/CTQ_Dashboard.py",
         "📅 Daily Reports": "pages/Daily_Reports.py",
         "🔧 Defect Rework": "pages/Defect_Rework_Tracker.py",
         "📄 Document Status": "pages/Document_Status.py",
-        "📊 Executive Summary": "pages/Executive_Summary.py",
         "📦 ITR Tracker": "pages/ITR_Tracker.py",
-        "📘 Lessons Learnt": "pages/Lessons_Learnt.py",
-        "📋 Management Summary": "pages/Management_Summary.py"
+        "📘 Lessons Learned": "pages/Lessons_Learned.py",
+        "📋 Management Summary": "pages/Management_Executive_Summary.py",
+        "📚 Standards Library": "pages/Standards_Library.py",
+        "🎓 Learning Academy": "pages/Learning_Academy.py",
+        "🧰 Quality Tools": "pages/Quality_Tools.py",
+        "💬 Customer Support": "pages/Customer_Support.py",
+        "👤 My Profile": "pages/User_Profile.py",
     }
 
     for label, page in pages.items():
@@ -2023,6 +2018,7 @@ def render_navigation():
                     ).strip().casefold()
                     current_page = _current_page_name()
                     matches = 0
+                    seen_pages = set()
                     for group, items in grouped_pages:
                         visible_items = [
                             (label, page)
@@ -2041,8 +2037,53 @@ def render_navigation():
                             expanded=bool(query or section_is_current),
                         ):
                             for label, page in visible_items:
-                                st.page_link(page, label=label, width="stretch")
+                                target = "#executive-dashboard" if page == "app.py" else "#" + Path(page).stem.lower()
+                                remap = {
+                                    "user_profile": "user-profile",
+                                    "customer_support": "customer-support",
+                                    "activity_log": "activity-log",
+                                    "access_admin": "access-admin",
+                                    "audit_surveillance": "audit-surveillance",
+                                    "calibration_log": "calibration-log",
+                                    "ctq_dashboard": "ctq-dashboard",
+                                    "document_status": "document-status",
+                                    "standards_library": "standards-library",
+                                    "learning_academy": "learning-academy",
+                                    "quality_tools": "quality-tools",
+                                    "management_executive_summary": "management-summary",
+                                    "executive_dashboard": "executive-dashboard",
+                                    "kpi_kra_register": "kpi-kra",
+                                    "daily_reports": "daily-reports",
+                                    "lessons_learned": "lessons-learned",
+                                    "ncr_tracker": "ncr-tracker",
+                                    "obs_tracker": "obs-tracker",
+                                    "itr_tracker": "itr-tracker",
+                                    "defect_rework_tracker": "defect-rework",
+                                    "concrete_tracker": "concrete-tracker",
+                                }
+                                target = "#" + remap.get(Path(page).stem.lower(), Path(page).stem.lower())
+                                st.markdown(f'<a class="nav-popover-link" href="{target}" target="_self">{html.escape(label)}</a>', unsafe_allow_html=True)
+                                seen_pages.add(page)
                                 matches += 1
+
+                    account_links = [
+                        ("My Profile", "pages/User_Profile.py"),
+                        ("Customer Support", "pages/Customer_Support.py"),
+                    ]
+                    if role := (st.session_state.get("auth", {}).get("role") or st.session_state.get("role") or "").strip().lower():
+                        if role in {"admin", "super_admin"}:
+                            account_links.extend([
+                                ("Activity Log", "pages/Activity_Log.py"),
+                                ("Access Admin", "pages/Access_Admin.py"),
+                            ])
+                    if account_links:
+                        with st.expander("●  Account and Administration", expanded=False):
+                            for label, page in account_links:
+                                if page not in seen_pages:
+                                    href = "#user-profile" if page.endswith("User_Profile.py") else "#customer-support" if page.endswith("Customer_Support.py") else "#activity-log" if page.endswith("Activity_Log.py") else "#access-admin"
+                                    st.markdown(f'<a class="nav-popover-link" href="{href}" target="_self">{html.escape(label)}</a>', unsafe_allow_html=True)
+                                    seen_pages.add(page)
+                                    matches += 1
                     if not matches:
                         st.caption("No pages match your search.")
         with tool_col:
@@ -2080,6 +2121,9 @@ def _record_page_access():
 
 def render_top_nav():
     render_header()
+
+    if st.session_state.get("single_page_mode"):
+        return
 
     pages = get_navigation_pages()
     grouped_pages = grouped_navigation_pages()
@@ -2131,9 +2175,25 @@ def render_top_nav():
     render_theme_selector()
     st.sidebar.markdown('<div class="side-menu-title">Menu</div>', unsafe_allow_html=True)
 
+    single_page_mode = bool(st.session_state.get("single_page_mode"))
+    single_page_navigation = st.session_state.get("single_page_navigation", {})
+    single_page_navigate = st.session_state.get("single_page_navigate")
+
     for group, items in grouped_pages:
         st.sidebar.markdown(f'<div class="side-nav-group">{html.escape(group)}</div>', unsafe_allow_html=True)
         for label, page in items:
+            if single_page_mode and callable(single_page_navigate):
+                page_key = "app" if page == "app.py" else Path(page).stem.lower()
+                target = single_page_navigation.get(page_key)
+                if target:
+                    st.sidebar.button(
+                        label,
+                        key=f"single_page_top_nav_{target}",
+                        on_click=single_page_navigate,
+                        args=(target,),
+                        width="stretch",
+                    )
+                    continue
             st.sidebar.page_link(page, label=label, width="stretch")
 
     st.sidebar.markdown(

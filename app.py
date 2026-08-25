@@ -126,6 +126,13 @@ SECTIONS = [
         "file": "CTQ_Dashboard.py",
     },
     {
+        "id": "quality-operations",
+        "label": "Quality Operations",
+        "icon": "🛠",
+        "group": "Engineering",
+        "file": "Quality_Operations.py",
+    },
+    {
         "id": "document-status",
         "label": "Document Status",
         "icon": "📄",
@@ -426,6 +433,25 @@ def render_scroll_nav(
 # SIDEBAR
 # ---------------------------------------------------------------------------
 
+def _set_active_section(section_id: str) -> None:
+    st.session_state["active_section"] = section_id
+    section_ids = [section["id"] for section in SECTIONS]
+    if section_id in section_ids:
+        st.session_state["section_navigation_slider"] = section_ids.index(section_id)
+
+
+def _set_active_section_from_slider(section_ids: list[str]) -> None:
+    selected_index = st.session_state.get("section_navigation_slider", 0)
+    if isinstance(selected_index, int) and 0 <= selected_index < len(section_ids):
+        st.session_state["active_section"] = section_ids[selected_index]
+
+
+def _section_target_map() -> dict[str, str]:
+    targets = {section["file"].rsplit(".", 1)[0].lower(): section["id"] for section in SECTIONS}
+    targets["app"] = "executive-dashboard"
+    return targets
+
+
 def render_shared_sidebar(is_admin: bool) -> None:
     user = st.session_state.get("auth") or {}
 
@@ -482,58 +508,21 @@ def render_shared_sidebar(is_admin: bool) -> None:
     if hasattr(utils, "render_theme_selector"):
         utils.render_theme_selector()
 
-    st.sidebar.markdown(
-        '<div class="side-menu-title">Jump to section</div>',
-        unsafe_allow_html=True,
-    )
+    return
 
-    for section in SECTIONS:
-        if section.get("admin_only") and not is_admin:
-            continue
-
-        st.sidebar.markdown(
-            f'<a class="side-nav-group" '
-            f'style="display:block;text-decoration:none;" '
-            f'href="#{html.escape(section["id"])}">'
-            f'{html.escape(section["icon"])} '
-            f'{html.escape(section["label"])}'
-            f'</a>',
-            unsafe_allow_html=True,
-        )
-
-
-# ---------------------------------------------------------------------------
-# GLOBAL PROJECT FILTER
-# ---------------------------------------------------------------------------
 
 def _silent_global_filter(data):
-    """Apply the application-level project selection to section data."""
-
     if not isinstance(data, dict):
         return data
-
-    project = st.session_state.get(
-        "global_project",
-        "All",
-    )
-
+    project = st.session_state.get("global_project", "All")
     if project == "All":
         return data
-
-    filtered = {}
-
-    for key, frame in data.items():
-        if (
-            isinstance(frame, pd.DataFrame)
-            and "Project" in frame.columns
-        ):
-            filtered[key] = frame[
-                frame["Project"] == project
-            ].copy()
-        else:
-            filtered[key] = frame
-
-    return filtered
+    return {
+        key: frame[frame["Project"] == project].copy()
+        if isinstance(frame, pd.DataFrame) and "Project" in frame.columns
+        else frame
+        for key, frame in data.items()
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -623,6 +612,7 @@ def run_section(section: dict) -> None:
                     f"The {section['label']} module "
                     f"was skipped: {exc}"
                 )
+                st.exception(exc)
 
         st.markdown(
             "</div>",
@@ -705,10 +695,10 @@ def main() -> None:
     if not auth.login():
         st.stop()
 
-    is_admin = (
-        str(auth.get_role() or "").lower()
-        == "admin"
-    )
+    is_admin = str(auth.get_role() or "").strip().lower() in {
+        "admin",
+        "super_admin",
+    }
 
     # ---------------------------------------------------------------
     # 3. Inject single-page enhancements.
@@ -719,6 +709,20 @@ def main() -> None:
     # ---------------------------------------------------------------
     # 4. Render shared sidebar.
     # ---------------------------------------------------------------
+
+    if "active_section" not in st.session_state:
+        st.session_state["active_section"] = "executive-dashboard"
+    section_by_id = {section["id"]: section for section in SECTIONS}
+    active_section = st.session_state.get("active_section", "executive-dashboard")
+    if active_section not in section_by_id or (
+        section_by_id[active_section].get("admin_only") and not is_admin
+    ):
+        active_section = "executive-dashboard"
+        st.session_state["active_section"] = active_section
+
+    st.session_state["single_page_mode"] = True
+    st.session_state["single_page_navigation"] = _section_target_map()
+    st.session_state["single_page_navigate"] = _set_active_section
 
     render_shared_sidebar(is_admin)
 
@@ -751,38 +755,52 @@ def main() -> None:
     render_enterprise_top_navigation()
 
     # ---------------------------------------------------------------
-    # 8. Render single-page section navigation.
-    #
-    # This is an additional jump navigation and does not replace the
-    # enterprise navigation.
-    # ---------------------------------------------------------------
-
-    render_scroll_nav(
-        SECTIONS,
-        is_admin,
-    )
-
-    # ---------------------------------------------------------------
-    # 9. Prevent individual sections from duplicating global chrome.
+    # 8. Prevent individual sections from duplicating global chrome.
     # ---------------------------------------------------------------
 
     patch_section_chrome()
 
     # ---------------------------------------------------------------
-    # 10. Render every section.
+    # 9. Render the selected section on this single application route.
     # ---------------------------------------------------------------
 
-    for section in SECTIONS:
-        if (
-            section.get("admin_only")
-            and not is_admin
-        ):
-            continue
+    visible_sections = [
+        section for section in SECTIONS
+        if not section.get("admin_only") or is_admin
+    ]
+    visible_ids = [section["id"] for section in visible_sections]
+    visible_labels = [section["label"] for section in visible_sections]
+    active_index = visible_ids.index(active_section)
+    with st.popover(
+        "Page navigation",
+        icon=":material/menu:",
+        key="main_page_navigation_popover",
+    ):
+        st.caption("Jump to section")
+        st.select_slider(
+            "Page navigation slider",
+            options=range(len(visible_sections)),
+            value=active_index,
+            format_func=lambda index: visible_labels[index],
+            key="section_navigation_slider",
+            on_change=_set_active_section_from_slider,
+            args=(visible_ids,),
+            label_visibility="collapsed",
+        )
+        for section in visible_sections:
+            st.button(
+                f'{section["icon"]}  {section["label"]}',
+                key=f'main_page_navigation_{section["id"]}',
+                on_click=_set_active_section,
+                args=(section["id"],),
+                type="primary" if active_section == section["id"] else "secondary",
+                width="stretch",
+            )
 
-        run_section(section)
+    run_section(section_by_id[active_section])
 
     # ---------------------------------------------------------------
-    # 11. Application footer.
+    # 10. Application footer.
     # ---------------------------------------------------------------
 
     st.sidebar.caption(
