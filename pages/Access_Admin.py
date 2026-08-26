@@ -17,7 +17,21 @@ st.set_page_config(
     layout="wide",
 )
 
+def render():
+    # ONLY admins can enter Access Admin.
+    if not auth.require_role(["admin", "super_admin"]):
+        st.error("🔒 Access denied")
+        st.warning(
+            "Only authorized administrators can manage user access."
+        )
+        return
 
+    st.title("Access Admin")
+
+    # Your existing user-management interface goes here.
+
+
+render()
 # ---------------------------------------------------------
 # GLOBAL UI
 # ---------------------------------------------------------
